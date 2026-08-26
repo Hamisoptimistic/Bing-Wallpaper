@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.71'
+$script:appVersion = [Version]'1.0.72'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2979,7 +2979,7 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 }
 # Restore saved interval
 $savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 1440 }
-$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { { $_ -eq 1 -or $_ -eq -1 } { 0 } 0 { 1 } 60 { 2 } 360 { 3 } default { 4 } }
+$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { 0 { 0 } { $_ -eq 1 -or $_ -eq -1 } { 1 } 60 { 2 } 360 { 3 } default { 4 } }
 
 # Populate target dropdown
 @('Desktop', 'Lock screen', 'Both') | ForEach-Object { [void]$SpotlightTargetBox.Items.Add($_) }
@@ -3033,6 +3033,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 

@@ -23,16 +23,19 @@ The standalone EXE embeds the PowerShell UI and works by itself. No additional f
 ## ✨ Features
 
 - 🪶 **Naive by design**: A straightforward PowerShell + WPF UI with minimal moving parts and no heavyweight application framework.
-- 🧠 **Ultra-low RAM footprint**: The app avoids a resident browser engine and can run only when you need to choose or apply a wallpaper.
+- 🧠 **Ultra-low RAM footprint**: The app avoids a resident browser engine and runs only when you need to choose or apply a wallpaper.
 - 🎨 **Clean Windows 11 UI**: Native dark title bar with rounded corners, a compact gallery, borderless inputs, and slim overlay scrollbars.
 - 🚀 **Zero-Console Standalone Launcher (`BingWallpaper.exe`)**: Launches immediately with zero terminal flash and the authentic high-resolution Bing icon.
+- ⏰ **Automated Background Spotlight (In-App Toggle)**: 1-click automatic wallpaper rotation that runs in the background even when the app is closed and persists across PC restarts.
+- 🤫 **100% Silent Execution**: Completely bypasses Windows 11 Windows Terminal pop-ups using a native hidden wrapper—guaranteed zero console flashes.
+- ⏱️ **Flexible Intervals**: Choose between **On Login**, **1 minute (test)**, **Hourly**, **Every 6h**, or **Daily**.
 - 🌍 **Global Country Support**: Browse wallpapers from 50+ international regions (United States, United Kingdom, Japan, Germany, France, India, Australia, etc.) with automatic clean title parsing.
 - 🖼️ **Live HD Gallery**: Visual interactive grid previewing recent Bing wallpapers.
 - 🔄 **Verified In-App Updates**: Checks GitHub Releases, shows release notes, and installs only an EXE matching the release's SHA-256 checksum.
 - 🖥️ **Multi-Target Personalization**: Apply wallpapers directly to **Desktop**, **Lock Screen**, or **Both**.
 - 📐 **Resolution Support**: Choose between **UHD (4K)**, **1080p Full HD**, or **1366×768**.
 - 💾 **Dedicated Downloader**: Apply directly from memory cache or save high-res files to your chosen folder.
-- ⏱️ **Unified Headless CLI (`-AutoApply`)**: One single unified script for both interactive GUI and background Task Scheduler automation.
+- ⏱️ **Unified Headless CLI (`-AutoApply`)**: One single unified script for interactive GUI, automation toggle, and background Task Scheduler automation.
 
 ---
 
@@ -75,22 +78,20 @@ WinDesktop-Bing-wallpapers/
 ### 1. Interactive GUI App
 Double-click **`BingWallpaper.exe`** (or the **`Bing Wallpaper`** desktop shortcut) to launch the GUI.
 
-### 2. Automated Daily Background Execution (Task Scheduler)
-To have Windows automatically update your wallpaper in the background every day without opening the UI:
+### 2. Automated Background Updates (Built-in Toggle)
+Inside the app, simply switch the **Auto** toggle to **ON**:
+- Select your preferred interval (**On Login**, **1 minute**, **Hourly**, **Every 6h**, or **Daily**).
+- Choose the target (**Desktop**, **Lock screen**, or **Both**).
+- The app automatically configures Windows Task Scheduler to run completely silently in the background with zero pop-ups, even when the UI is closed and after restarting your PC.
 
-1. Open **Task Scheduler** (`Win + R` ➔ `taskschd.msc`).
-2. Click **Create Basic Task…** and name it `Daily Bing Wallpaper`.
-3. Set Trigger to **Daily** (e.g., at 9:00 AM).
-4. Set Action to **Start a program**:
-   - **Program/script**: `powershell.exe`
-   - **Add arguments**:
-     ```text
-     -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Path\To\Bing-Wallpaper-UI.ps1" -AutoApply -Region "en-US" -Resolution "UHD"
-     ```
-5. Click **Finish**.
+### 3. Headless CLI / Manual Automation
+You can also run the script manually or from your own scripts using headless mode:
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "Bing-Wallpaper-UI.ps1" -AutoApply -Region "en-US" -Resolution "UHD" -Target "Both"
+```
 
-### 3. Re-create Desktop Shortcut
-To create or refresh the desktop shortcut:
+### 4. Re-create Desktop Shortcut
+To create or refresh the desktop shortcut and compile `BingWallpaper.exe`:
 ```powershell
 powershell -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.ps1"
 ```
