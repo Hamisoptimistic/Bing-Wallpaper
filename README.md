@@ -115,6 +115,37 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 ## Quick Comparison
 
+<style>
+  /* Style the comparison table header row */
+  table tr:first-child th {
+    background-color: #ff0000 !important;
+    color: #ffffff !important;
+    font-weight: bold !important;
+    text-align: center !important;
+  }
+
+  /* Style the Bing Wallpaper column (2nd column) */
+  table tr td:first-child + td {
+    background-color: #00cc44 !important;
+    color: #000000 !important;
+    font-weight: bold !important;
+    text-align: center !important;
+  }
+
+  /* Also style the header for the Bing Wallpaper column */
+  table tr:first-child th:nth-child(2) {
+    background-color: #ff0000 !important;
+    color: #ffffff !important;
+  }
+
+  /* Ensure text in the green column is visible in dark mode */
+  @media (prefers-color-scheme: dark) {
+    table tr td:first-child + td {
+      color: #000000 !important;
+    }
+  }
+</style>
+
 | Feature | **Bing Wallpaper** | Official Bing Wallpaper | Electron / WebView Apps |
 | :--- | :---: | :---: | :---: |
 | **Active Memory (RAM)** | **~50–60 MB** | ~80–120 MB | ~200 MB – 400 MB |
@@ -152,29 +183,3 @@ Whenever a new update is released, staying up to date is completely effortless:
 You can also run silent updates directly from scripts or the command line:
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "Bing-Wallpaper-UI.ps1" -AutoApply -Region "en-US" -Resolution "UHD" -Target "Both" -Style "Fit"
-```
-
----
-
-## Building from Source
-
-To compile the standalone `BingWallpaper.exe` launcher and create a desktop shortcut:
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.ps1"
-```
-
----
-
-## Security & Privacy
-
-- **Encrypted Connections**: Enforces TLS 1.2 and TLS 1.3 across all network requests.
-- **User-Space Only**: Runs with standard user privileges without administrative rights.
-- **Cryptographic Verification**: In-app updates verify cryptographic SHA-256 checksums before applying to prevent corrupted or unauthorized binaries.
-
----
-
-## License
-
-This project is open-source under the [MIT License](LICENSE).
-Wallpapers and imagery are copyrighted by Microsoft and their respective photographers.
