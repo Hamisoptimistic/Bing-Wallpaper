@@ -1,86 +1,365 @@
+<div align="center">
+
 # Bing Wallpaper for Windows
 
-A lightweight, native Windows utility that applies Bing's daily wallpapers without running a heavy background process all day.
+### A lightweight, native Windows utility for discovering, downloading, and applying Bing's daily wallpapers.
 
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](https://www.microsoft.com/windows)
-[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://microsoft.com/PowerShell)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+<br>
 
-![Bing Wallpaper preview](assets/Preview.png)
+<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
+  <img src="https://img.shields.io/badge/DOWNLOAD-BingWallpaper.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download BingWallpaper.exe">
+</a>
 
-## Download
+<br><br>
 
-<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1"><img src="https://img.shields.io/badge/Download-BingWallpaper.exe-107C10?style=for-the-badge&logo=windows&logoColor=white" alt="Download BingWallpaper.exe"></a>
+<img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows">
+<img src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white" alt="PowerShell">
+<img src="https://img.shields.io/badge/UI-Native%20WPF-68217A?style=flat-square" alt="WPF">
+<img src="https://img.shields.io/badge/License-MIT-2EA44F?style=flat-square" alt="MIT License">
 
-The standalone `BingWallpaper.exe` includes everything needed to run. No extra dependencies or installations are required.
+<br><br>
+
+<img src="assets/Preview.png" alt="Bing Wallpaper Preview" width="850">
+
+</div>
+
+---
+
+## Overview
+
+**Bing Wallpaper for Windows** brings Bing's daily photography directly to your desktop.
+
+Browse recent wallpapers, choose your preferred region and resolution, apply images to your Desktop or Lock Screen, and optionally automate wallpaper changes in the background.
+
+The application is designed to stay lightweight and use native Windows components rather than a heavyweight application framework.
 
 ---
 
 ## Features
 
-<<<<<<< HEAD
-- **Lightweight & Fast**: Built with PowerShell and native WPF for minimal resource usage.
-- **Silent Background Automation**: Set wallpaper updates on a schedule without terminal windows or pop-ups.
-- **Customizable Intervals**: Update on login, every minute, hourly, every 6 hours, or daily.
-- **Multi-Target Support**: Apply wallpapers to Desktop, Lock Screen, or both.
-- **Global Region Selection**: Browse daily wallpapers from over 50 international regions.
-- **Resolution Options**: Supports UHD (4K), 1080p Full HD, and 1366×768.
-- **Image Gallery & Downloader**: Preview recent daily wallpapers and save high-resolution copies locally.
-- **Verified Updates**: Built-in update checker that validates releases via SHA-256 checksums.
-=======
-- 🪶 **Native by design**: A straightforward PowerShell + WPF UI with minimal moving parts and no heavyweight application framework.
-- 🧠 **Ultra-low RAM footprint**: The app avoids a resident browser engine and runs only when you need to choose or apply a wallpaper.
-- 🎨 **Clean Windows 11 UI**: Native dark title bar with rounded corners, a compact gallery, borderless inputs, and slim overlay scrollbars.
-- 🚀 **Zero-Console Standalone Launcher (`BingWallpaper.exe`)**: Launches immediately with zero terminal flash and the authentic high-resolution Bing icon.
-- ⏰ **Automated Background Spotlight (In-App Toggle)**: 1-click automatic wallpaper rotation that runs in the background even when the app is closed and persists across PC restarts.
-- 🤫 **100% Silent Execution**: Completely bypasses Windows 11 Windows Terminal pop-ups using a native hidden wrapper—guaranteed zero console flashes.
-- ⏱️ **Flexible Intervals**: Choose between **On Login**, **1 minute (test)**, **Hourly**, **Every 6h**, or **Daily**.
-- 🌍 **Global Country Support**: Browse wallpapers from 50+ international regions (United States, United Kingdom, Japan, Germany, France, India, Australia, etc.) with automatic clean title parsing.
-- 🖼️ **Live HD Gallery**: Visual interactive grid previewing recent Bing wallpapers.
-- 🔄 **Verified In-App Updates**: Checks GitHub Releases, shows release notes, and installs only an EXE matching the release's SHA-256 checksum.
-- 🖥️ **Multi-Target Personalization**: Apply wallpapers directly to **Desktop**, **Lock Screen**, or **Both**.
-- 📐 **Resolution Support**: Choose between **UHD (4K)**, **1080p Full HD**, or **1366×768**.
-- 💾 **Dedicated Downloader**: Apply directly from memory cache or save high-res files to your chosen folder.
-- ⏱️ **Unified Headless CLI (`-AutoApply`)**: One single unified script for interactive GUI, automation toggle, and background Task Scheduler automation.
->>>>>>> 077ca693e884066bf2fa64e75bc1698ce0100d1b
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Native Windows Experience
+
+Built with **PowerShell + WPF**, using native Windows components for a lightweight desktop application.
+
+* Windows 10 and Windows 11 support
+* Modern Windows 11-inspired interface
+* Rounded corners and compact controls
+* Borderless inputs
+* Slim overlay scrollbars
+* No heavyweight browser engine
+
+</td>
+<td width="50%" valign="top">
+
+### Live Wallpaper Gallery
+
+Browse recent Bing wallpapers directly from the application.
+
+* Interactive wallpaper gallery
+* High-resolution previews
+* Recent daily wallpapers
+* Multiple international regions
+* Clean title parsing
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+
+### Automatic Background Updates
+
+Set your wallpaper to update automatically without keeping the application open.
+
+**Available intervals**
+
+* On Login
+* 1 minute — test mode
+* Hourly
+* Every 6 hours
+* Daily
+
+Updates are handled through Windows Task Scheduler and continue after system restarts.
+
+</td>
+<td width="50%" valign="top">
+
+### Flexible Personalization
+
+Choose exactly where and how your wallpaper should be applied.
+
+**Targets**
+
+* Desktop
+* Lock Screen
+* Both
+
+**Resolutions**
+
+* UHD / 4K
+* 1920 × 1080
+* 1366 × 768
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+
+### Download & Apply
+
+Use wallpapers directly from the local cache or save high-resolution copies for later use.
+
+* Apply directly
+* Save wallpapers locally
+* Select a destination folder
+* High-resolution downloads
+
+</td>
+<td width="50%" valign="top">
+
+### Verified Updates
+
+The built-in updater checks GitHub Releases and verifies downloaded updates before installation.
+
+* Release checking
+* Release notes
+* SHA-256 verification
+* Verified executable updates
+
+</td>
+</tr>
+</table>
 
 ---
 
-## Usage
+## Download
 
-### 1. Launching the App
-Run **`BingWallpaper.exe`** (or use the **`Bing Wallpaper`** desktop shortcut) to open the interface.
+<div align="center">
 
-### 2. Automatic Background Updates
-Inside the application, turn the **Auto** toggle to **ON**:
-- **Interval**: Choose between *On Login*, *1 minute*, *Hourly*, *Every 6h*, or *Daily*.
-- **Target**: Choose *Desktop*, *Lock screen*, or *Both*.
+<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
+  <img src="https://img.shields.io/badge/Download%20for%20Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
+</a>
 
-The app schedules the update via Windows Task Scheduler. It runs completely silently in the background, even when the application is closed and after computer restarts.
+<br><br>
 
-### 3. Command Line (Headless Mode)
-You can apply wallpapers directly from the terminal or scripts:
+**Standalone executable — no additional installation required.**
+
+</div>
+
+The standalone `BingWallpaper.exe` contains everything required to run the application.
+
+---
+
+## Getting Started
+
+### 1. Launch
+
+Run:
+
+```text
+BingWallpaper.exe
+```
+
+You can also launch the application using the **Bing Wallpaper** desktop shortcut.
+
+### 2. Choose Your Preferences
+
+Select:
+
+| Setting        | Available Options              |
+| -------------- | ------------------------------ |
+| **Region**     | 50+ international Bing regions |
+| **Resolution** | UHD, 1920×1080, 1366×768       |
+| **Target**     | Desktop, Lock Screen, Both     |
+
+### 3. Browse
+
+Use the gallery to explore recent Bing wallpapers and select the image you want.
+
+### 4. Apply or Save
+
+Apply the selected wallpaper directly or save a high-resolution copy to your preferred folder.
+
+---
+
+## Automatic Wallpaper
+
+Want Bing to change your wallpaper automatically?
+
+Turn **Auto** on inside the application and select your preferred interval and target.
+
+```text
+Automatic Wallpaper
+────────────────────────────────────────
+
+Interval     [ Daily ▾ ]
+Target       [ Desktop ▾ ]
+
+                         [ ON ]
+```
+
+The application creates a Windows Task Scheduler task that performs wallpaper updates silently in the background.
+
+The application does not need to remain open for scheduled updates to run.
+
+---
+
+## Supported Regions
+
+Bing Wallpaper supports **50+ international regions**, allowing you to browse wallpapers from different Bing markets.
+
+Examples include:
+
+```text
+United States     United Kingdom
+Japan             Germany
+France            India
+Australia         Canada
+```
+
+Additional regions supported by Bing can be selected through the application's region selector.
+
+---
+
+## Command Line
+
+The application includes a unified headless mode for automation and scripting.
+
+### Example
+
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "Bing-Wallpaper-UI.ps1" -AutoApply -Region "en-US" -Resolution "UHD" -Target "Both"
 ```
 
-### 4. Create / Repair Desktop Shortcut
+### Parameters
+
+| Parameter     | Description                                        |
+| ------------- | -------------------------------------------------- |
+| `-AutoApply`  | Runs wallpaper application without opening the GUI |
+| `-Region`     | Selects the Bing region, for example `en-US`       |
+| `-Resolution` | `UHD`, `1920x1080`, or `1366x768`                  |
+| `-Target`     | `Desktop`, `Lock screen`, or `Both`                |
+
+This makes the same application suitable for both interactive use and scheduled background execution.
+
+---
+
+## Desktop Shortcut
+
 To regenerate the standalone executable and desktop shortcut:
+
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.ps1"
 ```
 
 ---
 
+## Requirements
+
+<div align="center">
+
+| Requirement              | Version                                             |
+| ------------------------ | --------------------------------------------------- |
+| **Operating System**     | Windows 10 / Windows 11                             |
+| **PowerShell**           | 5.1+                                                |
+| **Internet**             | Required for retrieving Bing wallpapers and updates |
+| **Administrator Rights** | Not required                                        |
+
+</div>
+
+The standalone executable does not require additional application dependencies.
+
+---
+
 ## Security
 
-- **Secure Connections**: Uses TLS 1.2 / 1.3 for all downloads.
-- **No Administrator Rights Needed**: Operates entirely in user space.
-- **Safe File Handling**: Validates paths and input to prevent traversal issues.
+The application is designed to operate entirely within the user's account.
+
+* **Secure Connections** — TLS 1.2 / 1.3 is used for downloads.
+* **Update Verification** — Updates are validated using SHA-256 checksums.
+* **No Administrator Rights** — The application operates in user space.
+* **Safe File Handling** — Paths and input are validated to help prevent unsafe file operations.
+* **Silent Execution** — Background operations run without visible console windows.
+
+---
+
+## Architecture
+
+Bing Wallpaper uses a deliberately lightweight architecture:
+
+```text
+┌─────────────────────────────────────┐
+│          Bing Wallpaper UI          │
+│          PowerShell + WPF           │
+└──────────────────┬──────────────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+        ▼                     ▼
+   Bing Wallpaper        Local Cache
+       API                    │
+        │                     │
+        └──────────┬──────────┘
+                   │
+                   ▼
+          Windows Wallpaper
+             Management
+                   │
+                   ▼
+        Windows Task Scheduler
+          (Automatic Updates)
+```
+
+The GUI, headless mode, and background automation share the same underlying application rather than requiring separate utilities.
+
+---
+
+## Project Structure
+
+```text
+Bing-Wallpaper/
+│
+├── Bing-Wallpaper-UI.ps1
+├── BingWallpaper.exe
+├── assets/
+│   └── Preview.png
+├── scripts/
+│   └── Create-Bing-App-Shortcut.ps1
+├── LICENSE
+└── README.md
+```
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-Images downloaded through this utility are copyrighted by Microsoft and their respective photographers.
+This project is licensed under the **MIT License**.
+
+See [LICENSE](LICENSE) for the complete license text.
+
+Wallpaper images downloaded through this utility are copyrighted by Microsoft and their respective photographers.
+
+---
+
+<div align="center">
+
+### Bing Wallpaper for Windows
+
+**Beautiful wallpapers. Simple controls. Native Windows experience.**
+
+<br>
+
+<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper">
+  <img src="https://img.shields.io/badge/View%20Source%20Code-181717?style=for-the-badge&logo=github&logoColor=white" alt="View Source Code">
+</a>
+
+<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
+  <img src="https://img.shields.io/badge/Download-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download">
+</a>
+
+</div>
