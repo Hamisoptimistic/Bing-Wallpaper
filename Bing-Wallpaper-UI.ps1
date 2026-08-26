@@ -25,6 +25,12 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Windows.Forms # Kept only for the Folder Browser dialog
 Add-Type -AssemblyName System.Drawing
 
+# Application update metadata. Releases must publish both BingWallpaper.exe and
+# BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
+$script:appVersion = [Version]'1.0.0'
+$script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
+$script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
+
 # ============================================================
 # WINDOWS 11 LOCK SCREEN
 # ============================================================
@@ -1035,6 +1041,7 @@ if ($AutoApply) {
             <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
             
             <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
                 <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
                 <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
             </StackPanel>
@@ -1209,6 +1216,7 @@ $RefreshBtn = $window.FindName('RefreshBtn')
 $RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $StatusText = $window.FindName('StatusText')
+$CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
 
@@ -1563,6 +1571,184 @@ function Set-TransientStatus {
             $script:statusResetTimer.Stop()
         })
     $script:statusResetTimer.Start()
+}
+
+function Get-ReleaseVersion {
+    param(
+        [string]$TagName,
+        [string]$ReleaseName = '',
+        [string]$ReleaseBody = ''
+    )
+
+    # 1. Try TagName (e.g. v1.0.0, 1.0.0)
+    $cleanTag = ($TagName -replace '^[vV]', '').Trim()
+    if ($cleanTag -match '^\d+(\.\d+){1,3}$') {
+        return [Version]$cleanTag
+    }
+
+    # 2. Try ReleaseName (e.g. "Bing Wallpaper v1.0.0" or "Bing Wallpaper 1.0.0")
+    if ($ReleaseName -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+        $v = $Matches[1]
+        if ($v -notmatch '\.') { $v = "$v.0" }
+        if ($v -match '^\d+(\.\d+){1,3}$') {
+            return [Version]$v
+        }
+    }
+
+    # 3. Try ReleaseBody
+    if ($ReleaseBody -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+        $v = $Matches[1]
+        if ($v -notmatch '\.') { $v = "$v.0" }
+        if ($v -match '^\d+(\.\d+){1,3}$') {
+            return [Version]$v
+        }
+    }
+
+    throw "Release tag '$TagName' is not a supported version number. Releases should use tags such as v1.2.3."
+}
+
+function Invoke-GitHubApiJson([string]$Uri) {
+    try {
+        return Invoke-RestMethod -Uri $Uri -Headers @{ 'User-Agent' = 'BingWallpaper-Updater' } -UseBasicParsing -ErrorAction Stop
+    }
+    catch {
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+        return $wc.DownloadString($Uri) | ConvertFrom-Json
+    }
+}
+
+function Start-VerifiedUpdate {
+    $CheckUpdateBtn.IsEnabled = $false
+    $StatusText.Foreground = $statusDefaultBrush
+    $StatusText.Text = 'Checking for updates...'
+    Update-UI
+
+    try {
+        $release = $null
+        $latestVersion = $null
+
+        # First attempt: fetch /releases/latest
+        try {
+            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
+            $latestRel = Invoke-GitHubApiJson -Uri $releaseUri
+            $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
+            $release = $latestRel
+        }
+        catch {
+            # Fallback: scan recent releases to locate the newest release with a valid semantic version
+            $allReleasesUri = "https://api.github.com/repos/$($script:updateRepository)/releases?per_page=10"
+            $allReleases = Invoke-GitHubApiJson -Uri $allReleasesUri
+            foreach ($rel in $allReleases) {
+                try {
+                    $ver = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
+                    if ($null -eq $latestVersion -or $ver -gt $latestVersion) {
+                        $latestVersion = $ver
+                        $release = $rel
+                    }
+                }
+                catch {}
+            }
+            if ($null -eq $latestVersion -or $null -eq $release) {
+                throw "No releases with a valid version tag (e.g. v1.0.0) were found in repository '$($script:updateRepository)'."
+            }
+        }
+
+        if ($latestVersion -le $script:appVersion) {
+            [System.Windows.MessageBox]::Show("You already have the latest version ($($script:appVersion)).", 'Bing Wallpaper', 'OK', 'Information') | Out-Null
+            $StatusText.Text = 'You are up to date.'
+            return
+        }
+
+        $releaseNotes = if ($release.body) { $release.body.Trim() } else { 'No release notes were provided.' }
+        if ($releaseNotes.Length -gt 1800) { $releaseNotes = $releaseNotes.Substring(0, 1800) + "`n`n(Release notes shortened.)" }
+        $confirmation = [System.Windows.MessageBox]::Show(
+            "Version $latestVersion is available.`n`n$releaseNotes`n`nDownload, verify, and restart now?",
+            'Bing Wallpaper update', 'YesNo', 'Information')
+        if ($confirmation -ne 'Yes') {
+            $StatusText.Text = 'Update cancelled.'
+            return
+        }
+
+        $exeAsset = $release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe' } | Select-Object -First 1
+        $checksumAsset = $release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe.sha256' } | Select-Object -First 1
+        if (-not $exeAsset) {
+            throw 'This release does not include BingWallpaper.exe.'
+        }
+
+        $StatusText.Text = "Downloading version $latestVersion..."
+        Update-UI
+        $downloadPath = Join-Path $env:TEMP "BingWallpaper-$latestVersion-$([Guid]::NewGuid().ToString('N')).exe"
+        $client.DownloadFile($exeAsset.browser_download_url, $downloadPath)
+
+        # Extract SHA-256 hash from checksum file or release asset digest
+        $expectedHash = $null
+        if ($checksumAsset) {
+            $checksumText = $client.DownloadString($checksumAsset.browser_download_url)
+            $expectedHash = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b').Value.ToUpperInvariant()
+        }
+        elseif ($exeAsset.digest -and $exeAsset.digest -match '(?i)sha256:([a-f0-9]{64})') {
+            $expectedHash = $Matches[1].ToUpperInvariant()
+        }
+
+        if ($expectedHash) {
+            $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
+            if ($actualHash -ne $expectedHash) {
+                Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+                throw 'The downloaded update did not match the published SHA-256 checksum.'
+            }
+        }
+
+        if ($script:updatePublisherThumbprint) {
+            $signature = Get-AuthenticodeSignature -FilePath $downloadPath
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $script:updatePublisherThumbprint) {
+                Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+                throw 'The update does not have the expected valid Authenticode signature.'
+            }
+        }
+
+        $installedExe = Join-Path ([Environment]::CurrentDirectory) 'BingWallpaper.exe'
+        if (-not (Test-Path -LiteralPath $installedExe -PathType Leaf)) {
+            throw 'The installed BingWallpaper.exe could not be found. Run updates from the installed app, not the source script.'
+        }
+
+        $updaterPath = Join-Path $env:TEMP "BingWallpaper-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
+        $updaterScript = @'
+param(
+    [int]$ParentProcessId,
+    [string]$DownloadedExe,
+    [string]$InstalledExe
+)
+
+try { (Get-Process -Id $ParentProcessId -ErrorAction Stop).WaitForExit() } catch {}
+for ($attempt = 0; $attempt -lt 10; $attempt++) {
+    try {
+        Copy-Item -LiteralPath $DownloadedExe -Destination $InstalledExe -Force -ErrorAction Stop
+        Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
+        Start-Process -FilePath $InstalledExe -WorkingDirectory (Split-Path -Parent $InstalledExe)
+        break
+    }
+    catch {
+        Start-Sleep -Seconds 1
+    }
+}
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+'@
+        Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8
+        $updaterArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterPath`" -ParentProcessId $PID -DownloadedExe `"$downloadPath`" -InstalledExe `"$installedExe`""
+        Start-Process -FilePath "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $updaterArgs -WindowStyle Hidden
+
+        $StatusText.Text = 'Verified update downloaded. Restarting...'
+        $window.Close()
+    }
+    catch {
+        $StatusText.Foreground = $statusErrorBrush
+        $StatusText.Text = "Update failed: $($_.Exception.Message)"
+    }
+    finally {
+        if ($client) { $client.Dispose() }
+        $CheckUpdateBtn.IsEnabled = $true
+    }
 }
 
 function Show-GalleryCard {
@@ -1929,6 +2115,8 @@ $DownloadBtn.Add_Click({
             $DownloadBtn.IsEnabled = $true
         }
     })
+
+$CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 
 # Auto-trigger United States on load
 $usItem = $RegionBox.Items | Where-Object { $_.Tag -eq 'en-US' } | Select-Object -First 1

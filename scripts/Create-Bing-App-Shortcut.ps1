@@ -110,7 +110,11 @@ namespace BingWallpaperLauncher
 
     if ($proc.ExitCode -eq 0 -and (Test-Path $exePath)) {
         $hasExe = $true
+        $checksumPath = Join-Path $rootFolder 'BingWallpaper.exe.sha256'
+        $checksum = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Set-Content -LiteralPath $checksumPath -Value "$checksum  BingWallpaper.exe" -Encoding ASCII
         Write-Output "    Created $exePath (with embedded authentic icon)"
+        Write-Output "    Created $checksumPath"
     }
 }
 

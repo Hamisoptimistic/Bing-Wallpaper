@@ -28,10 +28,22 @@ The standalone EXE embeds the PowerShell UI and works by itself. No additional f
 - 🚀 **Zero-Console Standalone Launcher (`BingWallpaper.exe`)**: Launches immediately with zero terminal flash and the authentic high-resolution Bing icon.
 - 🌍 **Global Country Support**: Browse wallpapers from 50+ international regions (United States, United Kingdom, Japan, Germany, France, India, Australia, etc.) with automatic clean title parsing.
 - 🖼️ **Live HD Gallery**: Visual interactive grid previewing recent Bing wallpapers.
+- 🔄 **Verified In-App Updates**: Checks GitHub Releases, shows release notes, and installs only an EXE matching the release's SHA-256 checksum.
 - 🖥️ **Multi-Target Personalization**: Apply wallpapers directly to **Desktop**, **Lock Screen**, or **Both**.
 - 📐 **Resolution Support**: Choose between **UHD (4K)**, **1080p Full HD**, or **1366×768**.
 - 💾 **Dedicated Downloader**: Apply directly from memory cache or save high-res files to your chosen folder.
 - ⏱️ **Unified Headless CLI (`-AutoApply`)**: One single unified script for both interactive GUI and background Task Scheduler automation.
+
+---
+
+## 🔐 Publishing a verified update
+
+The **Check for updates** button reads the repository's latest GitHub Release. To publish an update it can accept, use a versioned tag such as `v1.0.1`, then upload these two release assets with exactly these names:
+
+- `BingWallpaper.exe`
+- `BingWallpaper.exe.sha256`
+
+Run `scripts\Create-Bing-App-Shortcut.ps1` after updating `$script:appVersion` in `Bing-Wallpaper-UI.ps1`; it builds the EXE and generates the matching checksum file. Upload both files to the same GitHub Release. For Authenticode enforcement, sign the EXE before generating its checksum, then set `$script:updatePublisherThumbprint` to the signing certificate's thumbprint before building the next version.
 
 ---
 

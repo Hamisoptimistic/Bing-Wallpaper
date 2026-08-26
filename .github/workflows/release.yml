@@ -20,28 +20,52 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Compile BingWallpaper.exe
+      - name: Compile BingWallpaper.exe and Checksum
         shell: powershell
         run: |
           powershell -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
           if (-not (Test-Path .\BingWallpaper.exe)) {
             throw "BingWallpaper.exe failed to compile"
           }
+          if (-not (Test-Path .\BingWallpaper.exe.sha256)) {
+            $hash = (Get-FileHash -LiteralPath .\BingWallpaper.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+            Set-Content -LiteralPath .\BingWallpaper.exe.sha256 -Value "$hash  BingWallpaper.exe" -Encoding ASCII
+          }
+
+      - name: Determine Version & Tag
+        id: get_version
+        shell: powershell
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $tag = $env:GITHUB_REF -replace 'refs/tags/', ''
+          } else {
+            $uiContent = Get-Content -LiteralPath .\Bing-Wallpaper-UI.ps1 -Raw
+            if ($uiContent -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
+              $tag = "v$($Matches[1])"
+            } else {
+              $tag = "v1.0.0"
+            }
+          }
+          Write-Output "Release Tag: $tag"
+          "tag_name=$tag" >> $env:GITHUB_OUTPUT
 
       - name: Create or Update Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: "Bing Wallpaper - Latest Build"
+          tag_name: ${{ steps.get_version.outputs.tag_name }}
+          name: "Bing Wallpaper ${{ steps.get_version.outputs.tag_name }}"
           body: |
-            ### 🚀 Automated Latest Build
-            Automatically built from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
+            ### 🚀 Bing Wallpaper Release (${{ steps.get_version.outputs.tag_name }})
+            Built from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
 
-            #### 📦 Download
-            - **[BingWallpaper.exe](https://github.com/${{ github.repository }}/releases/download/latest/BingWallpaper.exe)** (Zero-console standalone launcher)
+            #### 📦 Downloads
+            - **[BingWallpaper.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag_name }}/BingWallpaper.exe)** (Zero-console standalone launcher)
+            - **[BingWallpaper.exe.sha256](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag_name }}/BingWallpaper.exe.sha256)** (SHA-256 Checksum)
           draft: false
           prerelease: false
           files: |
             BingWallpaper.exe
+            BingWallpaper.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
