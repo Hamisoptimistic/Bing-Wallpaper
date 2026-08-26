@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.58'
+$script:appVersion = [Version]'1.0.60'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2631,14 +2631,8 @@ $DownloadBtn.Add_Click({
 
 $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 
-
-# Auto-select region: use saved preference if the user already chose one,
-# otherwise detect from Windows locale (first-launch experience).
-$initialRegionCode = if ($script:appSettings.Region -and $script:appSettings.Region -ne 'auto') {
-    $script:appSettings.Region
-} else {
-    Get-DetectedRegionCode
-}
+# Auto-select region: always detect from Windows locale on every launch
+$initialRegionCode = Get-DetectedRegionCode
 $detectedItem = $RegionBox.Items | Where-Object { $_.Tag -eq $initialRegionCode } | Select-Object -First 1
 if ($detectedItem) { $RegionBox.SelectedItem = $detectedItem }
 
@@ -2661,6 +2655,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
