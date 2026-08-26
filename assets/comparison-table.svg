@@ -88,7 +88,7 @@
   </g>
 
   <!-- Row 1: Active Memory -->
-  <text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
+<text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
   <g>
     <defs>
       <!-- High Contrast Text Drop Shadow for Maximum Readability -->
@@ -138,7 +138,8 @@
       stroke-width="2" 
     />
   </g>
-  <text x="365" y="102" text-anchor="middle" class="cell-winner">~50–60 MB</text>
+  <!-- Crisp Pure White Text -->
+  <text x="365" y="102" text-anchor="middle" filter="url(#dark-text-shadow)" style="fill: #ffffff; font-weight: 800; font-size: 12.5px;">~50–60 MB</text>
   <text x="595" y="102" text-anchor="middle" class="cell-value">~80–120 MB</text>
   <text x="825" y="102" text-anchor="middle" class="cell-value">~200 MB – 400 MB</text>
 
