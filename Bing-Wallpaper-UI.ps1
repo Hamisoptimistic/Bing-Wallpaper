@@ -719,6 +719,35 @@ if ($AutoApply) {
             </Setter>
         </Style>
 
+        <Style x:Key="TrayToggle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#D6D6D6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Name="SwitchTrack" Width="38" Height="22" CornerRadius="11" Background="#3A3A3A" BorderBrush="#666666" BorderThickness="1">
+                                <Ellipse Name="SwitchThumb" Width="16" Height="16" Fill="#C8C8C8" HorizontalAlignment="Left" Margin="2"/>
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="SwitchTrack" Property="Background" Value="#0078D4"/>
+                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#38A9F0"/>
+                                <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="SwitchThumb" Property="Fill" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#8CCFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Modern Windows 11 ComboBox Style (Borderless Matte) -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#2A2A2A"/>
@@ -972,6 +1001,7 @@ if ($AutoApply) {
             
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
+                <CheckBox Name="MinimizeToTrayToggle" Style="{StaticResource TrayToggle}" Content="Keep in tray" VerticalAlignment="Center" Margin="0,0,18,0" ToolTip="Hide the window in the notification area when you close it" />
                 <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
             </StackPanel>
         </Grid>
@@ -1048,10 +1078,12 @@ $iconCandidates = @(
     (Join-Path $scriptDir 'bing.ico')
 )
 
+$script:taskbarIconPath = $null
 foreach ($iconPath in $iconCandidates) {
     if (Test-Path -LiteralPath $iconPath) {
         try {
             $window.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new((Resolve-Path -LiteralPath $iconPath).Path))
+            $script:taskbarIconPath = (Resolve-Path -LiteralPath $iconPath).Path
             break
         }
         catch {}
@@ -1106,6 +1138,7 @@ function Load-Settings {
         Resolution = "1920x1080"
         Target     = "Both"
         SaveFolder = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        MinimizeToTray = $false
     }
 }
 
@@ -1116,6 +1149,7 @@ function Save-Settings {
             Resolution = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
             Target     = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
             SaveFolder = $FolderBox.Text
+            MinimizeToTray = [bool]$MinimizeToTrayToggle.IsChecked
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -1138,7 +1172,57 @@ $RefreshBtn = $window.FindName('RefreshBtn')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $StatusText = $window.FindName('StatusText')
 $DownloadBtn = $window.FindName('DownloadBtn')
+$MinimizeToTrayToggle = $window.FindName('MinimizeToTrayToggle')
 $UpdateBtn = $window.FindName('UpdateBtn')
+
+if ($script:appSettings.MinimizeToTray -eq $true) {
+    $MinimizeToTrayToggle.IsChecked = $true
+}
+
+# Keep the window available from the notification area when requested.
+$script:trayExitRequested = $false
+$script:trayIcon = $null
+$trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
+$restoreItem = $trayMenu.Items.Add('Open Bing Wallpaper')
+$exitItem = $trayMenu.Items.Add('Exit')
+
+$showMainWindow = {
+    $window.ShowInTaskbar = $true
+    $window.Show()
+    $window.WindowState = [System.Windows.WindowState]::Normal
+    $window.Activate()
+}
+
+$restoreItem.Add_Click($showMainWindow)
+$exitItem.Add_Click({
+        $script:trayExitRequested = $true
+        if ($script:trayIcon) {
+            $script:trayIcon.Visible = $false
+            $script:trayIcon.Dispose()
+        }
+        $window.Close()
+    })
+
+if ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
+    $script:trayIcon = New-Object System.Windows.Forms.NotifyIcon
+    $script:trayIcon.Icon = New-Object System.Drawing.Icon($script:taskbarIconPath)
+    $script:trayIcon.Text = 'Bing Wallpaper'
+    $script:trayIcon.ContextMenuStrip = $trayMenu
+    $script:trayIcon.Add_DoubleClick($showMainWindow)
+    $script:trayIcon.Visible = $true
+}
+
+$window.Add_Closing({
+        param($sender, $e)
+        if (-not $script:trayExitRequested -and $MinimizeToTrayToggle.IsChecked -eq $true) {
+            $e.Cancel = $true
+            $window.Hide()
+            $window.ShowInTaskbar = $false
+            if ($script:trayIcon) {
+                $script:trayIcon.ShowBalloonTip(1500, 'Bing Wallpaper', 'The app is still running in the notification area.', [System.Windows.Forms.ToolTipIcon]::Info)
+            }
+        }
+    })
 
 # Helper to force UI redraw during blocking network calls
 function Update-UI {
@@ -1248,6 +1332,8 @@ $RegionBox.Add_SelectionChanged($saveHandler)
 $ResolutionBox.Add_SelectionChanged($saveHandler)
 $TargetBox.Add_SelectionChanged($saveHandler)
 $FolderBox.Add_TextChanged($saveHandler)
+$MinimizeToTrayToggle.Add_Checked($saveHandler)
+$MinimizeToTrayToggle.Add_Unchecked($saveHandler)
 
 # Browse Folder Logic
 # Browse Folder Logic (modern Windows 11 dark-mode folder picker)
