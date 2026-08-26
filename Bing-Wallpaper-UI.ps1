@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.47'
+$script:appVersion = [Version]'1.0.48'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1863,95 +1863,63 @@ function Start-BackgroundUpdateCheck {
     try {
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-        
-        function Parse-VersionString($text) {
-            if (-not $text) { return $null }
-            $clean = ($text -replace '^[vV]', '').Trim()
-            if ($clean -match '^\d+(\.\d+){1,3}$') {
-                return [Version]$clean
-            }
-            if ($text -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                $v = $Matches[1]
-                if ($v -notmatch '\.') { $v = "$v.0" }
-                if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
-            }
-            return $null
-        }
 
-        $task = $wc.DownloadStringTaskAsync([System.Uri]::new("https://api.github.com/repos/$($script:updateRepository)/releases/latest"))
+        $wc.Add_DownloadStringCompleted({
+            param($sender, $e)
+            try {
+                if (-not $e.Error -and $e.Result) {
+                    $json = $e.Result | ConvertFrom-Json
+                    $v = $null
+                    try {
+                        $v = Get-ReleaseVersion -TagName $json.tag_name -ReleaseName $json.name -ReleaseBody $json.body
+                    } catch {}
 
-        $script:bgPollTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:bgPollTimer.Interval = [TimeSpan]::FromMilliseconds(100)
-        $script:bgPollTimer.Add_Tick({
-            if ($task.IsCompleted) {
-                $script:bgPollTimer.Stop()
-                try {
-                    $highestVer = $null
-                    if (-not $task.IsFaulted -and $task.Result) {
-                        $jsonLatest = $task.Result | ConvertFrom-Json
-                        $v = Parse-VersionString $jsonLatest.tag_name
-                        if (-not $v) { $v = Parse-VersionString $jsonLatest.name }
-                        if (-not $v) { $v = Parse-VersionString $jsonLatest.body }
-                        if ($v) { $highestVer = $v }
-                    }
-
-                    if (-not $highestVer) {
-                        $wc2 = New-Object System.Net.WebClient
-                        $wc2.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-                        $task2 = $wc2.DownloadStringTaskAsync([System.Uri]::new("https://api.github.com/repos/$($script:updateRepository)/releases?per_page=10"))
-                        
-                        $script:bgPollTimer2 = New-Object System.Windows.Threading.DispatcherTimer
-                        $script:bgPollTimer2.Interval = [TimeSpan]::FromMilliseconds(100)
-                        $script:bgPollTimer2.Add_Tick({
-                            if ($task2.IsCompleted) {
-                                $script:bgPollTimer2.Stop()
-                                try {
-                                    if (-not $task2.IsFaulted -and $task2.Result) {
-                                        $allReleases = $task2.Result | ConvertFrom-Json
-                                        foreach ($rel in $allReleases) {
-                                            $v = Parse-VersionString $rel.tag_name
-                                            if (-not $v) { $v = Parse-VersionString $rel.name }
-                                            if (-not $v) { $v = Parse-VersionString $rel.body }
-                                            if ($v -and ($null -eq $highestVer -or $v -gt $highestVer)) {
-                                                $highestVer = $v
-                                            }
-                                        }
-                                    }
-                                    if ($highestVer -and ($highestVer -gt $script:appVersion)) {
-                                        Set-UpdateButtonState -HasUpdate $true -NewVersion $highestVer
-                                    } else {
-                                        Set-UpdateButtonState -HasUpdate $false
-                                    }
-                                }
-                                catch {
-                                    Set-UpdateButtonState -HasUpdate $false
-                                }
-                                finally {
-                                    $wc2.Dispose()
-                                    [BingWallpaperNative]::FlushMemory()
-                                }
-                            }
-                        })
-                        $script:bgPollTimer2.Start()
+                    if ($v -and ($v -gt $script:appVersion)) {
+                        Set-UpdateButtonState -HasUpdate $true -NewVersion $v
                         return
                     }
-
-                    if ($highestVer -and ($highestVer -gt $script:appVersion)) {
-                        Set-UpdateButtonState -HasUpdate $true -NewVersion $highestVer
-                    } else {
-                        Set-UpdateButtonState -HasUpdate $false
+                }
+                
+                # Fallback to recent releases if /latest had unversioned tag
+                $wc2 = New-Object System.Net.WebClient
+                $wc2.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+                $wc2.Add_DownloadStringCompleted({
+                    param($s2, $e2)
+                    try {
+                        if (-not $e2.Error -and $e2.Result) {
+                            $all = $e2.Result | ConvertFrom-Json
+                            $highest = $null
+                            foreach ($rel in $all) {
+                                try {
+                                    $ver = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
+                                    if ($null -eq $highest -or $ver -gt $highest) { $highest = $ver }
+                                } catch {}
+                            }
+                            if ($highest -and ($highest -gt $script:appVersion)) {
+                                Set-UpdateButtonState -HasUpdate $true -NewVersion $highest
+                                return
+                            }
+                        }
+                    } catch {}
+                    finally {
+                        $s2.Dispose()
+                        [BingWallpaperNative]::FlushMemory()
                     }
-                }
-                catch {
                     Set-UpdateButtonState -HasUpdate $false
-                }
-                finally {
-                    $wc.Dispose()
-                    [BingWallpaperNative]::FlushMemory()
-                }
+                })
+                $wc2.DownloadStringAsync([System.Uri]::new("https://api.github.com/repos/$($script:updateRepository)/releases?per_page=10"))
+                return
+            }
+            catch {
+                Set-UpdateButtonState -HasUpdate $false
+            }
+            finally {
+                $sender.Dispose()
+                [BingWallpaperNative]::FlushMemory()
             }
         })
-        $script:bgPollTimer.Start()
+
+        $wc.DownloadStringAsync([System.Uri]::new("https://api.github.com/repos/$($script:updateRepository)/releases/latest"))
     }
     catch {}
 }
@@ -2494,6 +2462,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
