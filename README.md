@@ -10,6 +10,8 @@ This project keeps the UI intentionally simple: one PowerShell script, a small W
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Admin](https://img.shields.io/badge/privileges-No%20Admin%20Required-brightgreen.svg)](#)
 
+![Bing Wallpaper preview](assets/Preview.png)
+
 ---
 
 ## ✨ Features
