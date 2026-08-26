@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.55'
+$script:appVersion = [Version]'1.0.56'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1483,6 +1483,26 @@ function Get-SelectedRegionCode {
     return 'en-US'
 }
 
+# Auto-detect the user's region from Windows locale (used only on first launch)
+function Get-DetectedRegionCode {
+    try {
+        # Windows stores the user's locale as a BCP-47 tag e.g. en-GB, de-DE, zh-CN
+        $culture = [System.Globalization.CultureInfo]::CurrentUICulture
+        $tag = $culture.Name   # e.g. "en-GB"
+
+        # Exact match first
+        $match = $countries | Where-Object { $_.Code -eq $tag } | Select-Object -First 1
+        if ($match) { return $match.Code }
+
+        # Language-only fallback (e.g. "fr" -> picks fr-FR, "en" -> picks en-US)
+        $lang = $culture.TwoLetterISOLanguageName
+        $match = $countries | Where-Object { $_.Code -like "$lang-*" } | Select-Object -First 1
+        if ($match) { return $match.Code }
+    }
+    catch {}
+    return 'en-US'   # safe worldwide fallback
+}
+
 @('4K', '2K', '1080p', '720p') | ForEach-Object { 
     [void]$ResolutionBox.Items.Add($_)
     if ($_ -eq $script:appSettings.Resolution -or 
@@ -2608,9 +2628,16 @@ $DownloadBtn.Add_Click({
 
 $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 
-# Auto-trigger United States on load
-$usItem = $RegionBox.Items | Where-Object { $_.Tag -eq 'en-US' } | Select-Object -First 1
-if ($usItem) { $RegionBox.SelectedItem = $usItem }
+
+# Auto-select region: use saved preference if the user already chose one,
+# otherwise detect from Windows locale (first-launch experience).
+$initialRegionCode = if ($script:appSettings.Region -and $script:appSettings.Region -ne 'auto') {
+    $script:appSettings.Region
+} else {
+    Get-DetectedRegionCode
+}
+$detectedItem = $RegionBox.Items | Where-Object { $_.Tag -eq $initialRegionCode } | Select-Object -First 1
+if ($detectedItem) { $RegionBox.SelectedItem = $detectedItem }
 
 # Bind refresh events after the initial selection so startup never loads the gallery twice.
 $RegionBox.Add_SelectionChanged({ Load-Gallery })
@@ -2631,6 +2658,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
