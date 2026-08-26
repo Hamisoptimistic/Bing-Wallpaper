@@ -980,7 +980,21 @@ if ($AutoApply) {
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <ComboBox Name="RegionBox" FontSize="13.5"/>
-                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Content="&#xE149;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Grid.Column="1" Width="38" Height="38" Margin="8,0,0,0" FontSize="13" ToolTip="Refresh Gallery"/>
+                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Grid.Column="1" Width="38" Height="38" Margin="8,0,0,0" ToolTip="Refresh Gallery">
+                        <Viewbox Width="19" Height="19" Margin="0,2,0,0">
+                            <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+                                <Canvas.RenderTransform>
+                                <RotateTransform/>
+                                </Canvas.RenderTransform>
+                                <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M18.5,5 V10 H13.5"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
                 </Grid>
             </StackPanel>
             
@@ -1192,6 +1206,7 @@ $TargetBox = $window.FindName('TargetBox')
 $StyleBox = $window.FindName('StyleBox')
 $FolderBox = $window.FindName('FolderBox')
 $RefreshBtn = $window.FindName('RefreshBtn')
+$RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $StatusText = $window.FindName('StatusText')
 $DownloadBtn = $window.FindName('DownloadBtn')
@@ -1201,6 +1216,40 @@ $UpdateBtn = $window.FindName('UpdateBtn')
 function Update-UI {
     $dispatcher = [System.Windows.Threading.Dispatcher]::CurrentDispatcher
     $dispatcher.Invoke([Action] {}, [System.Windows.Threading.DispatcherPriority]::Background)
+}
+
+# Run the visual feedback before the synchronous gallery work starts. WPF owns
+# the animation clock, so this needs no timer, polling loop, or background worker.
+function Start-RefreshAnimation {
+    if (-not $RefreshIcon) { return }
+
+    $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
+    $spin = New-Object System.Windows.Media.Animation.DoubleAnimation
+    $spin.From = 0
+    $spin.To = 360
+    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(560))
+    $spin.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
+    [System.Windows.Media.Animation.Timeline]::SetDesiredFrameRate($spin, 60)
+    $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin, [System.Windows.Media.Animation.HandoffBehavior]::SnapshotAndReplace)
+
+    # PowerShell does not consistently deliver WPF animation Completed callbacks.
+    # Use one dispatcher tick to start the reload after the visual feedback ends.
+    $script:refreshDelayTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(560)
+    $script:refreshDelayTimer.Add_Tick({
+            $script:refreshDelayTimer.Stop()
+            $script:refreshDelayTimer = $null
+            $finishedRotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
+            $finishedRotation.Angle = 0
+            try {
+                Load-Gallery
+            }
+            finally {
+                $script:isRefreshAnimating = $false
+                $RefreshBtn.IsEnabled = $true
+            }
+        })
+    $script:refreshDelayTimer.Start()
 }
 
 # Populate Settings (Alphabetically sorted, Auto pinned at top)
@@ -1516,6 +1565,28 @@ function Set-TransientStatus {
     $script:statusResetTimer.Start()
 }
 
+function Show-GalleryCard {
+    param([System.Windows.Controls.Border]$Card)
+
+    # Native WPF transforms keep card arrivals smooth without layout work,
+    # timers, or a background rendering loop.
+    $Card.Opacity = 0
+    $translate = New-Object System.Windows.Media.TranslateTransform(0, 12)
+    $Card.RenderTransform = $translate
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(320))
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $duration)
+    $fade.EasingFunction = New-Object System.Windows.Media.Animation.SineEase
+    $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+
+    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(12, 0, $duration)
+    $slide.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+    $slide.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+
+    $Card.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
+    $translate.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $slide)
+}
+
 # Load Gallery Function
 function Load-Gallery {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -1774,6 +1845,7 @@ function Load-Gallery {
                 })
 
             $GalleryPanel.Children.Add($card)
+            Show-GalleryCard -Card $card
 
             Update-UI # Force UI draw right away so the user isn't staring at a blank screen
         }
@@ -1864,7 +1936,16 @@ if ($usItem) { $RegionBox.SelectedItem = $usItem }
 
 # Bind refresh events after the initial selection so startup never loads the gallery twice.
 $RegionBox.Add_SelectionChanged({ Load-Gallery })
-$RefreshBtn.Add_Click({ Load-Gallery })
+$RefreshBtn.Add_Click({
+        if ($script:isRefreshAnimating) { return }
+        if (-not $RefreshIcon) {
+            Load-Gallery
+            return
+        }
+        $script:isRefreshAnimating = $true
+        $RefreshBtn.IsEnabled = $false
+        Start-RefreshAnimation
+    })
 $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
