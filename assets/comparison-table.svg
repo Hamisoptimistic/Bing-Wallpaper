@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 530" width="100%" height="100%" style="background:#0d1117; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; border-radius:8px; border:1px solid #30363d;">
+  <defs>
+    <style>
+      .hdr-text { font-size: 13px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+      .row-lbl { font-size: 12.5px; font-weight: 600; fill: #e6edf3; }
+      .win-val { font-size: 12.5px; font-weight: 700; fill: #56d364; text-anchor: middle; }
+      .loss-val { font-size: 12px; font-weight: 500; fill: #f85149; text-anchor: middle; }
+      .muted-val { font-size: 12px; font-weight: 500; fill: #8b949e; text-anchor: middle; }
+      .grid-line { stroke: #30363d; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <!-- Green Column Background (Bing Wallpaper Winner Column) -->
+  <rect x="235" y="44" width="215" height="480" fill="#133822" />
+
+  <!-- Alternating row backgrounds for Feature & Competitor columns -->
+  <rect x="0" y="44" width="235" height="40" fill="#161b22" />
+  <rect x="450" y="44" width="430" height="40" fill="#161b22" />
+
+  <rect x="0" y="124" width="235" height="40" fill="#161b22" />
+  <rect x="450" y="124" width="430" height="40" fill="#161b22" />
+
+  <rect x="0" y="204" width="235" height="40" fill="#161b22" />
+  <rect x="450" y="204" width="430" height="40" fill="#161b22" />
+
+  <rect x="0" y="284" width="235" height="40" fill="#161b22" />
+  <rect x="450" y="284" width="430" height="40" fill="#161b22" />
+
+  <rect x="0" y="364" width="235" height="40" fill="#161b22" />
+  <rect x="450" y="364" width="430" height="40" fill="#161b22" />
+
+  <rect x="0" y="444" width="235" height="40" fill="#161b22" />
+  <rect x="450" y="444" width="430" height="40" fill="#161b22" />
+
+  <!-- Top Header Row Backgrounds (Red for non-winners, Vibrant Green for Bing Wallpaper) -->
+  <rect x="0" y="0" width="235" height="44" fill="#a4262c" />
+  <rect x="235" y="0" width="215" height="44" fill="#238636" />
+  <rect x="450" y="0" width="215" height="44" fill="#a4262c" />
+  <rect x="665" y="0" width="215" height="44" fill="#a4262c" />
+
+  <!-- Header Text -->
+  <text x="117" y="27" class="hdr-text">Feature</text>
+  <text x="342" y="27" class="hdr-text">★ Bing Wallpaper</text>
+  <text x="557" y="27" class="hdr-text">Official Bing Wallpaper</text>
+  <text x="772" y="27" class="hdr-text">Electron / WebView Apps</text>
+
+  <!-- Horizontal Grid Lines -->
+  <line x1="0" y1="44" x2="880" y2="44" class="grid-line" />
+  <line x1="0" y1="84" x2="880" y2="84" class="grid-line" />
+  <line x1="0" y1="124" x2="880" y2="124" class="grid-line" />
+  <line x1="0" y1="164" x2="880" y2="164" class="grid-line" />
+  <line x1="0" y1="204" x2="880" y2="204" class="grid-line" />
+  <line x1="0" y1="244" x2="880" y2="244" class="grid-line" />
+  <line x1="0" y1="284" x2="880" y2="284" class="grid-line" />
+  <line x1="0" y1="324" x2="880" y2="324" class="grid-line" />
+  <line x1="0" y1="364" x2="880" y2="364" class="grid-line" />
+  <line x1="0" y1="404" x2="880" y2="404" class="grid-line" />
+  <line x1="0" y1="444" x2="880" y2="444" class="grid-line" />
+  <line x1="0" y1="484" x2="880" y2="484" class="grid-line" />
+
+  <!-- Vertical Grid Lines -->
+  <line x1="235" y1="0" x2="235" y2="530" class="grid-line" />
+  <line x1="450" y1="0" x2="450" y2="530" class="grid-line" />
+  <line x1="665" y1="0" x2="665" y2="530" class="grid-line" />
+
+  <!-- ROW 1: Active Memory -->
+  <text x="18" y="69" class="row-lbl">Active Memory (RAM)</text>
+  <text x="342" y="69" class="win-val">~50–60 MB</text>
+  <text x="557" y="69" class="loss-val">~80–120 MB</text>
+  <text x="772" y="69" class="loss-val">~200 MB – 400 MB</text>
+
+  <!-- ROW 2: Idle Memory -->
+  <text x="18" y="109" class="row-lbl">Idle Memory (Closed)</text>
+  <text x="342" y="109" class="win-val">0 MB (Zero Resident)</text>
+  <text x="557" y="109" class="loss-val">~80 MB (Resident)</text>
+  <text x="772" y="109" class="loss-val">~200–400 MB (Resident)</text>
+
+  <!-- ROW 3: 4K / UHD -->
+  <text x="18" y="149" class="row-lbl">4K / UHD Resolutions</text>
+  <text x="342" y="149" class="win-val">✓ Yes (Full UHD)</text>
+  <text x="557" y="149" class="loss-val">✕ No</text>
+  <text x="772" y="149" class="muted-val">Varies</text>
+
+  <!-- ROW 4: Lock Screen Support -->
+  <text x="18" y="189" class="row-lbl">Lock Screen Support</text>
+  <text x="342" y="189" class="win-val">✓ Yes (Desktop + Lock)</text>
+  <text x="557" y="189" class="loss-val">✕ No</text>
+  <text x="772" y="189" class="muted-val">Rare</text>
+
+  <!-- ROW 5: Wallpaper Style -->
+  <text x="18" y="229" class="row-lbl">Wallpaper Styles</text>
+  <text x="342" y="229" class="win-val">✓ Fit, Fill, Stretch, Tile</text>
+  <text x="557" y="229" class="loss-val">✕ No</text>
+  <text x="772" y="229" class="muted-val">Rare</text>
+
+  <!-- ROW 6: 50+ Country Feeds -->
+  <text x="18" y="269" class="row-lbl">50+ Global Country Feeds</text>
+  <text x="342" y="269" class="win-val">✓ Yes (50+ Regions)</text>
+  <text x="557" y="269" class="loss-val">✕ No (US only)</text>
+  <text x="772" y="269" class="muted-val">Rare</text>
+
+  <!-- ROW 7: High-Res Downloader -->
+  <text x="18" y="309" class="row-lbl">High-Res Local Downloader</text>
+  <text x="342" y="309" class="win-val">✓ Yes (1-Click Save)</text>
+  <text x="557" y="309" class="loss-val">✕ No</text>
+  <text x="772" y="309" class="muted-val">Varies</text>
+
+  <!-- ROW 8: Modern Fluent UI -->
+  <text x="18" y="349" class="row-lbl">Modern Fluent UI &amp; Effects</text>
+  <text x="342" y="349" class="win-val">✓ Yes (Native WPF)</text>
+  <text x="557" y="349" class="loss-val">Outdated Win32</text>
+  <text x="772" y="349" class="loss-val">WebView / Heavy</text>
+
+  <!-- ROW 9: 1-Click In-App Updates -->
+  <text x="18" y="389" class="row-lbl">1-Click In-App Updates</text>
+  <text x="342" y="389" class="win-val">✓ Yes (SHA-256 Verified)</text>
+  <text x="557" y="389" class="muted-val">Proprietary</text>
+  <text x="772" y="389" class="loss-val">Large Re-downloads</text>
+
+  <!-- ROW 10: Background Automation -->
+  <text x="18" y="429" class="row-lbl">Background Automation</text>
+  <text x="342" y="429" class="win-val">✓ Task Scheduler</text>
+  <text x="557" y="429" class="loss-val">Tray Process</text>
+  <text x="772" y="429" class="loss-val">Node.js Process</text>
+
+  <!-- ROW 11: Single Portable Binary -->
+  <text x="18" y="469" class="row-lbl">Single Portable Binary</text>
+  <text x="342" y="469" class="win-val">✓ Yes (Standalone EXE)</text>
+  <text x="557" y="469" class="loss-val">✕ No (MSI required)</text>
+  <text x="772" y="469" class="loss-val">Large bundle</text>
+
+  <!-- ROW 12: Zero Console Popups -->
+  <text x="18" y="509" class="row-lbl">Zero Console Popups</text>
+  <text x="342" y="509" class="win-val">✓ 100% Silent Runner</text>
+  <text x="557" y="509" class="muted-val">Background service</text>
+  <text x="772" y="509" class="muted-val">Background process</text>
+
+</svg>
