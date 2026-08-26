@@ -25,83 +25,9 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Windows.Forms # Kept only for the Folder Browser dialog
 Add-Type -AssemblyName System.Drawing
 
-# High-Performance Image Accent Color Extractor (LockBits native execution)
-try {
-    $accentCode = @'
-    using System;
-    using System.Drawing;
-    using System.Drawing.Imaging;
-    using System.IO;
-    using System.Runtime.InteropServices;
-    using System.Windows.Media;
-
-    namespace BingWallpaper
-    {
-        public static class FastAccent
-        {
-            public static SolidColorBrush ExtractBrush(string path)
-            {
-                try
-                {
-                    if (!File.Exists(path))
-                    {
-                        var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
-                        fallback.Freeze();
-                        return fallback;
-                    }
-                    using (var bmp = new Bitmap(path))
-                    {
-                        using (var small = new Bitmap(bmp, new Size(24, 24)))
-                        {
-                            BitmapData data = small.LockBits(new Rectangle(0, 0, 24, 24), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                            int bytes = Math.Abs(data.Stride) * 24;
-                            byte[] rgb = new byte[bytes];
-                            Marshal.Copy(data.Scan0, rgb, 0, bytes);
-                            small.UnlockBits(data);
-
-                            int redTotal = 0, greenTotal = 0, blueTotal = 0, weightTotal = 0;
-                            for (int i = 0; i < rgb.Length; i += 4)
-                            {
-                                byte b = rgb[i];
-                                byte g = rgb[i + 1];
-                                byte r = rgb[i + 2];
-
-                                int max = Math.Max(r, Math.Max(g, b));
-                                int min = Math.Min(r, Math.Min(g, b));
-                                int weight = 1 + (((max - min) * 2) / 255);
-
-                                redTotal += r * weight;
-                                greenTotal += g * weight;
-                                blueTotal += b * weight;
-                                weightTotal += weight;
-                            }
-
-                            if (weightTotal == 0) weightTotal = 1;
-                            byte finalR = (byte)Math.Min(190, (redTotal / weightTotal) * 1.35);
-                            byte finalG = (byte)Math.Min(190, (greenTotal / weightTotal) * 1.35);
-                            byte finalB = (byte)Math.Min(190, (blueTotal / weightTotal) * 1.35);
-                            var brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, finalR, finalG, finalB));
-                            brush.Freeze();
-                            return brush;
-                        }
-                    }
-                }
-                catch
-                {
-                    var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
-                    fallback.Freeze();
-                    return fallback;
-                }
-            }
-        }
-    }
-'@
-    Add-Type -TypeDefinition $accentCode -ReferencedAssemblies System.Drawing, PresentationCore, WindowsBase -IgnoreWarnings
-} catch {}
-
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.60'
+$script:appVersion = [Version]'1.0.61'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1179,9 +1105,9 @@ $window.Add_Loaded({
         $idleFlush = New-Object System.Windows.Threading.DispatcherTimer
         $idleFlush.Interval = [TimeSpan]::FromSeconds(2.5)
         $idleFlush.Add_Tick({
-            $idleFlush.Stop()
-            [BingWallpaperNative]::FlushMemory()
-        })
+                $idleFlush.Stop()
+                [BingWallpaperNative]::FlushMemory()
+            })
         $idleFlush.Start()
     })
 
@@ -1560,11 +1486,43 @@ $cardUnselectedBg = (New-Object System.Windows.Media.SolidColorBrush([System.Win
 $cardHoverBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(190, 20, 22, 30)))
 
 function Get-ImageAccentBrush([string]$imagePath) {
+    $bitmap = $null
     try {
-        return [BingWallpaper.FastAccent]::ExtractBrush($imagePath)
+        $bitmap = [System.Drawing.Bitmap]::new($imagePath)
+        $sampleWidth = [Math]::Min(32, $bitmap.Width)
+        $sampleHeight = [Math]::Min(32, $bitmap.Height)
+        if ($sampleWidth -lt 1 -or $sampleHeight -lt 1) { throw 'Image has no pixels' }
+
+        $redTotal = 0.0
+        $greenTotal = 0.0
+        $blueTotal = 0.0
+        $weightTotal = 0.0
+        for ($y = 0; $y -lt $sampleHeight; $y++) {
+            for ($x = 0; $x -lt $sampleWidth; $x++) {
+                $pixel = $bitmap.GetPixel([int](($x / $sampleWidth) * $bitmap.Width), [int](($y / $sampleHeight) * $bitmap.Height))
+                $red = $pixel.R
+                $green = $pixel.G
+                $blue = $pixel.B
+                $maximum = [Math]::Max($red, [Math]::Max($green, $blue))
+                $minimum = [Math]::Min($red, [Math]::Min($green, $blue))
+                $weight = 1.0 + ((($maximum - $minimum) / 255.0) * 2.0)
+                $redTotal += $red * $weight
+                $greenTotal += $green * $weight
+                $blueTotal += $blue * $weight
+                $weightTotal += $weight
+            }
+        }
+
+        $red = [Math]::Min(190, [int]($redTotal / $weightTotal * 1.35))
+        $green = [Math]::Min(190, [int]($greenTotal / $weightTotal * 1.35))
+        $blue = [Math]::Min(190, [int]($blueTotal / $weightTotal * 1.35))
+        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, $red, $green, $blue))
     }
     catch {
         return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 70, 70, 70))
+    }
+    finally {
+        if ($bitmap) { $bitmap.Dispose() }
     }
 }
 
@@ -1650,20 +1608,20 @@ function Set-TransientStatus {
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
     $script:statusResetTimer.Add_Tick({
-        $script:statusResetTimer.Stop()
+            $script:statusResetTimer.Stop()
         
-        # Smooth fade transition
-        $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-        $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, $duration)
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
+            # Smooth fade transition
+            $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, $duration)
+            $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
         
-        $fadeOut.Add_Completed({
-            $StatusText.Foreground = $statusDefaultBrush
-            $StatusText.Text = 'Double-click any wallpaper to apply'
-            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+            $fadeOut.Add_Completed({
+                    $StatusText.Foreground = $statusDefaultBrush
+                    $StatusText.Text = 'Double-click any wallpaper to apply'
+                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+                })
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
         })
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-    })
     $script:statusResetTimer.Start()
 }
 
@@ -1803,18 +1761,20 @@ function Show-ModernDialog {
     elseif ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
         try {
             $dlg.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new($script:taskbarIconPath))
-        } catch {}
+        }
+        catch {}
     }
 
     # Enable native Windows 11 dark title bar for dialog
     $dlg.Add_SourceInitialized({
-        try {
-            $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
-            if ($helper.Handle -ne [IntPtr]::Zero) {
-                [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
+            try {
+                $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
+                if ($helper.Handle -ne [IntPtr]::Zero) {
+                    [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
+                }
             }
-        } catch {}
-    })
+            catch {}
+        })
 
     $badgeBorder = $dlg.FindName('BadgeBorder')
     $badgePath = $dlg.FindName('BadgePath')
@@ -1842,7 +1802,8 @@ function Show-ModernDialog {
             $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 248, 113, 113))
             $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z")
         }
-        Default { # Info
+        Default {
+            # Info
             $badgeBorder.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 18, 48, 76))
             $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 96, 165, 250))
             $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z")
@@ -1862,9 +1823,9 @@ function Show-ModernDialog {
         $btnNo.BorderThickness = New-Object System.Windows.Thickness(1)
         $btnNo.Margin = New-Object System.Windows.Thickness(0, 0, 10, 0)
         $btnNo.Add_Click({
-            $script:dialogChoice = 'No'
-            $dlg.Close()
-        })
+                $script:dialogChoice = 'No'
+                $dlg.Close()
+            })
         $buttonPanel.Children.Add($btnNo) | Out-Null
 
         $btnYes = New-Object System.Windows.Controls.Button
@@ -1875,9 +1836,9 @@ function Show-ModernDialog {
         $btnYes.BorderThickness = New-Object System.Windows.Thickness(0)
         $btnYes.IsDefault = $true
         $btnYes.Add_Click({
-            $script:dialogChoice = 'Yes'
-            $dlg.Close()
-        })
+                $script:dialogChoice = 'Yes'
+                $dlg.Close()
+            })
         $buttonPanel.Children.Add($btnYes) | Out-Null
     }
     else {
@@ -1889,9 +1850,9 @@ function Show-ModernDialog {
         $btnOk.BorderThickness = New-Object System.Windows.Thickness(0)
         $btnOk.IsDefault = $true
         $btnOk.Add_Click({
-            $script:dialogChoice = 'OK'
-            $dlg.Close()
-        })
+                $script:dialogChoice = 'OK'
+                $dlg.Close()
+            })
         $buttonPanel.Children.Add($btnOk) | Out-Null
     }
 
@@ -1939,7 +1900,8 @@ function Get-OnlineLatestVersion {
         if ($rawContent -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
             return [Version]$Matches[1]
         }
-    } catch {}
+    }
+    catch {}
 
     # 2. Redirect tag inspection fallback
     try {
@@ -1954,7 +1916,8 @@ function Get-OnlineLatestVersion {
             $v = Get-ReleaseVersion -TagName $tag
             if ($v) { return $v }
         }
-    } catch {}
+    }
+    catch {}
 
     return $null
 }
@@ -1965,24 +1928,25 @@ function Start-BackgroundUpdateCheck {
         $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
 
         $wc.Add_DownloadStringCompleted({
-            param($eventSource, $e)
-            try {
-                if (-not $e.Error -and $e.Result) {
-                    if ($e.Result -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
-                        $v = [Version]$Matches[1]
-                        if ($v -gt $script:appVersion) {
-                            Set-UpdateButtonState -HasUpdate $true -NewVersion $v
-                            return
+                param($eventSource, $e)
+                try {
+                    if (-not $e.Error -and $e.Result) {
+                        if ($e.Result -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
+                            $v = [Version]$Matches[1]
+                            if ($v -gt $script:appVersion) {
+                                Set-UpdateButtonState -HasUpdate $true -NewVersion $v
+                                return
+                            }
                         }
                     }
                 }
-            } catch {}
-            finally {
-                if ($eventSource) { $eventSource.Dispose() }
-                [BingWallpaperNative]::FlushMemory()
-            }
-            Set-UpdateButtonState -HasUpdate $false
-        })
+                catch {}
+                finally {
+                    if ($eventSource) { $eventSource.Dispose() }
+                    [BingWallpaperNative]::FlushMemory()
+                }
+                Set-UpdateButtonState -HasUpdate $false
+            })
 
         $wc.DownloadStringAsync([System.Uri]::new("https://raw.githubusercontent.com/$($script:updateRepository)/main/Bing-Wallpaper-UI.ps1"))
     }
@@ -2032,7 +1996,8 @@ function Start-VerifiedUpdate {
         try {
             $checksumText = $client.DownloadString($shaDownloadUrl)
             $expectedHash = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b').Value.ToUpperInvariant()
-        } catch {}
+        }
+        catch {}
 
         if ($expectedHash) {
             $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
@@ -2107,26 +2072,20 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 }
 
 function Show-GalleryCard {
-    param(
-        [System.Windows.Controls.Border]$Card,
-        [int]$Index = 0
-    )
+    param([System.Windows.Controls.Border]$Card)
 
-    # Native WPF hardware transform: smooth arrival fade-in & slide-up
+    # Native WPF transforms keep card arrivals smooth without layout work,
+    # timers, or a background rendering loop.
     $Card.Opacity = 0
-    $translate = New-Object System.Windows.Media.TranslateTransform(0, 14)
+    $translate = New-Object System.Windows.Media.TranslateTransform(0, 12)
     $Card.RenderTransform = $translate
 
-    $beginTime = [TimeSpan]::FromMilliseconds($Index * 28)
-    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(340))
-
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(320))
     $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $duration)
-    $fade.BeginTime = $beginTime
     $fade.EasingFunction = New-Object System.Windows.Media.Animation.SineEase
-    $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
 
-    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(14, 0, $duration)
-    $slide.BeginTime = $beginTime
+    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(12, 0, $duration)
     $slide.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
     $slide.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
 
@@ -2392,7 +2351,7 @@ function Load-Gallery {
                 })
 
             $GalleryPanel.Children.Add($card)
-            Show-GalleryCard -Card $card -Index ($current - 1)
+            Show-GalleryCard -Card $card
 
             Update-UI # Force UI draw right away so the user isn't staring at a blank screen
         }
@@ -2496,8 +2455,8 @@ $RefreshBtn.Add_Click({
         Start-RefreshAnimation
     })
 $window.Add_ContentRendered({
-    Load-Gallery
-})
+        Load-Gallery
+    })
 
 # Show the app
 $window.ShowDialog() | Out-Null
