@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.54'
+$script:appVersion = [Version]'1.0.55'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1853,6 +1853,10 @@ function Show-ModernDialog {
         $buttonPanel.Children.Add($btnOk) | Out-Null
     }
 
+    if (-not $dlg) {
+        return [System.Windows.MessageBox]::Show($Message, $Title, [System.Windows.MessageBoxButton]::OK)
+    }
+
     $dlg.ShowDialog() | Out-Null
     return $script:dialogChoice
 }
@@ -1957,8 +1961,7 @@ function Start-VerifiedUpdate {
 
         if ($latestVersion -le $script:appVersion) {
             Set-UpdateButtonState -HasUpdate $false
-            Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
-            Set-TransientStatus -Message 'You are up to date.' -Brush $statusSuccessBrush -Seconds 3.0
+            Set-TransientStatus -Message "You're all up to date (v$($script:appVersion))" -Brush $statusSuccessBrush -Seconds 3.0
             return
         }
 
@@ -2052,9 +2055,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $window.Close()
     }
     catch {
-        $StatusText.Foreground = $statusErrorBrush
-        $StatusText.Text = "Update failed: $($_.Exception.Message)"
-        Show-ModernDialog -Title "Update Error" -Header "Update Check Failed" -Message "$($_.Exception.Message)" -Icon "Error" -Buttons "OK" | Out-Null
+        Set-TransientStatus -Message "Update check failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4.0
     }
     finally {
         if ($client) { $client.Dispose() }
@@ -2451,6 +2452,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
