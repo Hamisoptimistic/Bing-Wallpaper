@@ -2,8 +2,8 @@
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
-    [ValidateSet('UHD', '1920x1080', '1366x768')]
-    [string]$Resolution = 'UHD',
+    [ValidateSet('4K UHD', 'UHD', '1920x1080', '1366x768')]
+    [string]$Resolution = '4K UHD',
     [ValidateSet('Desktop', 'Lock screen', 'Both')]
     [string]$Target = 'Desktop',
     [ValidateSet('Fit', 'Fill', 'Stretch', 'Center', 'Tile', 'Span')]
@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.45'
+$script:appVersion = [Version]'1.0.47'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -554,7 +554,7 @@ function Get-BingImageUri {
     if (-not $urlBase -or -not ($urlBase -match '^/th\?id=')) {
         throw "Invalid image URLBase format received from Bing."
     }
-    $imagePath = if ($Resolution -eq 'UHD') { "${urlBase}_UHD.jpg" } else { "${urlBase}_${Resolution}.jpg" }
+    $imagePath = if ($Resolution -match 'UHD|4K') { "${urlBase}_UHD.jpg" } else { "${urlBase}_${Resolution}.jpg" }
     return "https://www.bing.com$imagePath"
 }
 
@@ -1084,6 +1084,16 @@ function Find-RevealBorders($visual) {
 
 $window.Add_Loaded({
         Find-RevealBorders $window
+        Start-BackgroundUpdateCheck
+
+        # Automatically trim working set memory once startup and gallery render settles
+        $idleFlush = New-Object System.Windows.Threading.DispatcherTimer
+        $idleFlush.Interval = [TimeSpan]::FromSeconds(2.5)
+        $idleFlush.Add_Tick({
+            $idleFlush.Stop()
+            [BingWallpaperNative]::FlushMemory()
+        })
+        $idleFlush.Start()
     })
 
 $window.Add_MouseMove({
@@ -1348,11 +1358,13 @@ function Get-SelectedRegionCode {
     return 'en-US'
 }
 
-@('UHD', '1920x1080', '1366x768') | ForEach-Object { 
+@('4K UHD', '1920x1080', '1366x768') | ForEach-Object { 
     [void]$ResolutionBox.Items.Add($_)
-    if ($_ -eq $script:appSettings.Resolution) { $ResolutionBox.SelectedItem = $_ }
+    if ($_ -eq $script:appSettings.Resolution -or ($_ -eq '4K UHD' -and $script:appSettings.Resolution -eq 'UHD')) { 
+        $ResolutionBox.SelectedItem = $_ 
+    }
 }
-if (-not $ResolutionBox.SelectedItem) { $ResolutionBox.SelectedIndex = 1 }
+if (-not $ResolutionBox.SelectedItem) { $ResolutionBox.SelectedIndex = 0 }
 
 @('Desktop', 'Lock screen', 'Both') | ForEach-Object { 
     [void]$TargetBox.Items.Add($_)
@@ -1849,79 +1861,62 @@ function Set-UpdateButtonState {
     }
 }
 
+function Get-OnlineLatestVersion {
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+    
+    # 1. Direct CDN fetch with ZERO rate limits
+    try {
+        $rawContent = $wc.DownloadString("https://raw.githubusercontent.com/$($script:updateRepository)/main/Bing-Wallpaper-UI.ps1")
+        if ($rawContent -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
+            return [Version]$Matches[1]
+        }
+    } catch {}
+
+    # 2. Redirect tag inspection fallback
+    try {
+        $req = [System.Net.HttpWebRequest]::Create("https://github.com/$($script:updateRepository)/releases/latest")
+        $req.AllowAutoRedirect = $false
+        $req.UserAgent = 'BingWallpaper-Updater'
+        $res = $req.GetResponse()
+        $loc = $res.Headers['Location']
+        $res.Dispose()
+        if ($loc) {
+            $tag = Split-Path -Leaf $loc
+            $v = Get-ReleaseVersion -TagName $tag
+            if ($v) { return $v }
+        }
+    } catch {}
+
+    return $null
+}
+
 function Start-BackgroundUpdateCheck {
     try {
-        $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
-        $rs.ApartmentState = [System.Threading.ApartmentState]::STA
-        $rs.ThreadOptions = [System.Management.Automation.Runspaces.PSThreadOptions]::ReuseThread
-        $rs.Open()
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
 
-        $ps = [System.Management.Automation.PowerShell]::Create()
-        $ps.Runspace = $rs
-
-        $repo = $script:updateRepository
-        $currVer = $script:appVersion.ToString()
-
-        $ps.AddScript({
-            param($repo, $currentVer)
+        $wc.Add_DownloadStringCompleted({
+            param($sender, $e)
             try {
-                $wc = New-Object System.Net.WebClient
-                $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-                $json = $wc.DownloadString("https://api.github.com/repos/$repo/releases/latest") | ConvertFrom-Json
-                
-                $cleanTag = ($json.tag_name -replace '^[vV]', '').Trim()
-                if ($cleanTag -match '^\d+(\.\d+){1,3}$') {
-                    $ver = [Version]$cleanTag
-                    if ($ver -gt [Version]$currentVer) {
-                        return @{ HasUpdate = $true; Version = $ver.ToString() }
+                if (-not $e.Error -and $e.Result) {
+                    if ($e.Result -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
+                        $v = [Version]$Matches[1]
+                        if ($v -gt $script:appVersion) {
+                            Set-UpdateButtonState -HasUpdate $true -NewVersion $v
+                            return
+                        }
                     }
                 }
-                if ($json.name -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    $ver = [Version]$v
-                    if ($ver -gt [Version]$currentVer) {
-                        return @{ HasUpdate = $true; Version = $ver.ToString() }
-                    }
-                }
-                if ($json.body -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    $ver = [Version]$v
-                    if ($ver -gt [Version]$currentVer) {
-                        return @{ HasUpdate = $true; Version = $ver.ToString() }
-                    }
-                }
+            } catch {}
+            finally {
+                $sender.Dispose()
+                [BingWallpaperNative]::FlushMemory()
             }
-            catch {}
-            return @{ HasUpdate = $false; Version = $null }
-        }).AddArgument($repo).AddArgument($currVer) | Out-Null
-
-        $asyncHandle = $ps.BeginInvoke()
-
-        $script:bgPollTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:bgPollTimer.Interval = [TimeSpan]::FromMilliseconds(150)
-        $script:bgPollTimer.Add_Tick({
-            if ($asyncHandle.IsCompleted) {
-                $script:bgPollTimer.Stop()
-                try {
-                    $res = $ps.EndInvoke($asyncHandle)
-                    if ($res -and $res.Count -gt 0 -and $res[0].HasUpdate) {
-                        Set-UpdateButtonState -HasUpdate $true -NewVersion ([Version]$res[0].Version)
-                    }
-                    else {
-                        Set-UpdateButtonState -HasUpdate $false
-                    }
-                }
-                catch {}
-                finally {
-                    $ps.Dispose()
-                    $rs.Close()
-                    $rs.Dispose()
-                }
-            }
+            Set-UpdateButtonState -HasUpdate $false
         })
-        $script:bgPollTimer.Start()
+
+        $wc.DownloadStringAsync([System.Uri]::new("https://raw.githubusercontent.com/$($script:updateRepository)/main/Bing-Wallpaper-UI.ps1"))
     }
     catch {}
 }
@@ -1933,33 +1928,9 @@ function Start-VerifiedUpdate {
     Update-UI
 
     try {
-        $release = $null
-        $latestVersion = $null
-
-        # First attempt: fetch /releases/latest
-        try {
-            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
-            $latestRel = Invoke-GitHubApiJson -Uri $releaseUri
-            $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-            $release = $latestRel
-        }
-        catch {
-            # Fallback: scan recent releases to locate the newest release with a valid semantic version
-            $allReleasesUri = "https://api.github.com/repos/$($script:updateRepository)/releases?per_page=10"
-            $allReleases = Invoke-GitHubApiJson -Uri $allReleasesUri
-            foreach ($rel in $allReleases) {
-                try {
-                    $ver = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
-                    if ($null -eq $latestVersion -or $ver -gt $latestVersion) {
-                        $latestVersion = $ver
-                        $release = $rel
-                    }
-                }
-                catch {}
-            }
-            if ($null -eq $latestVersion -or $null -eq $release) {
-                throw "No releases with a valid version tag (e.g. v1.0.0) were found in repository '$($script:updateRepository)'."
-            }
+        $latestVersion = Get-OnlineLatestVersion
+        if (-not $latestVersion) {
+            throw "Unable to connect to GitHub update server. Please check your network connection."
         }
 
         if ($latestVersion -le $script:appVersion) {
@@ -1977,11 +1948,8 @@ function Start-VerifiedUpdate {
             return
         }
 
-        $exeAsset = $release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe' } | Select-Object -First 1
-        $checksumAsset = $release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe.sha256' } | Select-Object -First 1
-        if (-not $exeAsset) {
-            throw 'This release does not include BingWallpaper.exe.'
-        }
+        $exeDownloadUrl = "https://github.com/$($script:updateRepository)/releases/latest/download/BingWallpaper.exe"
+        $shaDownloadUrl = "https://github.com/$($script:updateRepository)/releases/latest/download/BingWallpaper.exe.sha256"
 
         $StatusText.Text = "Downloading version $latestVersion..."
         Update-UI
@@ -1989,17 +1957,14 @@ function Start-VerifiedUpdate {
         
         $client = New-Object System.Net.WebClient
         $client.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-        $client.DownloadFile($exeAsset.browser_download_url, $downloadPath)
+        $client.DownloadFile($exeDownloadUrl, $downloadPath)
 
-        # Extract SHA-256 hash from checksum file or release asset digest
+        # Extract SHA-256 hash from checksum file
         $expectedHash = $null
-        if ($checksumAsset) {
-            $checksumText = $client.DownloadString($checksumAsset.browser_download_url)
+        try {
+            $checksumText = $client.DownloadString($shaDownloadUrl)
             $expectedHash = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b').Value.ToUpperInvariant()
-        }
-        elseif ($exeAsset.digest -and $exeAsset.digest -match '(?i)sha256:([a-f0-9]{64})') {
-            $expectedHash = $Matches[1].ToUpperInvariant()
-        }
+        } catch {}
 
         if ($expectedHash) {
             $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
@@ -2282,7 +2247,7 @@ function Load-Gallery {
                 $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
                 $bitmap.BeginInit()
                 $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
-                $bitmap.DecodePixelWidth = 480
+                $bitmap.DecodePixelWidth = 360
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
                 $bitmap.Freeze()
@@ -2460,11 +2425,15 @@ $RefreshBtn.Add_Click({
     })
 $window.Add_ContentRendered({
     Load-Gallery
-    Start-BackgroundUpdateCheck
 })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
+
+
 
 
 
