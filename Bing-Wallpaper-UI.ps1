@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.51'
+$script:appVersion = [Version]'1.0.52'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1660,6 +1660,7 @@ $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.W
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
 $script:statusResetTimer = $null
 $script:fadeTimer = $null
+$script:loadingStatusTimer = $null
 
 function Restore-StatusTextDefaultWithFade {
     $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
@@ -2505,8 +2506,23 @@ function Load-Gallery {
         if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
         [BingWallpaperNative]::FlushMemory()
         
-        # Smoothly transition from 'Connecting to Bing...' to 'Double-click any wallpaper to apply'
-        Restore-StatusTextDefaultWithFade
+        # Animate the status text to count up synchronously with the card cascade animation
+        $script:loadingCounter = 0
+        $script:loadingTotal = $total
+        
+        if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+        $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
+        $script:loadingStatusTimer.Add_Tick({
+            $script:loadingCounter++
+            if ($script:loadingCounter -le $script:loadingTotal) {
+                $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
+            } else {
+                $script:loadingStatusTimer.Stop()
+                Restore-StatusTextDefaultWithFade
+            }
+        })
+        $script:loadingStatusTimer.Start()
     }
     catch {
         $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
@@ -2613,6 +2629,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
