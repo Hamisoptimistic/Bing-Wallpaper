@@ -117,79 +117,79 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 <table>
   <thead>
-    <tr bgcolor="#2d1519">
-      <th align="left">Feature</th>
-      <th align="center">Bing Wallpaper</th>
-      <th align="center">Official Bing Wallpaper</th>
-      <th align="center">Electron / Webview Apps</th>
+    <tr bgcolor="#5c1822" style="background-color: #5c1822; color: #ffffff;">
+      <th align="left" style="padding: 8px 12px;">Feature</th>
+      <th align="center" bgcolor="#133826" style="background-color: #133826; padding: 8px 12px;">Bing Wallpaper</th>
+      <th align="center" bgcolor="#4a151b" style="background-color: #4a151b; padding: 8px 12px;">Official Bing Wallpaper</th>
+      <th align="center" bgcolor="#4a151b" style="background-color: #4a151b; padding: 8px 12px;">Electron / Webview Apps</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><b>Active Memory (RAM)</b></td>
-      <td align="center"><b>~50–60 MB</b></td>
-      <td align="center" bgcolor="#221114">~80–120 MB</td>
-      <td align="center" bgcolor="#221114">~200 MB – 400 MB</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>~50–60 MB</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">~80–120 MB</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">~200 MB – 400 MB</td>
     </tr>
     <tr>
       <td><b>Idle Memory (When Closed)</b></td>
-      <td align="center"><b>0 MB</b></td>
-      <td align="center" bgcolor="#221114">~80 MB (Always resident)</td>
-      <td align="center" bgcolor="#221114">~200 MB – 400 MB (Always resident)</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>0 MB</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">~80 MB (Always resident)</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">~200 MB – 400 MB (Always resident)</td>
     </tr>
     <tr>
       <td><b>4K / UHD Resolutions</b></td>
-      <td align="center"><b>Yes</b></td>
-      <td align="center" bgcolor="#221114">No</td>
-      <td align="center" bgcolor="#221114">Varies</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">No</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Varies</td>
     </tr>
     <tr>
       <td><b>Lock Screen Support</b></td>
-      <td align="center"><b>Yes</b></td>
-      <td align="center" bgcolor="#221114">No</td>
-      <td align="center" bgcolor="#221114">Rare</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">No</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Rare</td>
     </tr>
     <tr>
       <td><b>Wallpaper Style (Fit, Fill, Stretch, Tile)</b></td>
-      <td align="center"><b>Yes</b></td>
-      <td align="center" bgcolor="#221114">No</td>
-      <td align="center" bgcolor="#221114">Rare</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">No</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Rare</td>
     </tr>
     <tr>
       <td><b>50+ Country Feeds</b></td>
-      <td align="center"><b>Yes</b></td>
-      <td align="center" bgcolor="#221114">No (US only)</td>
-      <td align="center" bgcolor="#221114">Rare</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">No (US only)</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Rare</td>
     </tr>
     <tr>
       <td><b>High-Res Local Downloader</b></td>
-      <td align="center"><b>Yes</b></td>
-      <td align="center" bgcolor="#221114">No</td>
-      <td align="center" bgcolor="#221114">Varies</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">No</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Varies</td>
     </tr>
     <tr>
       <td><b>Modern Fluent UI & Hover Effects</b></td>
-      <td align="center"><b>Yes</b> (Native WPF)</td>
-      <td align="center" bgcolor="#221114">Outdated Win32</td>
-      <td align="center" bgcolor="#221114">Webview / Heavy</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b> (Native WPF)</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Outdated Win32</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Webview / Heavy</td>
     </tr>
     <tr>
       <td><b>1-Click Seamless In-App Updates</b></td>
-      <td align="center"><b>Yes</b> (SHA-256 Verified)</td>
-      <td align="center" bgcolor="#221114">Proprietary Updater</td>
-      <td align="center" bgcolor="#221114">Large Re-downloads</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b> (SHA-256 Verified)</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Proprietary Updater</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Large Re-downloads</td>
     </tr>
     <tr>
       <td><b>Background Automation Engine</b></td>
-      <td align="center"><b>Native Task Scheduler</b></td>
-      <td align="center" bgcolor="#221114">Background Tray Daemon</td>
-      <td align="center" bgcolor="#221114">Background Node.js Process</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Native Task Scheduler</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Background Tray Daemon</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Background Node.js Process</td>
     </tr>
     <tr>
       <td><b>Single Portable Binary</b></td>
-      <td align="center"><b>Yes</b></td>
-      <td align="center" bgcolor="#221114">No (MSI required)</td>
-      <td align="center" bgcolor="#221114">Large bundle</td>
+      <td align="center" bgcolor="#0d2419" style="background-color: #0d2419;"><b>Yes</b></td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">No (MSI required)</td>
+      <td align="center" bgcolor="#331216" style="background-color: #331216;">Large bundle</td>
     </tr>
   </tbody>
 </table>
