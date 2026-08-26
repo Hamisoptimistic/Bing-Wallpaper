@@ -89,7 +89,37 @@
 
   <!-- Row 1: Active Memory -->
   <text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
-  <rect x="300" y="86" width="130" height="24" class="badge" fill="#238636" fill-opacity="0.25"/>
+  <g>
+    <defs>
+      <linearGradient id="special-glow-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#2ea44f" stop-opacity="0.6" />
+        <stop offset="100%" stop-color="#238636" stop-opacity="0.3" />
+      </linearGradient>
+      <style>
+        @keyframes pulse-special {
+          0% { opacity: 0.7; filter: drop-shadow(0 0 2px #3fb950); }
+          50% { opacity: 1.0; filter: drop-shadow(0 0 8px #3fb950); }
+          100% { opacity: 0.7; filter: drop-shadow(0 0 2px #3fb950); }
+        }
+        .special-badge-glow {
+          animation: pulse-special 2s infinite ease-in-out;
+        }
+      </style>
+    </defs>
+
+    <rect 
+      x="300" 
+      y="86" 
+      width="130" 
+      height="24" 
+      rx="6" 
+      ry="6" 
+      class="badge special-badge-glow" 
+      fill="url(#special-glow-grad)" 
+      stroke="#3fb950" 
+      stroke-width="1.5" 
+    />
+  </g>
   <text x="365" y="102" text-anchor="middle" class="cell-winner">~50–60 MB</text>
   <text x="595" y="102" text-anchor="middle" class="cell-value">~80–120 MB</text>
   <text x="825" y="102" text-anchor="middle" class="cell-value">~200 MB – 400 MB</text>
@@ -102,8 +132,8 @@
   <text x="825" y="147" text-anchor="middle" class="cell-value">~200–400 MB (Resident)</text>
 
   <!-- Row 3: 4K / UHD -->
-  <text x="40" y="192" class="cell-label">4K / UHD Resolutions</text>
-  <text x="365" y="192" text-anchor="middle" class="cell-winner">✓ Yes (Full UHD)</text>
+  <text x="40" y="192" class="cell-label"> 4K / 2K Resolutions</text>
+  <text x="365" y="192" text-anchor="middle" class="cell-winner">✓ Yes 4K / 2K </text>
   <text x="595" y="192" text-anchor="middle" class="cell-bad">✕ No</text>
   <text x="825" y="192" text-anchor="middle" class="cell-value">Varies</text>
 
