@@ -1,0 +1,31 @@
+# Windows OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+
+# Visual Studio / VS Code / JetBrains
+.vscode/
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# PowerShell / Temporary artifacts / Logs
+*.log
+*.tmp
+*.bak
+*.swp
+AppLauncher_temp.cs
+scratch/
+.system_generated/
+
+# Local cache & downloads
+Cache/
+Thumbs/
