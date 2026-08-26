@@ -19,7 +19,7 @@
 
 <br><br>
 
-<img src="assets/Preview.png" alt="Bing Wallpaper Preview" width="850">
+<img src="assets/Preview.jpg" alt="Bing Wallpaper Preview" width="850">
 
 </div>
 
