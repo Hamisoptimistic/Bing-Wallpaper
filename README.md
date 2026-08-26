@@ -18,6 +18,7 @@ The standalone `BingWallpaper.exe` includes everything needed to run. No extra d
 
 ## Features
 
+<<<<<<< HEAD
 - **Lightweight & Fast**: Built with PowerShell and native WPF for minimal resource usage.
 - **Silent Background Automation**: Set wallpaper updates on a schedule without terminal windows or pop-ups.
 - **Customizable Intervals**: Update on login, every minute, hourly, every 6 hours, or daily.
@@ -26,6 +27,22 @@ The standalone `BingWallpaper.exe` includes everything needed to run. No extra d
 - **Resolution Options**: Supports UHD (4K), 1080p Full HD, and 1366×768.
 - **Image Gallery & Downloader**: Preview recent daily wallpapers and save high-resolution copies locally.
 - **Verified Updates**: Built-in update checker that validates releases via SHA-256 checksums.
+=======
+- 🪶 **Native by design**: A straightforward PowerShell + WPF UI with minimal moving parts and no heavyweight application framework.
+- 🧠 **Ultra-low RAM footprint**: The app avoids a resident browser engine and runs only when you need to choose or apply a wallpaper.
+- 🎨 **Clean Windows 11 UI**: Native dark title bar with rounded corners, a compact gallery, borderless inputs, and slim overlay scrollbars.
+- 🚀 **Zero-Console Standalone Launcher (`BingWallpaper.exe`)**: Launches immediately with zero terminal flash and the authentic high-resolution Bing icon.
+- ⏰ **Automated Background Spotlight (In-App Toggle)**: 1-click automatic wallpaper rotation that runs in the background even when the app is closed and persists across PC restarts.
+- 🤫 **100% Silent Execution**: Completely bypasses Windows 11 Windows Terminal pop-ups using a native hidden wrapper—guaranteed zero console flashes.
+- ⏱️ **Flexible Intervals**: Choose between **On Login**, **1 minute (test)**, **Hourly**, **Every 6h**, or **Daily**.
+- 🌍 **Global Country Support**: Browse wallpapers from 50+ international regions (United States, United Kingdom, Japan, Germany, France, India, Australia, etc.) with automatic clean title parsing.
+- 🖼️ **Live HD Gallery**: Visual interactive grid previewing recent Bing wallpapers.
+- 🔄 **Verified In-App Updates**: Checks GitHub Releases, shows release notes, and installs only an EXE matching the release's SHA-256 checksum.
+- 🖥️ **Multi-Target Personalization**: Apply wallpapers directly to **Desktop**, **Lock Screen**, or **Both**.
+- 📐 **Resolution Support**: Choose between **UHD (4K)**, **1080p Full HD**, or **1366×768**.
+- 💾 **Dedicated Downloader**: Apply directly from memory cache or save high-res files to your chosen folder.
+- ⏱️ **Unified Headless CLI (`-AutoApply`)**: One single unified script for interactive GUI, automation toggle, and background Task Scheduler automation.
+>>>>>>> 077ca693e884066bf2fa64e75bc1698ce0100d1b
 
 ---
 
