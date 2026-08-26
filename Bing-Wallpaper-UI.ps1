@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.52'
+$script:appVersion = [Version]'1.0.53'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1747,8 +1747,11 @@ function Show-ModernDialog {
 </Window>
 "@
 
-    $r = New-Object System.Xml.XmlNodeReader ([xml]$dialogXaml)
-    $dlg = [Windows.Markup.XamlReader]::Load($r)
+    $stringReader = New-Object System.IO.StringReader $dialogXaml
+    $xmlReader = [System.Xml.XmlReader]::Create($stringReader)
+    $dlg = [System.Windows.Markup.XamlReader]::Load($xmlReader)
+    $xmlReader.Close()
+    $stringReader.Close()
     if ($ParentWindow) { $dlg.Owner = $ParentWindow }
 
     # Set authentic Bing icon for dialog titlebar
@@ -2448,6 +2451,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
