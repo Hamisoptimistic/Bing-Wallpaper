@@ -1681,6 +1681,9 @@ function Start-VerifiedUpdate {
         $StatusText.Text = "Downloading version $latestVersion..."
         Update-UI
         $downloadPath = Join-Path $env:TEMP "BingWallpaper-$latestVersion-$([Guid]::NewGuid().ToString('N')).exe"
+        
+        $client = New-Object System.Net.WebClient
+        $client.Headers.Add('User-Agent', 'BingWallpaper-Updater')
         $client.DownloadFile($exeAsset.browser_download_url, $downloadPath)
 
         # Extract SHA-256 hash from checksum file or release asset digest
@@ -1709,8 +1712,15 @@ function Start-VerifiedUpdate {
             }
         }
 
-        $installedExe = Join-Path ([Environment]::CurrentDirectory) 'BingWallpaper.exe'
-        if (-not (Test-Path -LiteralPath $installedExe -PathType Leaf)) {
+        $exeCandidates = @(
+            (Join-Path ([Environment]::CurrentDirectory) 'BingWallpaper.exe'),
+            (Join-Path (Get-Location).Path 'BingWallpaper.exe'),
+            (Join-Path $PSScriptRoot 'BingWallpaper.exe'),
+            (Join-Path (Split-Path -Parent $PSScriptRoot) 'BingWallpaper.exe')
+        )
+        $installedExe = $exeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+
+        if (-not $installedExe -or -not (Test-Path -LiteralPath $installedExe -PathType Leaf)) {
             throw 'The installed BingWallpaper.exe could not be found. Run updates from the installed app, not the source script.'
         }
 
