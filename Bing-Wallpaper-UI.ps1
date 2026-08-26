@@ -2,8 +2,8 @@
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
-    [ValidateSet('4K UHD', 'UHD', '1920x1080', '1366x768')]
-    [string]$Resolution = '4K UHD',
+    [ValidateSet('4K', '2K', '1080p', '720p', '4K UHD', 'UHD', '1920x1080', '1366x768')]
+    [string]$Resolution = '4K',
     [ValidateSet('Desktop', 'Lock screen', 'Both')]
     [string]$Target = 'Desktop',
     [ValidateSet('Fit', 'Fill', 'Stretch', 'Center', 'Tile', 'Span')]
@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.47'
+$script:appVersion = [Version]'1.0.52'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -554,8 +554,23 @@ function Get-BingImageUri {
     if (-not $urlBase -or -not ($urlBase -match '^/th\?id=')) {
         throw "Invalid image URLBase format received from Bing."
     }
-    $imagePath = if ($Resolution -match 'UHD|4K') { "${urlBase}_UHD.jpg" } else { "${urlBase}_${Resolution}.jpg" }
-    return "https://www.bing.com$imagePath"
+    switch -Regex ($Resolution) {
+        '4K|UHD' {
+            return "https://www.bing.com${urlBase}_UHD.jpg"
+        }
+        '2K|1440' {
+            return "https://www.bing.com${urlBase}_UHD.jpg&w=2560&h=1440&rs=1&c=4"
+        }
+        '1080' {
+            return "https://www.bing.com${urlBase}_1920x1080.jpg"
+        }
+        '720|1366|768' {
+            return "https://www.bing.com${urlBase}_1920x1080.jpg&w=1280&h=720&rs=1&c=4"
+        }
+        Default {
+            return "https://www.bing.com${urlBase}_UHD.jpg"
+        }
+    }
 }
 
 function Set-DesktopWallpaperStyle {
@@ -1358,9 +1373,13 @@ function Get-SelectedRegionCode {
     return 'en-US'
 }
 
-@('4K UHD', '1920x1080', '1366x768') | ForEach-Object { 
+@('4K', '2K', '1080p', '720p') | ForEach-Object { 
     [void]$ResolutionBox.Items.Add($_)
-    if ($_ -eq $script:appSettings.Resolution -or ($_ -eq '4K UHD' -and $script:appSettings.Resolution -eq 'UHD')) { 
+    if ($_ -eq $script:appSettings.Resolution -or 
+        ($_ -eq '4K' -and $script:appSettings.Resolution -match '4K|UHD') -or
+        ($_ -eq '2K' -and $script:appSettings.Resolution -match '2K|1440') -or
+        ($_ -eq '1080p' -and $script:appSettings.Resolution -match '1080') -or
+        ($_ -eq '720p' -and $script:appSettings.Resolution -match '720|1366|768')) { 
         $ResolutionBox.SelectedItem = $_ 
     }
 }
@@ -2429,6 +2448,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
