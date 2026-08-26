@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.43'
+$script:appVersion = [Version]'1.0.44'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1838,42 +1838,80 @@ function Set-UpdateButtonState {
 }
 
 function Start-BackgroundUpdateCheck {
-    $script:bgUpdateTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:bgUpdateTimer.Interval = [TimeSpan]::FromMilliseconds(800)
-    $script:bgUpdateTimer.Add_Tick({
-        $script:bgUpdateTimer.Stop()
-        try {
-            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
-            $latestRel = Invoke-GitHubApiJson -Uri $releaseUri
-            $latestVer = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-            
-            if ($latestVer -gt $script:appVersion) {
-                Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
-                return
-            }
-        }
-        catch {
+    try {
+        $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+        $rs.ApartmentState = [System.Threading.ApartmentState]::STA
+        $rs.ThreadOptions = [System.Management.Automation.Runspaces.PSThreadOptions]::ReuseThread
+        $rs.Open()
+
+        $ps = [System.Management.Automation.PowerShell]::Create()
+        $ps.Runspace = $rs
+
+        $repo = $script:updateRepository
+        $currVer = $script:appVersion.ToString()
+
+        $ps.AddScript({
+            param($repo, $currentVer)
             try {
-                $allReleasesUri = "https://api.github.com/repos/$($script:updateRepository)/releases?per_page=5"
-                $allReleases = Invoke-GitHubApiJson -Uri $allReleasesUri
-                $latestVer = $null
-                foreach ($rel in $allReleases) {
-                    try {
-                        $v = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
-                        if ($null -eq $latestVer -or $v -gt $latestVer) {
-                            $latestVer = $v
-                        }
-                    } catch {}
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+                $json = $wc.DownloadString("https://api.github.com/repos/$repo/releases/latest") | ConvertFrom-Json
+                
+                $cleanTag = ($json.tag_name -replace '^[vV]', '').Trim()
+                if ($cleanTag -match '^\d+(\.\d+){1,3}$') {
+                    $ver = [Version]$cleanTag
+                    if ($ver -gt [Version]$currentVer) {
+                        return @{ HasUpdate = $true; Version = $ver.ToString() }
+                    }
                 }
-                if ($latestVer -and ($latestVer -gt $script:appVersion)) {
-                    Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
-                    return
+                if ($json.name -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                    $v = $Matches[1]
+                    if ($v -notmatch '\.') { $v = "$v.0" }
+                    $ver = [Version]$v
+                    if ($ver -gt [Version]$currentVer) {
+                        return @{ HasUpdate = $true; Version = $ver.ToString() }
+                    }
                 }
-            } catch {}
-        }
-        Set-UpdateButtonState -HasUpdate $false
-    })
-    $script:bgUpdateTimer.Start()
+                if ($json.body -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                    $v = $Matches[1]
+                    if ($v -notmatch '\.') { $v = "$v.0" }
+                    $ver = [Version]$v
+                    if ($ver -gt [Version]$currentVer) {
+                        return @{ HasUpdate = $true; Version = $ver.ToString() }
+                    }
+                }
+            }
+            catch {}
+            return @{ HasUpdate = $false; Version = $null }
+        }).AddArgument($repo).AddArgument($currVer) | Out-Null
+
+        $asyncHandle = $ps.BeginInvoke()
+
+        $script:bgPollTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:bgPollTimer.Interval = [TimeSpan]::FromMilliseconds(150)
+        $script:bgPollTimer.Add_Tick({
+            if ($asyncHandle.IsCompleted) {
+                $script:bgPollTimer.Stop()
+                try {
+                    $res = $ps.EndInvoke($asyncHandle)
+                    if ($res -and $res.Count -gt 0 -and $res[0].HasUpdate) {
+                        Set-UpdateButtonState -HasUpdate $true -NewVersion ([Version]$res[0].Version)
+                    }
+                    else {
+                        Set-UpdateButtonState -HasUpdate $false
+                    }
+                }
+                catch {}
+                finally {
+                    $ps.Dispose()
+                    $rs.Close()
+                    $rs.Dispose()
+                }
+            }
+        })
+        $script:bgPollTimer.Start()
+    }
+    catch {}
 }
 
 function Start-VerifiedUpdate {
@@ -1979,6 +2017,9 @@ function Start-VerifiedUpdate {
             throw 'The installed BingWallpaper.exe could not be found. Run updates from the installed app, not the source script.'
         }
 
+        # Clear temp cache before launching updater
+        Remove-Item -LiteralPath (Join-Path $env:TEMP 'BingWallpaper') -Recurse -Force -ErrorAction SilentlyContinue
+
         $updaterPath = Join-Path $env:TEMP "BingWallpaper-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
         $updaterScript = @'
 param(
@@ -1988,7 +2029,10 @@ param(
 )
 
 try { (Get-Process -Id $ParentProcessId -ErrorAction Stop).WaitForExit() } catch {}
-for ($attempt = 0; $attempt -lt 10; $attempt++) {
+$tempDir = Join-Path $env:TEMP "BingWallpaper"
+Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+
+for ($attempt = 0; $attempt -lt 15; $attempt++) {
     try {
         Copy-Item -LiteralPath $DownloadedExe -Destination $InstalledExe -Force -ErrorAction Stop
         Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
@@ -1996,7 +2040,7 @@ for ($attempt = 0; $attempt -lt 10; $attempt++) {
         break
     }
     catch {
-        Start-Sleep -Seconds 1
+        Start-Sleep -Milliseconds 500
     }
 }
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
@@ -2409,6 +2453,8 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
 
 
 

@@ -73,23 +73,27 @@ namespace BingWallpaperLauncher
             string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
             string iconPath = Path.Combine(tempDir, "assets", "bing.ico");
 
-            try
+            for (int attempt = 0; attempt < 20; attempt++)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.Bing-Wallpaper-UI.ps1"))
-                using (FileStream destination = File.Create(psScript))
+                try
                 {
-                    source.CopyTo(destination);
+                    Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
+                    using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.Bing-Wallpaper-UI.ps1"))
+                    using (FileStream destination = new FileStream(psScript, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        source.CopyTo(destination);
+                    }
+                    using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.bing.ico"))
+                    using (FileStream destination = new FileStream(iconPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        source.CopyTo(destination);
+                    }
+                    break;
                 }
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.bing.ico"))
-                using (FileStream destination = File.Create(iconPath))
+                catch
                 {
-                    source.CopyTo(destination);
+                    System.Threading.Thread.Sleep(250);
                 }
-            }
-            catch
-            {
-                return;
             }
 
             ProcessStartInfo psi = new ProcessStartInfo();
