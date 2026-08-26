@@ -1,17 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 530" width="100%" height="100%" style="background:#0d1117; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; border-radius:8px; border:1px solid #30363d;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 484" width="100%" height="100%" style="background:#0d1117; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif; border-radius:6px; border:1px solid #30363d; display:block;">
   <defs>
     <style>
-      .hdr-text { font-size: 13px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
-      .row-lbl { font-size: 12.5px; font-weight: 600; fill: #e6edf3; }
-      .win-val { font-size: 12.5px; font-weight: 700; fill: #7ee787; text-anchor: middle; }
-      .loss-val { font-size: 12px; font-weight: 500; fill: #c98a8e; text-anchor: middle; }
-      .muted-val { font-size: 12px; font-weight: 500; fill: #8b949e; text-anchor: middle; }
+      .hdr-text { font-size: 14px; font-weight: 600; fill: #ffffff; text-anchor: middle; }
+      .row-lbl { font-size: 14px; font-weight: 600; fill: #f0f6fc; }
+      .win-val { font-size: 14px; font-weight: 600; fill: #7ee787; text-anchor: middle; }
+      .loss-val { font-size: 13.5px; font-weight: 400; fill: #c98a8e; text-anchor: middle; }
+      .muted-val { font-size: 13.5px; font-weight: 400; fill: #8b949e; text-anchor: middle; }
       .grid-line { stroke: #30363d; stroke-width: 1; }
     </style>
   </defs>
 
   <!-- Green Column Background (Bing Wallpaper Winner Column) -->
-  <rect x="235" y="44" width="215" height="480" fill="#133822" />
+  <rect x="235" y="44" width="215" height="440" fill="#133822" />
 
   <!-- Alternating row backgrounds for Feature & Competitor columns -->
   <rect x="0" y="44" width="235" height="40" fill="#161b22" />
@@ -32,7 +32,7 @@
   <rect x="0" y="444" width="235" height="40" fill="#161b22" />
   <rect x="450" y="444" width="430" height="40" fill="#161b22" />
 
-  <!-- Top Header Row Backgrounds (Muted Dark Crimson for non-winners, Vibrant Green for Bing Wallpaper) -->
+  <!-- Top Header Row Backgrounds (Dark Crimson for non-winners, Forest Green for Bing Wallpaper) -->
   <rect x="0" y="0" width="235" height="44" fill="#6e1b21" />
   <rect x="235" y="0" width="215" height="44" fill="#238636" />
   <rect x="450" y="0" width="215" height="44" fill="#6e1b21" />
@@ -56,12 +56,11 @@
   <line x1="0" y1="364" x2="880" y2="364" class="grid-line" />
   <line x1="0" y1="404" x2="880" y2="404" class="grid-line" />
   <line x1="0" y1="444" x2="880" y2="444" class="grid-line" />
-  <line x1="0" y1="484" x2="880" y2="484" class="grid-line" />
 
   <!-- Vertical Grid Lines -->
-  <line x1="235" y1="0" x2="235" y2="530" class="grid-line" />
-  <line x1="450" y1="0" x2="450" y2="530" class="grid-line" />
-  <line x1="665" y1="0" x2="665" y2="530" class="grid-line" />
+  <line x1="235" y1="0" x2="235" y2="484" class="grid-line" />
+  <line x1="450" y1="0" x2="450" y2="484" class="grid-line" />
+  <line x1="665" y1="0" x2="665" y2="484" class="grid-line" />
 
   <!-- ROW 1: Active Memory -->
   <text x="18" y="69" class="row-lbl">Active Memory (RAM)</text>
@@ -128,11 +127,5 @@
   <text x="342" y="469" class="win-val">✓ Yes (Standalone EXE)</text>
   <text x="557" y="469" class="loss-val">✕ No (MSI required)</text>
   <text x="772" y="469" class="loss-val">Large bundle</text>
-
-  <!-- ROW 12: Zero Console Popups -->
-  <text x="18" y="509" class="row-lbl">Zero Console Popups</text>
-  <text x="342" y="509" class="win-val">✓ 100% Silent Runner</text>
-  <text x="557" y="509" class="muted-val">Background service</text>
-  <text x="772" y="509" class="muted-val">Background process</text>
 
 </svg>
