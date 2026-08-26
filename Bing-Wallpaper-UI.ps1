@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.39'
+$script:appVersion = [Version]'1.0.40'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1623,6 +1623,7 @@ function Invoke-GitHubApiJson([string]$Uri) {
 function Format-MarkdownForDialog {
     param([string]$Text)
     if (-not $Text) { return '' }
+    $bullet = [char]0x2022
     $lines = $Text -split "\r?\n"
     $cleanLines = @()
     foreach ($line in $lines) {
@@ -1642,7 +1643,7 @@ function Format-MarkdownForDialog {
         # Strip backticks
         $cleaned = $cleaned -replace '`([^`]+)`', '$1'
         # Replace list markers with clean bullet dots
-        $cleaned = $cleaned -replace '^[-*]\s+', 'â€¢ '
+        $cleaned = $cleaned -replace '^[-*]\s+', "$bullet "
         # Shorten full commit SHAs to 7 characters
         $cleaned = $cleaned -replace '\b([a-f0-9]{7})[a-f0-9]{33}\b', '$1'
         $cleanLines += $cleaned
@@ -1778,6 +1779,16 @@ function Show-ModernDialog {
     $r = New-Object System.Xml.XmlNodeReader ([xml]$dialogXaml)
     $dlg = [Windows.Markup.XamlReader]::Load($r)
     if ($ParentWindow) { $dlg.Owner = $ParentWindow }
+
+    # Set authentic Bing icon for dialog titlebar
+    if ($window -and $window.Icon) {
+        $dlg.Icon = $window.Icon
+    }
+    elseif ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
+        try {
+            $dlg.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new($script:taskbarIconPath))
+        } catch {}
+    }
 
     # Enable native Windows 11 dark title bar for dialog
     $dlg.Add_SourceInitialized({
@@ -2408,6 +2419,7 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
