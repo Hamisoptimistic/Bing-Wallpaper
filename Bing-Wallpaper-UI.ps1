@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.58'
+$script:appVersion = [Version]'1.0.59'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1923,7 +1923,7 @@ function Start-BackgroundUpdateCheck {
         $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
 
         $wc.Add_DownloadStringCompleted({
-            param($sender, $e)
+            param($eventSource, $e)
             try {
                 if (-not $e.Error -and $e.Result) {
                     if ($e.Result -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
@@ -1936,7 +1936,7 @@ function Start-BackgroundUpdateCheck {
                 }
             } catch {}
             finally {
-                $sender.Dispose()
+                if ($eventSource) { $eventSource.Dispose() }
                 [BingWallpaperNative]::FlushMemory()
             }
             Set-UpdateButtonState -HasUpdate $false
@@ -2453,6 +2453,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
