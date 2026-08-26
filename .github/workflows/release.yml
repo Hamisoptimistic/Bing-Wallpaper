@@ -1,0 +1,47 @@
+name: Build and Auto-Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compile BingWallpaper.exe
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
+          if (-not (Test-Path .\BingWallpaper.exe)) {
+            throw "BingWallpaper.exe failed to compile"
+          }
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Bing Wallpaper - Latest Build"
+          body: |
+            ### 🚀 Automated Latest Build
+            Automatically built from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
+
+            #### 📦 Download
+            - **[BingWallpaper.exe](https://github.com/${{ github.repository }}/releases/download/latest/BingWallpaper.exe)** (Zero-console standalone launcher)
+          draft: false
+          prerelease: false
+          files: |
+            BingWallpaper.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
