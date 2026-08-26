@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.52'
+$script:appVersion = [Version]'1.0.53'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1699,10 +1699,13 @@ function Set-TransientStatus {
         $script:statusResetTimer.Stop()
     }
     
-    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-    $StatusText.Opacity = 1
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
+    
+    # Smooth fade-in when the transient message appears
+    $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+    $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
+    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
 
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
@@ -2029,30 +2032,35 @@ function Show-ModernDialog {
 }
 
 function Check-ForUpdatesInBackground {
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-    $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
-    
-    $wc.DownloadStringCompleted.Add({
-        param($sender, $e)
-        if ($e.Error) { return }
-        try {
-            $latestRel = $e.Result | ConvertFrom-Json
-            $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-            if ($latestVersion -gt $script:appVersion) {
-                # Use the main window's dispatcher, not the background thread's CurrentDispatcher
-                $window.Dispatcher.Invoke([Action]{
-                    if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = 'Visible' }
-                    if ($UpdateBtnText) { $UpdateBtnText.Text = 'Update Now' }
-                })
+    $worker = New-Object System.ComponentModel.BackgroundWorker
+    $worker.Add_DoWork({
+            param($sender, $e)
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
+            try {
+                $e.Result = $wc.DownloadString($releaseUri)
+            } catch {
+                $e.Result = $null
             }
-        }
-        catch {}
-        finally {
+            $wc.Dispose()
+        })
+    $worker.Add_RunWorkerCompleted({
+            param($sender, $e)
+            if ($e.Result) {
+                try {
+                    $latestRel = $e.Result | ConvertFrom-Json
+                    $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
+                    if ($latestVersion -gt $script:appVersion) {
+                        if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = 'Visible' }
+                        if ($UpdateBtnText) { $UpdateBtnText.Text = 'Update Now' }
+                    }
+                }
+                catch {}
+            }
             $sender.Dispose()
-        }
-    })
-    $wc.DownloadStringAsync((New-Object System.Uri($releaseUri)))
+        })
+    $worker.RunWorkerAsync()
 }
 
 function Start-VerifiedUpdate {
@@ -2093,19 +2101,7 @@ function Start-VerifiedUpdate {
 
         if ($latestVersion -le $script:appVersion) {
             Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
-            $StatusText.Text = 'You are up to date.'
-            
-            if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
-            $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
-            $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds(3)
-            $script:statusResetTimer.Add_Tick({
-                $script:statusResetTimer.Stop()
-                if ($StatusText.Text -eq 'You are up to date.') {
-                    Restore-StatusTextDefaultWithFade
-                }
-            })
-            $script:statusResetTimer.Start()
-            
+            Set-TransientStatus -Message 'You are up to date.' -Brush $statusDefaultBrush
             return
         }
 
@@ -2113,7 +2109,7 @@ function Start-VerifiedUpdate {
         if ($releaseNotes.Length -gt 1800) { $releaseNotes = $releaseNotes.Substring(0, 1800) + "`n`n(Release notes shortened.)" }
         $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Details $releaseNotes -Icon "Update" -Buttons "YesNo"
         if ($confirmation -ne 'Yes') {
-            $StatusText.Text = 'Update cancelled.'
+            Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush
             return
         }
 
@@ -2199,8 +2195,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $window.Close()
     }
     catch {
-        $StatusText.Foreground = $statusErrorBrush
-        $StatusText.Text = "Update failed: $($_.Exception.Message)"
+        Set-TransientStatus -Message "Update failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
         Show-ModernDialog -Title "Update Error" -Header "Update Check Failed" -Message "$($_.Exception.Message)" -Icon "Error" -Buttons "OK" | Out-Null
     }
     finally {
@@ -2629,6 +2624,8 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
 
 
 
