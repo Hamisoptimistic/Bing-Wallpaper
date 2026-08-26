@@ -46,42 +46,42 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 <table>
   <tr>
-    <td width="50%" align="center" valign="top">
-      <h3>⚡ Ultra-Low Memory Footprint</h3>
+    <td width="50%" align="center">
+      <b>⚡ Ultra-Low Memory Footprint</b>
       <p>Built with native PowerShell and WPF. Uses only <b>~50–60 MB RAM</b> when open, and drops to <b>0 MB</b> when closed while Windows Task Scheduler manages background rotation.</p>
     </td>
-    <td width="50%" align="center" valign="top">
-      <h3>🎨 Modern Fluent UI & Hover Effects</h3>
+    <td width="50%" align="center">
+      <b>🎨 Modern Fluent UI & Hover Effects</b>
       <p>Windows 11-inspired dark aesthetic featuring smooth card hover animations, reveal borders, rounded controls, custom dark title bar integration, and clean typography.</p>
     </td>
   </tr>
   <tr>
-    <td width="50%" align="center" valign="top">
-      <h3>🤫 1-Click Silent Background Automation</h3>
+    <td width="50%" align="center">
+      <b>🤫 1-Click Silent Background Automation</b>
       <p>Toggle <b>Auto</b> on to update wallpapers automatically. Choose from <i>On Login</i>, <i>1 minute (test)</i>, <i>Hourly</i>, <i>Every 6 hours</i>, or <i>Daily</i> with zero console pop-ups.</p>
     </td>
-    <td width="50%" align="center" valign="top">
-      <h3>🎯 Desktop & Lock Screen Support</h3>
+    <td width="50%" align="center">
+      <b>🎯 Desktop & Lock Screen Support</b>
       <p>Personalize your <b>Desktop</b>, <b>Lock Screen</b>, or <b>Both</b> simultaneously. Select wallpaper styles: <i>Fit</i>, <i>Fill</i>, <i>Stretch</i>, <i>Center</i>, or <i>Tile</i>.</p>
     </td>
   </tr>
   <tr>
-    <td width="50%" align="center" valign="top">
-      <h3>📐 4K UHD & Crisp Resolutions</h3>
+    <td width="50%" align="center">
+      <b>📐 4K UHD & Crisp Resolutions</b>
       <p>Select your preferred resolution directly from the toolbar: <b>4K / UHD</b>, <b>1080p Full HD</b>, or standard widescreen formats.</p>
     </td>
-    <td width="50%" align="center" valign="top">
-      <h3>🌍 50+ Global Country Feeds</h3>
+    <td width="50%" align="center">
+      <b>🌍 50+ Global Country Feeds</b>
       <p>Explore and apply daily wallpapers curated from 50+ international regions (India, United States, United Kingdom, Japan, Germany, France, Australia, and more).</p>
     </td>
   </tr>
   <tr>
-    <td width="50%" align="center" valign="top">
-      <h3>💾 Dedicated Wallpaper Downloader</h3>
+    <td width="50%" align="center">
+      <b>💾 Dedicated Wallpaper Downloader</b>
       <p>Save original, full-resolution 4K wallpaper images directly to your designated download folder with metadata and location info intact.</p>
     </td>
-    <td width="50%" align="center" valign="top">
-      <h3>🔄 1-Click Seamless In-App Updates</h3>
+    <td width="50%" align="center">
+      <b>🔄 1-Click Seamless In-App Updates</b>
       <p>Click <b>Check for updates</b> to instantly check GitHub Releases. The app validates SHA-256 checksums, downloads the new version, and auto-restarts seamlessly—no installers or manual file downloads needed.</p>
     </td>
   </tr>
