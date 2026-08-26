@@ -1415,11 +1415,20 @@ $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.W
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
 $script:statusResetTimer = $null
 
+function Get-AppliedSuccessMessage([string]$target) {
+    switch ($target) {
+        'Desktop'     { return "Success! Wallpaper applied to background" }
+        'Lock screen' { return "Success! Wallpaper applied to Lockscreen" }
+        'Both'        { return "Success! Wallpaper applied to background and Lockscreen" }
+        Default       { return "Success! Wallpaper applied to $target" }
+    }
+}
+
 function Set-TransientStatus {
     param(
         [string]$Message,
         [System.Windows.Media.Brush]$Brush = $statusSuccessBrush,
-        [int]$Seconds = 3
+        [double]$Seconds = 3.5
     )
     if ($script:statusResetTimer) {
         $script:statusResetTimer.Stop()
@@ -1676,7 +1685,7 @@ function Load-Gallery {
 
                         try {
                             $null = Set-BingImage -Image $clickedImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem
-                            Set-TransientStatus -Message "Success! Applied to $($TargetBox.SelectedItem)."
+                            Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
                         }
                         catch {
                             Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
@@ -1715,7 +1724,7 @@ $UpdateBtn.Add_Click({
 
         try {
             $null = Set-BingImage -Image $targetImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem
-            Set-TransientStatus -Message "Success! Applied to $($TargetBox.SelectedItem)."
+            Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
         }
         catch {
             Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
