@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.48'
+$script:appVersion = [Version]'1.0.49'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1859,6 +1859,36 @@ function Set-UpdateButtonState {
     }
 }
 
+function Get-OnlineLatestVersion {
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+    
+    # 1. Direct CDN fetch with ZERO rate limits
+    try {
+        $rawContent = $wc.DownloadString("https://raw.githubusercontent.com/$($script:updateRepository)/main/Bing-Wallpaper-UI.ps1")
+        if ($rawContent -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
+            return [Version]$Matches[1]
+        }
+    } catch {}
+
+    # 2. Redirect tag inspection fallback
+    try {
+        $req = [System.Net.HttpWebRequest]::Create("https://github.com/$($script:updateRepository)/releases/latest")
+        $req.AllowAutoRedirect = $false
+        $req.UserAgent = 'BingWallpaper-Updater'
+        $res = $req.GetResponse()
+        $loc = $res.Headers['Location']
+        $res.Dispose()
+        if ($loc) {
+            $tag = Split-Path -Leaf $loc
+            $v = Get-ReleaseVersion -TagName $tag
+            if ($v) { return $v }
+        }
+    } catch {}
+
+    return $null
+}
+
 function Start-BackgroundUpdateCheck {
     try {
         $wc = New-Object System.Net.WebClient
@@ -1868,58 +1898,23 @@ function Start-BackgroundUpdateCheck {
             param($sender, $e)
             try {
                 if (-not $e.Error -and $e.Result) {
-                    $json = $e.Result | ConvertFrom-Json
-                    $v = $null
-                    try {
-                        $v = Get-ReleaseVersion -TagName $json.tag_name -ReleaseName $json.name -ReleaseBody $json.body
-                    } catch {}
-
-                    if ($v -and ($v -gt $script:appVersion)) {
-                        Set-UpdateButtonState -HasUpdate $true -NewVersion $v
-                        return
+                    if ($e.Result -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
+                        $v = [Version]$Matches[1]
+                        if ($v -gt $script:appVersion) {
+                            Set-UpdateButtonState -HasUpdate $true -NewVersion $v
+                            return
+                        }
                     }
                 }
-                
-                # Fallback to recent releases if /latest had unversioned tag
-                $wc2 = New-Object System.Net.WebClient
-                $wc2.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-                $wc2.Add_DownloadStringCompleted({
-                    param($s2, $e2)
-                    try {
-                        if (-not $e2.Error -and $e2.Result) {
-                            $all = $e2.Result | ConvertFrom-Json
-                            $highest = $null
-                            foreach ($rel in $all) {
-                                try {
-                                    $ver = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
-                                    if ($null -eq $highest -or $ver -gt $highest) { $highest = $ver }
-                                } catch {}
-                            }
-                            if ($highest -and ($highest -gt $script:appVersion)) {
-                                Set-UpdateButtonState -HasUpdate $true -NewVersion $highest
-                                return
-                            }
-                        }
-                    } catch {}
-                    finally {
-                        $s2.Dispose()
-                        [BingWallpaperNative]::FlushMemory()
-                    }
-                    Set-UpdateButtonState -HasUpdate $false
-                })
-                $wc2.DownloadStringAsync([System.Uri]::new("https://api.github.com/repos/$($script:updateRepository)/releases?per_page=10"))
-                return
-            }
-            catch {
-                Set-UpdateButtonState -HasUpdate $false
-            }
+            } catch {}
             finally {
                 $sender.Dispose()
                 [BingWallpaperNative]::FlushMemory()
             }
+            Set-UpdateButtonState -HasUpdate $false
         })
 
-        $wc.DownloadStringAsync([System.Uri]::new("https://api.github.com/repos/$($script:updateRepository)/releases/latest"))
+        $wc.DownloadStringAsync([System.Uri]::new("https://raw.githubusercontent.com/$($script:updateRepository)/main/Bing-Wallpaper-UI.ps1"))
     }
     catch {}
 }
@@ -1931,33 +1926,9 @@ function Start-VerifiedUpdate {
     Update-UI
 
     try {
-        $release = $null
-        $latestVersion = $null
-
-        # First attempt: fetch /releases/latest
-        try {
-            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
-            $latestRel = Invoke-GitHubApiJson -Uri $releaseUri
-            $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-            $release = $latestRel
-        }
-        catch {
-            # Fallback: scan recent releases to locate the newest release with a valid semantic version
-            $allReleasesUri = "https://api.github.com/repos/$($script:updateRepository)/releases?per_page=10"
-            $allReleases = Invoke-GitHubApiJson -Uri $allReleasesUri
-            foreach ($rel in $allReleases) {
-                try {
-                    $ver = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
-                    if ($null -eq $latestVersion -or $ver -gt $latestVersion) {
-                        $latestVersion = $ver
-                        $release = $rel
-                    }
-                }
-                catch {}
-            }
-            if ($null -eq $latestVersion -or $null -eq $release) {
-                throw "No releases with a valid version tag (e.g. v1.0.0) were found in repository '$($script:updateRepository)'."
-            }
+        $latestVersion = Get-OnlineLatestVersion
+        if (-not $latestVersion) {
+            throw "Unable to connect to GitHub update server. Please check your network connection."
         }
 
         if ($latestVersion -le $script:appVersion) {
@@ -1975,11 +1946,8 @@ function Start-VerifiedUpdate {
             return
         }
 
-        $exeAsset = $release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe' } | Select-Object -First 1
-        $checksumAsset = $release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe.sha256' } | Select-Object -First 1
-        if (-not $exeAsset) {
-            throw 'This release does not include BingWallpaper.exe.'
-        }
+        $exeDownloadUrl = "https://github.com/$($script:updateRepository)/releases/latest/download/BingWallpaper.exe"
+        $shaDownloadUrl = "https://github.com/$($script:updateRepository)/releases/latest/download/BingWallpaper.exe.sha256"
 
         $StatusText.Text = "Downloading version $latestVersion..."
         Update-UI
@@ -1987,17 +1955,14 @@ function Start-VerifiedUpdate {
         
         $client = New-Object System.Net.WebClient
         $client.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-        $client.DownloadFile($exeAsset.browser_download_url, $downloadPath)
+        $client.DownloadFile($exeDownloadUrl, $downloadPath)
 
-        # Extract SHA-256 hash from checksum file or release asset digest
+        # Extract SHA-256 hash from checksum file
         $expectedHash = $null
-        if ($checksumAsset) {
-            $checksumText = $client.DownloadString($checksumAsset.browser_download_url)
+        try {
+            $checksumText = $client.DownloadString($shaDownloadUrl)
             $expectedHash = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b').Value.ToUpperInvariant()
-        }
-        elseif ($exeAsset.digest -and $exeAsset.digest -match '(?i)sha256:([a-f0-9]{64})') {
-            $expectedHash = $Matches[1].ToUpperInvariant()
-        }
+        } catch {}
 
         if ($expectedHash) {
             $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
@@ -2462,6 +2427,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
