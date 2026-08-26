@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.62'
+$script:appVersion = [Version]'1.0.64'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1109,6 +1109,7 @@ if ($AutoApply) {
                 <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             
@@ -1153,7 +1154,32 @@ if ($AutoApply) {
                 <ComboBox Name="StyleBox" FontSize="13.5"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="4">
+            <!-- Spotlight / Auto Wallpaper pill + options (inline, next to Style) -->
+            <StackPanel Grid.Column="4" Margin="0,0,16,0" Orientation="Horizontal">
+                <StackPanel Margin="0,0,10,0">
+                    <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <Border Name="SpotlightPill" Width="54" Height="30" CornerRadius="15"
+                            Background="#2D2D2D" BorderBrush="#444444" BorderThickness="1.5"
+                            Cursor="Hand" VerticalAlignment="Center">
+                        <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="White"
+                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Border>
+                </StackPanel>
+                <StackPanel Name="SpotlightIntervalPanel" Margin="0,0,10,0" Visibility="Collapsed">
+                    <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110"/>
+                </StackPanel>
+                <StackPanel Name="SpotlightTargetPanel" Visibility="Collapsed">
+                    <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Column="5">
                 <TextBlock Text="Save Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change save folder" />
             </StackPanel>
@@ -1330,11 +1356,13 @@ function Load-Settings {
 function Save-Settings {
     try {
         $settingsObj = @{
-            Region     = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
-            Resolution = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
-            Target     = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
-            Style      = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
-            SaveFolder = $FolderBox.Text
+            Region             = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
+            Resolution         = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
+            Target             = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
+            Style              = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
+            SaveFolder         = $FolderBox.Text
+            SpotlightInterval  = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { $SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
+            SpotlightTarget    = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedItem } else { 'Both' }
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -1361,8 +1389,14 @@ $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
 $UpdateBtnText = $window.FindName('UpdateBtnText')
 $UpdateBadgeDot = $window.FindName('UpdateBadgeDot')
-$DownloadBtn = $window.FindName('DownloadBtn')
-$UpdateBtn = $window.FindName('UpdateBtn')
+$DownloadBtn           = $window.FindName('DownloadBtn')
+$UpdateBtn             = $window.FindName('UpdateBtn')
+$SpotlightPill         = $window.FindName('SpotlightPill')
+$SpotlightThumb        = $window.FindName('SpotlightThumb')
+$SpotlightIntervalPanel = $window.FindName('SpotlightIntervalPanel')
+$SpotlightTargetPanel  = $window.FindName('SpotlightTargetPanel')
+$SpotlightIntervalBox  = $window.FindName('SpotlightIntervalBox')
+$SpotlightTargetBox    = $window.FindName('SpotlightTargetBox')
 
 # Helper to force UI redraw during blocking network calls
 function Update-UI {
@@ -1739,6 +1773,92 @@ function Get-UserFriendlyNetworkError {
         return $msg
     }
     return "Unable to $DefaultAction. Please check your internet connection."
+}
+
+# =============================================================
+# Spotlight / Auto Wallpaper (Task Scheduler)
+# =============================================================
+$script:SpotlightTaskName  = 'BingWallpaperSpotlight'
+$script:SpotlightScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
+$script:SpotlightEnabled   = $false
+
+function Register-SpotlightTask {
+    try {
+        $minutes = if ($SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
+        $target  = if ($SpotlightTargetBox.SelectedItem)  { [string]$SpotlightTargetBox.SelectedItem  } else { 'Both' }
+
+        $arg = "-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$($script:SpotlightScriptPath)`" -AutoApply -Target `"$target`""
+        $action   = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arg
+        $settings = New-ScheduledTaskSettingsSet -RunOnlyIfNetworkAvailable `
+                        -MultipleInstances IgnoreNew `
+                        -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+
+        if ($minutes -eq 0) {
+            $trigger = New-ScheduledTaskTrigger -AtLogOn
+        } elseif ($minutes -lt 1440) {
+            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+                           -RepetitionInterval ([TimeSpan]::FromMinutes($minutes))
+        } else {
+            $trigger = New-ScheduledTaskTrigger -Daily -At '06:00'
+        }
+
+        Register-ScheduledTask -TaskName $script:SpotlightTaskName `
+            -Action $action -Trigger $trigger -Settings $settings `
+            -RunLevel Limited -Force | Out-Null
+    } catch {}
+}
+
+function Unregister-SpotlightTask {
+    Unregister-ScheduledTask -TaskName $script:SpotlightTaskName -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+function Set-SpotlightState {
+    param([bool]$Enabled, [bool]$Animate = $true)
+    $script:SpotlightEnabled = $Enabled
+
+    $transform = $SpotlightThumb.RenderTransform
+    $targetX   = if ($Enabled) { 24.0 } else { 0.0 }
+    $dur       = if ($Animate)  { [TimeSpan]::FromMilliseconds(220) } else { [TimeSpan]::Zero }
+    $anim      = New-Object System.Windows.Media.Animation.DoubleAnimation($targetX, (New-Object System.Windows.Duration($dur)))
+    $anim.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+    $anim.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $anim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $transform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $anim)
+
+    if ($Enabled) {
+        $SpotlightPill.Background   = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
+        $SpotlightPill.BorderBrush  = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
+
+        # Fade the extra controls in
+        $SpotlightIntervalPanel.Opacity  = 0
+        $SpotlightTargetPanel.Opacity    = 0
+        $SpotlightIntervalPanel.Visibility = [System.Windows.Visibility]::Visible
+        $SpotlightTargetPanel.Visibility   = [System.Windows.Visibility]::Visible
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(250))))
+        $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+        $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+
+        Register-SpotlightTask
+    } else {
+        $SpotlightPill.Background  = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(45, 45, 45))
+        $SpotlightPill.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(68, 68, 68))
+
+        # Fade out then hide
+        $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180))))
+        $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+        $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+        $t = New-Object System.Windows.Threading.DispatcherTimer
+        $t.Interval = [TimeSpan]::FromMilliseconds(200)
+        $t.Add_Tick({
+            $t.Stop()
+            $SpotlightIntervalPanel.Visibility = [System.Windows.Visibility]::Collapsed
+            $SpotlightTargetPanel.Visibility   = [System.Windows.Visibility]::Collapsed
+        })
+        $t.Start()
+
+        Unregister-SpotlightTask
+    }
+    Save-Settings
 }
 
 function Set-TransientStatus {
@@ -2676,6 +2796,42 @@ $DownloadBtn.Add_Click({
 
 $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 
+# ---- Spotlight initialisation ----
+# Populate interval dropdown
+@(
+    @{ Label = 'On Login'; Minutes = 0 },
+    @{ Label = 'Hourly';   Minutes = 60 },
+    @{ Label = 'Every 6h'; Minutes = 360 },
+    @{ Label = 'Daily';    Minutes = 1440 }
+) | ForEach-Object {
+    $it = New-Object System.Windows.Controls.ComboBoxItem
+    $it.Content = $_.Label
+    $it.Tag     = $_.Minutes
+    [void]$SpotlightIntervalBox.Items.Add($it)
+}
+# Restore saved interval
+$savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 1440 }
+$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { 0 { 0 } 60 { 1 } 360 { 2 } default { 3 } }
+
+# Populate target dropdown
+@('Desktop', 'Lock screen', 'Both') | ForEach-Object { [void]$SpotlightTargetBox.Items.Add($_) }
+$savedTarget = if ($script:appSettings.SpotlightTarget) { $script:appSettings.SpotlightTarget } else { 'Both' }
+$SpotlightTargetBox.SelectedItem = $SpotlightTargetBox.Items | Where-Object { $_ -eq $savedTarget } | Select-Object -First 1
+if (-not $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedIndex = 2 }
+
+# Reflect task state on startup (task might already be registered)
+$taskExists = [bool](Get-ScheduledTask -TaskName $script:SpotlightTaskName -ErrorAction SilentlyContinue)
+if ($taskExists) {
+    Set-SpotlightState -Enabled $true -Animate $false
+}
+
+# Wire up pill click
+$SpotlightPill.Add_MouseLeftButtonUp({ Set-SpotlightState -Enabled (-not $script:SpotlightEnabled) })
+
+# Re-register task when interval or target changes while ON
+$SpotlightIntervalBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Register-SpotlightTask; Save-Settings } })
+$SpotlightTargetBox.Add_SelectionChanged({  if ($script:SpotlightEnabled) { Register-SpotlightTask; Save-Settings } })
+
 # Auto-select region: always detect from Windows locale on every launch
 $initialRegionCode = Get-DetectedRegionCode
 $detectedItem = $RegionBox.Items | Where-Object { $_.Tag -eq $initialRegionCode } | Select-Object -First 1
@@ -2700,6 +2856,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
