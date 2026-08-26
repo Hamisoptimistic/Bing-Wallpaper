@@ -45,6 +45,7 @@ if ($csc) {
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 
 namespace BingWallpaperLauncher
 {
@@ -54,11 +55,20 @@ namespace BingWallpaperLauncher
         static void Main()
         {
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string psScript = Path.Combine(appDir, "Bing-Wallpaper-UI.ps1");
+            string psScript = Path.Combine(Path.GetTempPath(), "BingWallpaper", "Bing-Wallpaper-UI.ps1");
 
-            if (!File.Exists(psScript))
+            try
             {
-                psScript = Path.Combine(Environment.CurrentDirectory, "Bing-Wallpaper-UI.ps1");
+                Directory.CreateDirectory(Path.GetDirectoryName(psScript));
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.Bing-Wallpaper-UI.ps1"))
+                using (FileStream destination = File.Create(psScript))
+                {
+                    source.CopyTo(destination);
+                }
+            }
+            catch
+            {
+                return;
             }
 
             ProcessStartInfo psi = new ProcessStartInfo();
@@ -82,6 +92,7 @@ namespace BingWallpaperLauncher
         "/optimize+",
         "/platform:anycpu",
         "/win32icon:`"$icoPath`"",
+        "/resource:`"$uiPath`",BingWallpaperLauncher.Bing-Wallpaper-UI.ps1",
         "/out:`"$exePath`"",
         "`"$csTemp`""
     )
