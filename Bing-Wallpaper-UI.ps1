@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.49'
+$script:appVersion = [Version]'1.0.50'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2496,7 +2496,21 @@ function Load-Gallery {
         if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
         [BingWallpaperNative]::FlushMemory()
         $StatusText.Foreground = $statusDefaultBrush
-        $StatusText.Text = 'Double-click any wallpaper to apply'
+        
+        # Smoothly transition from 'Connecting to Bing...' to 'Double-click any wallpaper to apply'
+        $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+        $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+        
+        $loadTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $loadTimer.Interval = [TimeSpan]::FromMilliseconds(320)
+        $loadTimer.Add_Tick({
+            $loadTimer.Stop()
+            $StatusText.Text = 'Double-click any wallpaper to apply'
+            $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+        })
+        $loadTimer.Start()
     }
     catch {
         $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
@@ -2601,6 +2615,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
