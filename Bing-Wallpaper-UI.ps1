@@ -21,6 +21,7 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Windows.Forms # Kept only for the Folder Browser dialog
+Add-Type -AssemblyName System.Drawing
 
 # ============================================================
 # WINDOWS 11 LOCK SCREEN
@@ -1317,19 +1318,13 @@ $script:selection = @{
 $cardUnselectedBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(140, 10, 12, 18)))
 $cardHoverBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(190, 20, 22, 30)))
 
-function Get-ImageAccentBrush($bitmap) {
+function Get-ImageAccentBrush([string]$imagePath) {
+    $bitmap = $null
     try {
-        $converted = New-Object System.Windows.Media.Imaging.FormatConvertedBitmap
-        $converted.BeginInit()
-        $converted.Source = $bitmap
-        $converted.DestinationFormat = [System.Windows.Media.PixelFormats]::Bgra32
-        $converted.EndInit()
-
-        $sampleWidth = [Math]::Min(48, [int]$converted.PixelWidth)
-        $sampleHeight = [Math]::Min(48, [int]$converted.PixelHeight)
-        $stride = $sampleWidth * 4
-        $pixels = New-Object byte[] ($stride * $sampleHeight)
-        $converted.CopyPixels($pixels, $stride, 0)
+        $bitmap = [System.Drawing.Bitmap]::new($imagePath)
+        $sampleWidth = [Math]::Min(32, $bitmap.Width)
+        $sampleHeight = [Math]::Min(32, $bitmap.Height)
+        if ($sampleWidth -lt 1 -or $sampleHeight -lt 1) { throw 'Image has no pixels' }
 
         $redTotal = 0.0
         $greenTotal = 0.0
@@ -1337,10 +1332,10 @@ function Get-ImageAccentBrush($bitmap) {
         $weightTotal = 0.0
         for ($y = 0; $y -lt $sampleHeight; $y++) {
             for ($x = 0; $x -lt $sampleWidth; $x++) {
-                $offset = ($y * $stride) + ($x * 4)
-                $blue = $pixels[$offset]
-                $green = $pixels[$offset + 1]
-                $red = $pixels[$offset + 2]
+                $pixel = $bitmap.GetPixel([int](($x / $sampleWidth) * $bitmap.Width), [int](($y / $sampleHeight) * $bitmap.Height))
+                $red = $pixel.R
+                $green = $pixel.G
+                $blue = $pixel.B
                 $maximum = [Math]::Max($red, [Math]::Max($green, $blue))
                 $minimum = [Math]::Min($red, [Math]::Min($green, $blue))
                 $weight = 1.0 + ((($maximum - $minimum) / 255.0) * 2.0)
@@ -1357,7 +1352,10 @@ function Get-ImageAccentBrush($bitmap) {
         return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, $red, $green, $blue))
     }
     catch {
-        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(210, 0, 60, 120))
+        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 70, 70, 70))
+    }
+    finally {
+        if ($bitmap) { $bitmap.Dispose() }
     }
 }
 
@@ -1582,7 +1580,7 @@ function Load-Gallery {
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
                 $bitmap.Freeze()
-                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $bitmap))
+                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
                 
                 $window.Dispatcher.Invoke({
                         [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
