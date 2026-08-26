@@ -143,10 +143,11 @@ try {
     }
 '@
     Add-Type -TypeDefinition $nativeHelperCode -ReferencedAssemblies System.Drawing, PresentationCore, WindowsBase -IgnoreWarnings
-} catch {}
+}
+catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.67'
+$script:appVersion = [Version]'1.0.68'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -818,11 +819,43 @@ function Save-BingImage {
 }
 
 # ==========================================
-# Headless CLI Execution Mode
+# Settings & Headless CLI Execution Mode
 # (For Task Scheduler / Background Automation)
 # ==========================================
+$script:settingsPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\settings.json'
+
+function Load-Settings {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    [CmdletBinding()]
+    param()
+    if (Test-Path -LiteralPath $script:settingsPath) {
+        try {
+            return (Get-Content -LiteralPath $script:settingsPath -Raw | ConvertFrom-Json)
+        }
+        catch {}
+    }
+    return @{
+        Region     = "auto"
+        Resolution = "1920x1080"
+        Target     = "Both"
+        Style      = (Get-CurrentDesktopWallpaperStyle)
+        SaveFolder = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+    }
+}
+
 if ($AutoApply) {
     try {
+        $savedSettings = Load-Settings
+        if ($savedSettings) {
+            if ($PSBoundParameters.ContainsKey('Region') -eq $false -and $savedSettings.Region -and $savedSettings.Region -ne 'auto') { $Region = $savedSettings.Region }
+            elseif ($Region -eq 'en-US') {
+                $detected = Get-DetectedRegionCode
+                if ($detected) { $Region = $detected }
+            }
+            if ($PSBoundParameters.ContainsKey('Resolution') -eq $false -and $savedSettings.Resolution) { $Resolution = $savedSettings.Resolution }
+            if ($PSBoundParameters.ContainsKey('Style') -eq $false -and $savedSettings.Style) { $Style = $savedSettings.Style }
+            if ($PSBoundParameters.ContainsKey('Target') -eq $false -and $savedSettings.SpotlightTarget) { $Target = $savedSettings.SpotlightTarget }
+        }
         $images = Get-BingImages -Region $Region
         if (-not $images -or $images.Count -eq 0) {
             throw "No Bing wallpaper metadata found for region '$Region'."
@@ -1120,7 +1153,7 @@ if ($AutoApply) {
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <ComboBox Name="RegionBox" FontSize="13.5"/>
+                    <ComboBox Name="RegionBox" FontSize="13.5" Height="38"/>
                     <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Grid.Column="1" Width="38" Height="38" Margin="8,0,0,0" ToolTip="Refresh Gallery">
                         <Viewbox Width="19" Height="19" Margin="0,2,0,0">
                             <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
@@ -1141,17 +1174,17 @@ if ($AutoApply) {
             
             <StackPanel Grid.Column="1" Margin="0,0,16,0">
                 <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="ResolutionBox" FontSize="13.5"/>
+                <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
             <StackPanel Grid.Column="2" Margin="0,0,16,0">
                 <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="TargetBox" FontSize="13.5"/>
+                <ComboBox Name="TargetBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
             <StackPanel Grid.Column="3" Margin="0,0,16,0">
                 <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="StyleBox" FontSize="13.5"/>
+                <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
             <!-- Spotlight / Auto Wallpaper pill + options (inline, next to Style) -->
@@ -1179,11 +1212,11 @@ if ($AutoApply) {
                 <StackPanel Name="SpotlightOptionsContainer" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
                     <StackPanel Margin="0,0,16,0">
                         <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110"/>
+                        <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
                     </StackPanel>
                     <StackPanel Margin="0,0,16,0">
                         <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120"/>
+                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
@@ -1365,13 +1398,14 @@ function Load-Settings {
 function Save-Settings {
     try {
         $settingsObj = @{
-            Region             = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
-            Resolution         = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
-            Target             = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
-            Style              = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
-            SaveFolder         = $FolderBox.Text
-            SpotlightInterval  = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { $SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
-            SpotlightTarget    = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedItem } else { 'Both' }
+            Region            = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
+            Resolution        = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
+            Target            = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
+            Style             = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
+            SaveFolder        = $FolderBox.Text
+            SpotlightInterval = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { $SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
+            SpotlightTarget   = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedItem } else { 'Both' }
+            SpotlightEnabled  = [bool]$script:SpotlightEnabled
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -1398,14 +1432,14 @@ $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
 $UpdateBtnText = $window.FindName('UpdateBtnText')
 $UpdateBadgeDot = $window.FindName('UpdateBadgeDot')
-$DownloadBtn           = $window.FindName('DownloadBtn')
-$UpdateBtn             = $window.FindName('UpdateBtn')
-$SpotlightPill             = $window.FindName('SpotlightPill')
-$SpotlightThumb            = $window.FindName('SpotlightThumb')
-$SpotlightGlow             = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
+$DownloadBtn = $window.FindName('DownloadBtn')
+$UpdateBtn = $window.FindName('UpdateBtn')
+$SpotlightPill = $window.FindName('SpotlightPill')
+$SpotlightThumb = $window.FindName('SpotlightThumb')
+$SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
 $SpotlightOptionsContainer = $window.FindName('SpotlightOptionsContainer')
-$SpotlightIntervalBox      = $window.FindName('SpotlightIntervalBox')
-$SpotlightTargetBox        = $window.FindName('SpotlightTargetBox')
+$SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
+$SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 
 # Helper to force UI redraw during blocking network calls
 function Update-UI {
@@ -1739,24 +1773,25 @@ function Restore-StatusTextDefaultWithFade {
     }
 
     $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-    $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
+    $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1, 0, $fadeDuration
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
     
     if ($script:fadeTimer) { $script:fadeTimer.Stop() }
     $script:fadeTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:fadeTimer.Interval = [TimeSpan]::FromMilliseconds(320)
     $script:fadeTimer.Add_Tick({
-        $script:fadeTimer.Stop()
-        if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
-            $StatusText.Foreground = $statusErrorBrush
-            $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
-        } else {
-            $StatusText.Foreground = $statusDefaultBrush
-            $StatusText.Text = 'Double-click any wallpaper to apply'
-        }
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-    })
+            $script:fadeTimer.Stop()
+            if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
+                $StatusText.Foreground = $statusErrorBrush
+                $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
+            }
+            else {
+                $StatusText.Foreground = $statusDefaultBrush
+                $StatusText.Text = 'Double-click any wallpaper to apply'
+            }
+            $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0, 1, $fadeDuration
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+        })
     $script:fadeTimer.Start()
 }
 
@@ -1787,17 +1822,25 @@ function Get-UserFriendlyNetworkError {
 # =============================================================
 # Spotlight / Auto Wallpaper (Task Scheduler)
 # =============================================================
-$script:SpotlightTaskName   = 'BingWallpaperSpotlight'
+$script:SpotlightTaskName = 'BingWallpaperSpotlight'
 $script:SpotlightScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
-$script:SpotlightEnabled    = $false
-$script:SpotlightHideTimer  = $null
+$script:SpotlightEnabled = $false
+$script:SpotlightHideTimer = $null
 
 # SolidColorBrushes for butter-smooth GPU color animation
-$script:pillBgBrush     = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(38, 38, 38))
+$script:pillBgBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(38, 38, 38))
 $script:pillBorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(61, 61, 61))
 if ($SpotlightPill) {
-    $SpotlightPill.Background  = $script:pillBgBrush
+    $SpotlightPill.Background = $script:pillBgBrush
     $SpotlightPill.BorderBrush = $script:pillBorderBrush
+}
+
+$script:SpotlightScriptPath = if ($PSCommandPath) {
+    (Resolve-Path -LiteralPath $PSCommandPath).Path
+} elseif ($PSScriptRoot) {
+    (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1')).Path
+} else {
+    (Resolve-Path -LiteralPath 'Bing-Wallpaper-UI.ps1').Path
 }
 
 function Update-SpotlightScheduledTaskAsync {
@@ -1811,30 +1854,62 @@ function Update-SpotlightScheduledTaskAsync {
     if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) {
         $target = [string]$SpotlightTargetBox.SelectedItem
     }
-    $scriptPath = $script:SpotlightScriptPath
 
-    [System.Threading.ThreadPool]::QueueUserWorkItem({
-        try {
-            if ($Enable) {
-                # Delete any old task first
-                & schtasks.exe /Delete /TN "BingWallpaperSpotlight" /F 2>$null
+    if ($Enable) {
+        $appDataDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper'
+        if (-not (Test-Path $appDataDir)) { New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null }
 
-                $cmd = "-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`" -AutoApply -Target `"$target`""
-                $tr = "powershell.exe $cmd"
+        # Copy the current running script to a persistent AppData location so background tasks always find it
+        $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
+        $currentScript = if ($script:SpotlightScriptPath -and (Test-Path -LiteralPath $script:SpotlightScriptPath)) {
+            $script:SpotlightScriptPath
+        } elseif ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
+            $PSCommandPath
+        } else {
+            (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1') -ErrorAction SilentlyContinue).Path
+        }
 
-                if ($minutes -eq 0) {
-                    & schtasks.exe /Create /TN "BingWallpaperSpotlight" /TR $tr /SC ONLOGON /F 2>$null
-                } elseif ($minutes -lt 1440) {
-                    $hours = [math]::Max(1, [int]($minutes / 60))
-                    & schtasks.exe /Create /TN "BingWallpaperSpotlight" /TR $tr /SC HOURLY /MO $hours /F 2>$null
-                } else {
-                    & schtasks.exe /Create /TN "BingWallpaperSpotlight" /TR $tr /SC DAILY /ST 06:00 /F 2>$null
-                }
-            } else {
-                & schtasks.exe /Delete /TN "BingWallpaperSpotlight" /F 2>$null
-            }
-        } catch {}
-    }) | Out-Null
+        if ($currentScript -and (Test-Path -LiteralPath $currentScript)) {
+            try { Copy-Item -LiteralPath $currentScript -Destination $persistentScriptPath -Force } catch {}
+        }
+
+        # Remove any legacy cmd wrappers that cause console popups
+        $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
+        if (Test-Path -LiteralPath $legacyCmd) { Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue }
+
+        # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
+        $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
+        $vbsCode = @"
+Set objShell = WScript.CreateObject("WScript.Shell")
+scriptPath = WScript.Arguments(0)
+target = WScript.Arguments(1)
+cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & scriptPath & """ -AutoApply -Target """ & target & """"
+objShell.Run cmd, 0, False
+"@
+        Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
+
+        $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$target`""
+        $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+        
+        if ($minutes -eq 0) {
+            $trigger = New-ScheduledTaskTrigger -AtLogOn
+        } elseif ($minutes -lt 0) {
+            # Test mode: every 1 minute
+            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
+        } elseif ($minutes -lt 60) {
+            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $minutes)
+        } elseif ($minutes -lt 1440) {
+            $hours = [math]::Max(1, [int]($minutes / 60))
+            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+        } else {
+            $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
+        }
+        
+        Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+    } else {
+        Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
+    }
 }
 
 function Set-SpotlightState {
@@ -1858,22 +1933,22 @@ function Set-SpotlightState {
         $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
 
         # 1. Animate Thumb position
-        $thumbAnim = New-Object System.Windows.Media.Animation.DoubleAnimation($targetX, (New-Object System.Windows.Duration($dur)))
+        $thumbAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetX, (New-Object System.Windows.Duration($dur))
         $thumbAnim.EasingFunction = $easing
         $SpotlightThumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $thumbAnim)
 
         # 2. Animate Pill Background & Border Color
-        $bgAnim = New-Object System.Windows.Media.Animation.ColorAnimation($targetBgColor, (New-Object System.Windows.Duration($dur)))
+        $bgAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetBgColor, (New-Object System.Windows.Duration($dur))
         $bgAnim.EasingFunction = $easing
         $script:pillBgBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $bgAnim)
 
-        $borderAnim = New-Object System.Windows.Media.Animation.ColorAnimation($targetBorderColor, (New-Object System.Windows.Duration($dur)))
+        $borderAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetBorderColor, (New-Object System.Windows.Duration($dur))
         $borderAnim.EasingFunction = $easing
         $script:pillBorderBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $borderAnim)
 
         # 3. Animate Glow Effect
         if ($SpotlightGlow) {
-            $glowAnim = New-Object System.Windows.Media.Animation.DoubleAnimation($targetGlowOpacity, (New-Object System.Windows.Duration($dur)))
+            $glowAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetGlowOpacity, (New-Object System.Windows.Duration($dur))
             $glowAnim.EasingFunction = $easing
             $SpotlightGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowAnim)
         }
@@ -1884,28 +1959,30 @@ function Set-SpotlightState {
             $SpotlightOptionsContainer.Opacity = 0
             $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Visible
 
-            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220))))
+            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.0, 1.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220)))
             $fadeAnim.EasingFunction = $easing
             $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
-        } else {
-            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180))))
+        }
+        else {
+            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, 0.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180)))
             $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
 
             $script:SpotlightHideTimer = New-Object System.Windows.Threading.DispatcherTimer
             $script:SpotlightHideTimer.Interval = [TimeSpan]::FromMilliseconds(190)
             $script:SpotlightHideTimer.Add_Tick({
-                if ($script:SpotlightHideTimer) {
-                    $script:SpotlightHideTimer.Stop()
-                    $script:SpotlightHideTimer = $null
-                }
-                if (-not $script:SpotlightEnabled) {
-                    $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                    $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
-                }
-            })
+                    if ($script:SpotlightHideTimer) {
+                        $script:SpotlightHideTimer.Stop()
+                        $script:SpotlightHideTimer = $null
+                    }
+                    if (-not $script:SpotlightEnabled) {
+                        $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                        $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
+                    }
+                })
             $script:SpotlightHideTimer.Start()
         }
-    } else {
+    }
+    else {
         # Instant set without animation (startup)
         $SpotlightThumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
         $SpotlightThumb.RenderTransform.X = $targetX
@@ -1925,7 +2002,8 @@ function Set-SpotlightState {
         if ($Enabled) {
             $SpotlightOptionsContainer.Opacity = 1
             $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Visible
-        } else {
+        }
+        else {
             $SpotlightOptionsContainer.Opacity = 0
             $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
         }
@@ -1952,7 +2030,7 @@ function Set-TransientStatus {
     
     # Smooth fade-in when the transient message appears
     $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-    $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
+    $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0, 1, $fadeDuration
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
 
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -2176,18 +2254,20 @@ function Show-ModernDialog {
     elseif ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
         try {
             $dlg.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new($script:taskbarIconPath))
-        } catch {}
+        }
+        catch {}
     }
 
     # Enable native Windows 11 dark title bar for dialog
     $dlg.Add_SourceInitialized({
-        try {
-            $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
-            if ($helper.Handle -ne [IntPtr]::Zero) {
-                [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
+            try {
+                $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
+                if ($helper.Handle -ne [IntPtr]::Zero) {
+                    [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
+                }
             }
-        } catch {}
-    })
+            catch {}
+        })
 
     $badgeBorder = $dlg.FindName('BadgeBorder')
     $badgePath = $dlg.FindName('BadgePath')
@@ -2217,7 +2297,8 @@ function Show-ModernDialog {
             $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 248, 113, 113))
             $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z")
         }
-        Default { # Info
+        Default {
+            # Info
             $badgeBorder.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 18, 48, 76))
             $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 96, 165, 250))
             $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z")
@@ -2242,9 +2323,9 @@ function Show-ModernDialog {
         $btnNo.BorderThickness = New-Object System.Windows.Thickness(1)
         $btnNo.Margin = New-Object System.Windows.Thickness(0, 0, 10, 0)
         $btnNo.Add_Click({
-            $script:dialogChoice = 'No'
-            $dlg.Close()
-        })
+                $script:dialogChoice = 'No'
+                $dlg.Close()
+            })
         $buttonPanel.Children.Add($btnNo) | Out-Null
 
         $btnYes = New-Object System.Windows.Controls.Button
@@ -2255,9 +2336,9 @@ function Show-ModernDialog {
         $btnYes.BorderThickness = New-Object System.Windows.Thickness(0)
         $btnYes.IsDefault = $true
         $btnYes.Add_Click({
-            $script:dialogChoice = 'Yes'
-            $dlg.Close()
-        })
+                $script:dialogChoice = 'Yes'
+                $dlg.Close()
+            })
         $buttonPanel.Children.Add($btnYes) | Out-Null
     }
     else {
@@ -2269,9 +2350,9 @@ function Show-ModernDialog {
         $btnOk.BorderThickness = New-Object System.Windows.Thickness(0)
         $btnOk.IsDefault = $true
         $btnOk.Add_Click({
-            $script:dialogChoice = 'OK'
-            $dlg.Close()
-        })
+                $script:dialogChoice = 'OK'
+                $dlg.Close()
+            })
         $buttonPanel.Children.Add($btnOk) | Out-Null
     }
 
@@ -2282,8 +2363,8 @@ function Show-ModernDialog {
 function Check-ForUpdatesInBackground {
     # Capture the dispatcher on the UI thread before handing off to the background worker
     $dispatcher = $window.Dispatcher
-    $repo       = $script:updateRepository
-    $appVer     = $script:appVersion
+    $repo = $script:updateRepository
+    $appVer = $script:appVersion
 
     $worker = New-Object System.ComponentModel.BackgroundWorker
     $worker.Add_DoWork({
@@ -2303,14 +2384,14 @@ function Check-ForUpdatesInBackground {
             param($sender, $e)
             if ($e.Result) {
                 try {
-                    $latestRel     = $e.Result | ConvertFrom-Json
+                    $latestRel = $e.Result | ConvertFrom-Json
                     $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
                     if ($latestVersion -gt $appVer) {
                         # Must update WPF elements from the UI thread
-                        $dispatcher.Invoke([Action]{
-                            if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = [System.Windows.Visibility]::Visible }
-                            if ($UpdateBtnText)  { $UpdateBtnText.Text = 'Update Now' }
-                        })
+                        $dispatcher.Invoke([Action] {
+                                if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = [System.Windows.Visibility]::Visible }
+                                if ($UpdateBtnText) { $UpdateBtnText.Text = 'Update Now' }
+                            })
                     }
                 }
                 catch {}
@@ -2475,12 +2556,12 @@ function Show-GalleryCard {
     $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(400))
     $beginTime = [TimeSpan]::FromMilliseconds($DelayMs)
 
-    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $duration)
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0, 1, $duration
     $fade.BeginTime = $beginTime
     $fade.EasingFunction = New-Object System.Windows.Media.Animation.SineEase
     $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
 
-    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(12, 0, $duration)
+    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 12, 0, $duration
     $slide.BeginTime = $beginTime
     $slide.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
     $slide.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
@@ -2774,14 +2855,15 @@ function Load-Gallery {
         $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
         $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
         $script:loadingStatusTimer.Add_Tick({
-            $script:loadingCounter++
-            if ($script:loadingCounter -le $script:loadingTotal) {
-                $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
-            } else {
-                $script:loadingStatusTimer.Stop()
-                Restore-StatusTextDefaultWithFade
-            }
-        })
+                $script:loadingCounter++
+                if ($script:loadingCounter -le $script:loadingTotal) {
+                    $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
+                }
+                else {
+                    $script:loadingStatusTimer.Stop()
+                    Restore-StatusTextDefaultWithFade
+                }
+            })
         $script:loadingStatusTimer.Start()
     }
     catch {
@@ -2875,6 +2957,7 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 # ---- Spotlight initialisation ----
 # Populate interval dropdown
 @(
+    @{ Label = '30 sec (test)'; Minutes = -1 },
     @{ Label = 'On Login'; Minutes = 0 },
     @{ Label = 'Hourly';   Minutes = 60 },
     @{ Label = 'Every 6h'; Minutes = 360 },
@@ -2882,12 +2965,12 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 ) | ForEach-Object {
     $it = New-Object System.Windows.Controls.ComboBoxItem
     $it.Content = $_.Label
-    $it.Tag     = $_.Minutes
+    $it.Tag = $_.Minutes
     [void]$SpotlightIntervalBox.Items.Add($it)
 }
 # Restore saved interval
 $savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 1440 }
-$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { 0 { 0 } 60 { 1 } 360 { 2 } default { 3 } }
+$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { -1 { 0 } 0 { 1 } 60 { 2 } 360 { 3 } default { 4 } }
 
 # Populate target dropdown
 @('Desktop', 'Lock screen', 'Both') | ForEach-Object { [void]$SpotlightTargetBox.Items.Add($_) }
@@ -2895,29 +2978,27 @@ $savedTarget = if ($script:appSettings.SpotlightTarget) { $script:appSettings.Sp
 $SpotlightTargetBox.SelectedItem = $SpotlightTargetBox.Items | Where-Object { $_ -eq $savedTarget } | Select-Object -First 1
 if (-not $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedIndex = 2 }
 
-# Reflect task state on startup (fast native check)
-$taskExists = $false
-try {
-    $out = & schtasks.exe /Query /TN $script:SpotlightTaskName 2>$null
-    if ($LASTEXITCODE -eq 0 -and $out -match $script:SpotlightTaskName) {
-        $taskExists = $true
-    }
-} catch {}
-
-if ($taskExists) {
+# Reflect Auto toggle state from saved settings (instant, no schtasks overhead)
+$spotlightWasEnabled = ($script:appSettings.SpotlightEnabled -eq $true)
+if ($spotlightWasEnabled) {
     Set-SpotlightState -Enabled $true -Animate $false -UpdateTask $false
+    # Always refresh the scheduled task on startup to ensure it uses the latest script logic
+    Update-SpotlightScheduledTaskAsync -Enable $true
 }
 
 # Wire up pill click with instant down-press response
 $SpotlightPill.Add_PreviewMouseLeftButtonDown({
     param($sender, $e)
     $e.Handled = $true
-    Set-SpotlightState -Enabled (-not $script:SpotlightEnabled)
+    $newState = -not $script:SpotlightEnabled
+    Set-SpotlightState -Enabled $newState
+    Update-SpotlightScheduledTaskAsync -Enable $newState
+    Save-Settings
 })
 
 # Re-register task asynchronously when interval or target changes while ON
 $SpotlightIntervalBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
-$SpotlightTargetBox.Add_SelectionChanged({  if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
+$SpotlightTargetBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
 
 # Auto-select region: always detect from Windows locale on every launch
 $initialRegionCode = Get-DetectedRegionCode
@@ -2937,16 +3018,12 @@ $RefreshBtn.Add_Click({
         Start-RefreshAnimation
     })
 $window.Add_ContentRendered({ 
-    Load-Gallery 
-    Check-ForUpdatesInBackground
-})
+        Load-Gallery 
+        Check-ForUpdatesInBackground
+    })
 
 # Show the app
 $window.ShowDialog() | Out-Null
-
-
-
-
 
 
 
