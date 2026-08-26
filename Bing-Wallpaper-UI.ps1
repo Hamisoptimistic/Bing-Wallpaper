@@ -1053,6 +1053,8 @@ if ($AutoApply) {
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
+#TEST
+
 # --- Global Reveal Highlight System ---
 $script:revealElements = New-Object System.Collections.ArrayList
 
