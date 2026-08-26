@@ -1,24 +1,30 @@
 <div align="center">
 
-# <img src="./assets/bing-color.svg" width="32" height="32" alt="Bing" /> Bing Wallpaper for Windows
+<h1>
+  <img src="assets/bing-color.svg" width="36" height="36" alt="Bing Logo" style="vertical-align: middle; margin-right: 8px;" />
+  Bing Wallpaper for Windows
+</h1>
 
-**Daily Bing photography for your Desktop & Lock Screen — lightweight, native, and silent.**
+<p><b>Daily 4K Bing photography delivered to your Desktop & Lock Screen with near-zero resource consumption.</b></p>
 
-<br>
+<p align="center">
+  <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
+    <img src="https://img.shields.io/badge/Download%20for%20Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download Bing Wallpaper" />
+  </a>
+</p>
 
-[![Download for Windows](https://img.shields.io/badge/Download%20for%20Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1)
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows 10 / 11" />
+  <img src="https://img.shields.io/badge/Runtime-PowerShell%205.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white" alt="PowerShell 5.1+" />
+  <img src="https://img.shields.io/badge/UI-Native%20WPF-68217A?style=flat-square" alt="Native WPF" />
+  <img src="https://img.shields.io/badge/Active%20RAM-~50--60%20MB-blue?style=flat-square" alt="Active RAM" />
+  <img src="https://img.shields.io/badge/Idle%20RAM-0%20MB-brightgreen?style=flat-square" alt="0 MB Idle RAM" />
+  <img src="https://img.shields.io/badge/License-MIT-2EA44F?style=flat-square" alt="MIT License" />
+</p>
 
-<br>
+<br />
 
-![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white)
-![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white)
-![WPF](https://img.shields.io/badge/UI-Native%20WPF-68217A?style=flat-square)
-![RAM](https://img.shields.io/badge/Active%20RAM-~50--60%20MB-0078D4?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-2EA44F?style=flat-square)
-
-<br><br>
-
-<img src="./assets/Preview.png" width="900" alt="Bing Wallpaper for Windows preview">
+<img src="assets/Preview.jpg" width="100%" alt="Bing Wallpaper Application Preview" />
 
 </div>
 
@@ -26,222 +32,133 @@
 
 ## Why Bing Wallpaper?
 
-Bing Wallpaper for Windows is a lightweight native Windows utility for discovering, downloading, and applying Bing's daily wallpapers.
+Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanently hogging **150 MB to 400 MB of RAM** just to change a wallpaper once a day.
 
-Unlike wallpaper applications built around heavyweight web runtimes, this project uses **PowerShell and native WPF** and exits completely when you close the interface. Automatic updates are handled by **Windows Task Scheduler**, so there is no resident tray process required.
-
-| | |
-|---|---|
-| **~50–60 MB Active RAM** | Lightweight native WPF interface while the app is open |
-| **0 MB Idle RAM** | The GUI exits completely when closed |
-| **Silent Automation** | Background rotation is handled by Windows Task Scheduler |
-| **Standalone EXE** | Launch directly without an installer or console window |
+**Bing Wallpaper for Windows is built natively:**
+- **~50–60 MB Active RAM**: The lightweight WPF interface uses minimal memory while open.
+- **0 MB Idle RAM**: The application exits completely when you close it. Automated background rotations are scheduled directly through Windows Task Scheduler—no background tray process or resident daemon needed.
+- **100% Silent Execution**: Uses an invisible native runner to apply wallpapers in the background without terminal flashes or command prompt windows.
+- **Zero-Console Standalone App**: Launches instantly via `BingWallpaper.exe` with no terminal pop-up.
 
 ---
 
 ## Features
 
 <table>
-<tr>
-<td width="50%" valign="top">
-
-### Ultra-Low Memory Footprint
-
-Built with native PowerShell and WPF rather than a heavyweight web framework.
-
-**~50–60 MB RAM while open**  
-**0 MB when closed**
-
-</td>
-<td width="50%" valign="top">
-
-### Modern Windows 11 UI
-
-A clean native interface with rounded controls, subtle hover effects, a custom dark title bar, compact gallery, and focused typography.
-
-</td>
-</tr>
-
-<tr>
-<td width="50%" valign="top">
-
-### Silent Background Automation
-
-Enable **Auto** and choose:
-
-`On Login` · `1 minute (test)` · `Hourly` · `Every 6 hours` · `Daily`
-
-Updates continue silently through Windows Task Scheduler, even after restarting your PC.
-
-</td>
-<td width="50%" valign="top">
-
-### Desktop & Lock Screen
-
-Apply wallpapers to:
-
-`Desktop` · `Lock Screen` · `Both`
-
-Choose from:
-
-`Fit` · `Fill` · `Stretch` · `Center` · `Tile`
-
-</td>
-</tr>
-
-<tr>
-<td width="50%" valign="top">
-
-### 4K UHD Support
-
-Choose the resolution that fits your display:
-
-`UHD / 4K` · `1920 × 1080` · `1366 × 768`
-
-</td>
-<td width="50%" valign="top">
-
-### 50+ Global Regions
-
-Browse daily Bing photography from more than **50 international regions**, including India, United States, United Kingdom, Japan, Germany, France, Australia, and more.
-
-</td>
-</tr>
-
-<tr>
-<td width="50%" valign="top">
-
-### Full-Resolution Downloads
-
-Save original high-resolution wallpapers directly to your preferred folder, with available metadata and location information preserved.
-
-</td>
-<td width="50%" valign="top">
-
-### Verified In-App Updates
-
-Check GitHub Releases directly from the application. Updates are downloaded, validated with **SHA-256**, installed, and followed by an automatic restart.
-
-</td>
-</tr>
+  <tr>
+    <td width="50%" align="center">
+      <br />
+      <b>⚡ Ultra-Low Memory Footprint</b>
+      <br /><br />
+      Built with native PowerShell and WPF. Uses only <b>~50–60 MB RAM</b> when open, and drops to <b>0 MB</b> when closed while Windows Task Scheduler manages background rotation.
+      <br /><br />
+    </td>
+    <td width="50%" align="center">
+      <br />
+      <b>🎨 Modern Fluent UI & Hover Effects</b>
+      <br /><br />
+      Windows 11-inspired dark aesthetic featuring smooth card hover animations, reveal borders, rounded controls, custom dark title bar integration, and clean typography.
+      <br /><br />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <br />
+      <b>🤫 1-Click Silent Background Automation</b>
+      <br /><br />
+      Toggle <b>Auto</b> on to update wallpapers automatically. Choose from <i>On Login</i>, <i>1 minute (test)</i>, <i>Hourly</i>, <i>Every 6 hours</i>, or <i>Daily</i> with zero console pop-ups.
+      <br /><br />
+    </td>
+    <td width="50%" align="center">
+      <br />
+      <b>🎯 Desktop & Lock Screen Support</b>
+      <br /><br />
+      Personalize your <b>Desktop</b>, <b>Lock Screen</b>, or <b>Both</b> simultaneously. Select wallpaper styles: <i>Fit</i>, <i>Fill</i>, <i>Stretch</i>, <i>Center</i>, or <i>Tile</i>.
+      <br /><br />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <br />
+      <b>📐 4K UHD & Crisp Resolutions</b>
+      <br /><br />
+      Select your preferred resolution directly from the toolbar: <b>4K / UHD</b>, <b>1080p Full HD</b>, or standard widescreen formats.
+      <br /><br />
+    </td>
+    <td width="50%" align="center">
+      <br />
+      <b>🌍 50+ Global Country Feeds</b>
+      <br /><br />
+      Explore and apply daily wallpapers curated from 50+ international regions (India, United States, United Kingdom, Japan, Germany, France, Australia, and more).
+      <br /><br />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <br />
+      <b>💾 Dedicated Wallpaper Downloader</b>
+      <br /><br />
+      Save original, full-resolution 4K wallpaper images directly to your designated download folder with metadata and location info intact.
+      <br /><br />
+    </td>
+    <td width="50%" align="center">
+      <br />
+      <b>🔄 1-Click Seamless In-App Updates</b>
+      <br /><br />
+      Click <b>Check for updates</b> to instantly check GitHub Releases. The app validates SHA-256 checksums, downloads the new version, and auto-restarts seamlessly—no installers or manual file downloads needed.
+      <br /><br />
+    </td>
+  </tr>
 </table>
 
 ---
 
 ## Quick Comparison
 
-| Feature | **Bing Wallpaper** | Official Bing Wallpaper | Electron / WebView Apps |
-|---|:---:|:---:|:---:|
-| **Active RAM** | **~50–60 MB** | ~80–120 MB | ~200–400 MB |
-| **Idle RAM** | **0 MB** | ~80 MB | ~200–400 MB |
-| **4K / UHD** | **Yes** | No | Varies |
-| **Lock Screen** | **Yes** | No | Rare |
-| **Wallpaper Styles** | **Yes** | No | Rare |
+| Feature | Bing Wallpaper | Official Bing Wallpaper | Electron / Webview Apps |
+| :--- | :---: | :---: | :---: |
+| **Active Memory (RAM)** | **~50–60 MB** | ~80–120 MB | ~200 MB – 400 MB |
+| **Idle Memory (When Closed)** | **0 MB** | ~80 MB (Always resident) | ~200 MB – 400 MB (Always resident) |
+| **4K / UHD Resolutions** | **Yes** | No | Varies |
+| **Lock Screen Support** | **Yes** | No | Rare |
+| **Wallpaper Style (Fit, Fill, Stretch, Tile)** | **Yes** | No | Rare |
 | **50+ Country Feeds** | **Yes** | No (US only) | Rare |
-| **High-Res Downloader** | **Yes** | No | Varies |
-| **Native WPF UI** | **Yes** | Limited | No |
-| **In-App Updates** | **Yes** | Yes | Varies |
-| **Background Automation** | **Task Scheduler** | Background Process | Node.js Process |
-| **Portable Binary** | **Yes** | No | Large Bundle |
+| **High-Res Local Downloader** | **Yes** | No | Varies |
+| **Modern Fluent UI & Hover Effects** | **Yes** (Native WPF) | Outdated Win32 | Webview / Heavy |
+| **1-Click Seamless In-App Updates** | **Yes** (SHA-256 Verified) | Proprietary Updater | Large Re-downloads |
+| **Background Automation Engine** | **Native Task Scheduler** | Background Tray Daemon | Background Node.js Process |
+| **Single Portable Binary** | **Yes** | No (MSI required) | Large bundle |
 
 ---
 
 ## Getting Started
 
-### 1. Download
+### 1. Download & Launch
+Download **[`BingWallpaper.exe`](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1)** and double-click to run. No setup wizard or administrative permissions required.
 
-[![Download BingWallpaper.exe](https://img.shields.io/badge/Download%20BingWallpaper.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1)
+### 2. Automatic Updates
+Inside the application, turn the **Auto** toggle to **ON**:
+1. Choose an interval (*On Login*, *1 minute*, *Hourly*, *Every 6h*, or *Daily*).
+2. Choose a target (*Desktop*, *Lock screen*, or *Both*) and style (*Fit*, *Fill*, *Stretch*, etc.).
+3. Close the app. Windows will automatically rotate your wallpaper silently in the background, even after restarting your PC.
 
-Run `BingWallpaper.exe` directly.
+### 3. Effortless 1-Click Updates
+Whenever a new update is released, staying up to date is completely effortless:
+1. Click **Check for updates** in the bottom-left corner of the app.
+2. If a new version is found, click **Yes** to update.
+3. The app automatically downloads the release, verifies its SHA-256 checksum for security, replaces the executable, and relaunches the newest version in seconds.
 
-No setup wizard or administrator permissions are required.
-
-### 2. Choose Your Preferences
-
-Select your:
-
-- **Region**
-- **Resolution**
-- **Target**
-- **Wallpaper Style**
-
-### 3. Browse & Apply
-
-Browse recent Bing wallpapers in the gallery, select an image, and apply it to your Desktop, Lock Screen, or both.
-
-You can also save the original high-resolution image locally.
-
-### 4. Enable Automatic Updates
-
-Turn **Auto** on and select your preferred interval and target.
-
-Once configured, you can close the application. Windows Task Scheduler handles future wallpaper rotations silently in the background.
-
----
-
-## Automatic Wallpaper
-
-Automatic wallpaper rotation works without keeping the application open.
-
-```text
-Automatic Wallpaper
-────────────────────────────────────────
-
-Interval     [ Daily ▾ ]
-Target       [ Desktop ▾ ]
-
-                         [ ON ]
-```
-
-### Intervals
-
-`On Login` · `1 minute (test)` · `Hourly` · `Every 6 hours` · `Daily`
-
-### Targets
-
-`Desktop` · `Lock Screen` · `Both`
-
----
-
-## Global Regions
-
-Bing Wallpaper supports more than **50 international Bing regions**.
-
-Some examples:
-
-| | | |
-|---|---|---|
-| United States | United Kingdom | Japan |
-| Germany | France | India |
-| Australia | Canada | More available |
-
----
-
-## Command Line
-
-The application includes a unified headless mode for scripting and automation.
-
-### Example
-
+### 4. Headless CLI
+You can also run silent updates directly from scripts or the command line:
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "Bing-Wallpaper-UI.ps1" -AutoApply -Region "en-US" -Resolution "UHD" -Target "Both" -Style "Fit"
 ```
-
-### Parameters
-
-| Parameter | Description |
-|---|---|
-| `-AutoApply` | Runs wallpaper application without opening the GUI |
-| `-Region` | Selects the Bing region, for example `en-US` |
-| `-Resolution` | `UHD`, `1920x1080`, or `1366x768` |
-| `-Target` | `Desktop`, `Lock screen`, or `Both` |
-| `-Style` | `Fit`, `Fill`, `Stretch`, `Center`, or `Tile` |
 
 ---
 
 ## Building from Source
 
-To generate the standalone executable and desktop shortcut:
+To compile the standalone `BingWallpaper.exe` launcher and create a desktop shortcut:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.ps1"
@@ -249,72 +166,15 @@ powershell.exe -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.p
 
 ---
 
-## Requirements
+## Security & Privacy
 
-| Requirement | Details |
-|---|---|
-| **Operating System** | Windows 10 / Windows 11 |
-| **PowerShell** | 5.1+ |
-| **Internet Connection** | Required for Bing wallpaper and update downloads |
-| **Administrator Rights** | Not required |
-
-The standalone executable includes everything required to run the application.
-
----
-
-## Security
-
-- **TLS 1.2 / 1.3** — Secure network connections for downloads.
-- **SHA-256 Verification** — Updates are verified before installation.
-- **User-Space Operation** — No administrator privileges required.
-- **Safe File Handling** — Input and file paths are validated.
-- **Silent Execution** — Scheduled operations run without visible console windows.
-
----
-
-## Project Structure
-
-```text
-Bing-Wallpaper/
-│
-├── Bing-Wallpaper-UI.ps1
-├── BingWallpaper.exe
-├── assets/
-│   ├── bing-color.svg
-│   └── Preview.png
-├── scripts/
-│   └── Create-Bing-App-Shortcut.ps1
-├── LICENSE
-└── README.md
-```
+- **Encrypted Connections**: Enforces TLS 1.2 and TLS 1.3 across all network requests.
+- **User-Space Only**: Runs with standard user privileges without administrative rights.
+- **Cryptographic Verification**: In-app updates verify cryptographic SHA-256 checksums before applying to prevent corrupted or unauthorized binaries.
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License**.
-
-See [LICENSE](LICENSE) for the complete license text.
-
-Wallpaper images downloaded through this utility are copyrighted by Microsoft and their respective photographers.
-
----
-
-<div align="center">
-
-<img src="./assets/bing-color.svg" width="28" height="28" alt="Bing">
-
-### Bing Wallpaper for Windows
-
-**Beautiful wallpapers. Simple controls. Native Windows experience.**
-
-<br>
-
-[![View Source](https://img.shields.io/badge/View%20Source%20Code-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hamisoptimistic/Bing-Wallpaper)
-[![Download](https://img.shields.io/badge/Download-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1)
-
-<br>
-
-<sub>Built with PowerShell and native WPF for Windows.</sub>
-
-</div>
+This project is open-source under the [MIT License](LICENSE).
+Wallpapers and imagery are copyrighted by Microsoft and their respective photographers.
