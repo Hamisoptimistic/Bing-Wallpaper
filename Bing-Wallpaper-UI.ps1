@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.61'
+$script:appVersion = [Version]'1.0.62'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1686,6 +1686,15 @@ $script:fadeTimer = $null
 $script:loadingStatusTimer = $null
 
 function Restore-StatusTextDefaultWithFade {
+    # If no wallpapers are loaded, never prompt to double-click
+    if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $StatusText.Opacity = 1
+        $StatusText.Foreground = $statusErrorBrush
+        $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
+        return
+    }
+
     $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
     $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
@@ -1695,8 +1704,13 @@ function Restore-StatusTextDefaultWithFade {
     $script:fadeTimer.Interval = [TimeSpan]::FromMilliseconds(320)
     $script:fadeTimer.Add_Tick({
         $script:fadeTimer.Stop()
-        $StatusText.Foreground = $statusDefaultBrush
-        $StatusText.Text = 'Double-click any wallpaper to apply'
+        if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
+            $StatusText.Foreground = $statusErrorBrush
+            $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
+        } else {
+            $StatusText.Foreground = $statusDefaultBrush
+            $StatusText.Text = 'Double-click any wallpaper to apply'
+        }
         $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
         $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
     })
@@ -2284,6 +2298,11 @@ function Load-Gallery {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     [CmdletBinding()]
     param()
+
+    if ($script:fadeTimer) { $script:fadeTimer.Stop() }
+    if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
+    if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+
     $GalleryPanel.Children.Clear()
     $script:selectedCard = $null
     $script:selectedImage = $null
@@ -2570,6 +2589,10 @@ function Load-Gallery {
         $script:loadingStatusTimer.Start()
     }
     catch {
+        if ($script:fadeTimer) { $script:fadeTimer.Stop() }
+        if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
+        if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+
         $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
         $StatusText.Opacity = 1
         $StatusText.Foreground = $statusErrorBrush
@@ -2677,6 +2700,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
