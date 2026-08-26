@@ -88,9 +88,6 @@
   </g>
 
   <!-- Row 1: Active Memory -->
-
-<!-- Row 1: Active Memory -->
-<!-- Row 1: Active Memory (GitHub-Safe Static Glow) -->
 <!-- Row 1: Active Memory (Static Green Border + Subtle Red Ambient Shadow) -->
   <text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
 
