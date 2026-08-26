@@ -1411,6 +1411,8 @@ function Select-Card($card, $image) {
 $statusDefaultBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 211, 153)))
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
+$statusDefaultFontSize = 14
+$statusTransientFontSize = 16
 $script:statusResetTimer = $null
 
 function Set-TransientStatus {
@@ -1424,6 +1426,7 @@ function Set-TransientStatus {
     }
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
+    $StatusText.FontSize = $statusTransientFontSize
     $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $null)
     $StatusText.Opacity = 0
 
@@ -1446,6 +1449,7 @@ function Set-TransientStatus {
             $fadeOut.Add_Completed({
                     $StatusText.Foreground = $statusDefaultBrush
                     $StatusText.Text = 'Double-click any wallpaper to apply'
+                    $StatusText.FontSize = $statusDefaultFontSize
                     $StatusText.Opacity = 1
                 })
             $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeOut)
