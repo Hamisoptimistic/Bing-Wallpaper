@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.42'
+$script:appVersion = [Version]'1.0.43'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1837,17 +1837,19 @@ function Set-UpdateButtonState {
     }
 }
 
-function Check-BackgroundUpdate {
-    [System.Threading.Tasks.Task]::Run([Action]{
+function Start-BackgroundUpdateCheck {
+    $script:bgUpdateTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:bgUpdateTimer.Interval = [TimeSpan]::FromMilliseconds(800)
+    $script:bgUpdateTimer.Add_Tick({
+        $script:bgUpdateTimer.Stop()
         try {
             $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
             $latestRel = Invoke-GitHubApiJson -Uri $releaseUri
             $latestVer = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
             
             if ($latestVer -gt $script:appVersion) {
-                $window.Dispatcher.Invoke([Action]{
-                    Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
-                })
+                Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
+                return
             }
         }
         catch {
@@ -1864,13 +1866,14 @@ function Check-BackgroundUpdate {
                     } catch {}
                 }
                 if ($latestVer -and ($latestVer -gt $script:appVersion)) {
-                    $window.Dispatcher.Invoke([Action]{
-                        Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
-                    })
+                    Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
+                    return
                 }
             } catch {}
         }
+        Set-UpdateButtonState -HasUpdate $false
     })
+    $script:bgUpdateTimer.Start()
 }
 
 function Start-VerifiedUpdate {
@@ -2401,11 +2404,12 @@ $RefreshBtn.Add_Click({
     })
 $window.Add_ContentRendered({
     Load-Gallery
-    Check-BackgroundUpdate
+    Start-BackgroundUpdateCheck
 })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
