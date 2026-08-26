@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.36'
+$script:appVersion = [Version]'1.0.38'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1620,6 +1620,196 @@ function Invoke-GitHubApiJson([string]$Uri) {
     }
 }
 
+function Show-ModernDialog {
+    param(
+        [string]$Title = 'Bing Wallpaper',
+        [string]$Header = 'Bing Wallpaper',
+        [string]$Message = '',
+        [string]$Details = '',
+        [ValidateSet('Info', 'Update', 'Error', 'Success')]
+        [string]$Icon = 'Info',
+        [ValidateSet('OK', 'YesNo')]
+        [string]$Buttons = 'OK',
+        [System.Windows.Window]$ParentWindow = $window
+    )
+
+    $dialogXaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="$Title" Width="450" SizeToContent="Height"
+        Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        ResizeMode="NoResize" WindowStyle="SingleBorderWindow">
+    <Window.Resources>
+        <Style x:Key="DialogBtn" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="100"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="BtnBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,6,16,6"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Padding="24" Background="#181818">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header with Badge Icon -->
+            <Grid Grid.Row="0" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Name="BadgeBorder" Width="44" Height="44" CornerRadius="22" Margin="0,0,16,0" VerticalAlignment="Top">
+                    <Path Name="BadgePath" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Width="20" Height="20"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Name="DialogHeader" FontSize="16.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,4" TextWrapping="Wrap"/>
+                    <TextBlock Name="DialogMessage" FontSize="13.5" Foreground="#BBBBBB" TextWrapping="Wrap" LineHeight="20"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Release Details (Collapsible) -->
+            <Border Name="DetailsCard" Grid.Row="1" Background="#212121" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16" MaxHeight="140" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" FocusVisualStyle="{x:Null}">
+                    <TextBlock Name="DetailsContent" FontSize="12.5" Foreground="#A8A8A8" TextWrapping="Wrap" FontFamily="Consolas, Segoe UI"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Action Buttons Panel -->
+            <StackPanel Name="ButtonPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0"/>
+        </Grid>
+    </Border>
+</Window>
+"@
+
+    $r = New-Object System.Xml.XmlNodeReader ([xml]$dialogXaml)
+    $dlg = [Windows.Markup.XamlReader]::Load($r)
+    if ($ParentWindow) { $dlg.Owner = $ParentWindow }
+
+    # Enable native Windows 11 dark title bar for dialog
+    $dlg.Add_SourceInitialized({
+        try {
+            $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
+            if ($helper.Handle -ne [IntPtr]::Zero) {
+                [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
+            }
+        } catch {}
+    })
+
+    $badgeBorder = $dlg.FindName('BadgeBorder')
+    $badgePath = $dlg.FindName('BadgePath')
+    $dialogHeader = $dlg.FindName('DialogHeader')
+    $dialogMessage = $dlg.FindName('DialogMessage')
+    $detailsCard = $dlg.FindName('DetailsCard')
+    $detailsContent = $dlg.FindName('DetailsContent')
+    $buttonPanel = $dlg.FindName('ButtonPanel')
+
+    $dialogHeader.Text = $Header
+    $dialogMessage.Text = $Message
+
+    # Configure Icon & Colors
+    switch ($Icon) {
+        'Update' {
+            $badgeBorder.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 16, 52, 88))
+            $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 56, 189, 248))
+            $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z")
+        }
+        'Success' {
+            $badgeBorder.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 16, 60, 36))
+            $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 74, 222, 128))
+            $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z")
+        }
+        'Error' {
+            $badgeBorder.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 68, 24, 24))
+            $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 248, 113, 113))
+            $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z")
+        }
+        Default { # Info
+            $badgeBorder.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 18, 48, 76))
+            $badgePath.Fill = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 96, 165, 250))
+            $badgePath.Data = [System.Windows.Media.Geometry]::Parse("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z")
+        }
+    }
+
+    if ($Details) {
+        $detailsContent.Text = $Details
+        $detailsCard.Visibility = [System.Windows.Visibility]::Visible
+    }
+
+    $script:dialogChoice = 'Cancel'
+    $btnStyle = $dlg.FindResource('DialogBtn')
+
+    if ($Buttons -eq 'YesNo') {
+        $btnNo = New-Object System.Windows.Controls.Button
+        $btnNo.Style = $btnStyle
+        $btnNo.Content = 'Not Now'
+        $btnNo.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 42, 42, 42))
+        $btnNo.Foreground = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 220, 220, 220))
+        $btnNo.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 60, 60, 60))
+        $btnNo.BorderThickness = New-Object System.Windows.Thickness(1)
+        $btnNo.Margin = New-Object System.Windows.Thickness(0, 0, 10, 0)
+        $btnNo.Add_Click({
+            $script:dialogChoice = 'No'
+            $dlg.Close()
+        })
+        $buttonPanel.Children.Add($btnNo) | Out-Null
+
+        $btnYes = New-Object System.Windows.Controls.Button
+        $btnYes.Style = $btnStyle
+        $btnYes.Content = 'Update Now'
+        $btnYes.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 0, 120, 212))
+        $btnYes.Foreground = [System.Windows.Media.Brushes]::White
+        $btnYes.BorderThickness = New-Object System.Windows.Thickness(0)
+        $btnYes.IsDefault = $true
+        $btnYes.Add_Click({
+            $script:dialogChoice = 'Yes'
+            $dlg.Close()
+        })
+        $buttonPanel.Children.Add($btnYes) | Out-Null
+    }
+    else {
+        $btnOk = New-Object System.Windows.Controls.Button
+        $btnOk.Style = $btnStyle
+        $btnOk.Content = 'OK'
+        $btnOk.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 0, 120, 212))
+        $btnOk.Foreground = [System.Windows.Media.Brushes]::White
+        $btnOk.BorderThickness = New-Object System.Windows.Thickness(0)
+        $btnOk.IsDefault = $true
+        $btnOk.Add_Click({
+            $script:dialogChoice = 'OK'
+            $dlg.Close()
+        })
+        $buttonPanel.Children.Add($btnOk) | Out-Null
+    }
+
+    $dlg.ShowDialog() | Out-Null
+    return $script:dialogChoice
+}
+
 function Start-VerifiedUpdate {
     $CheckUpdateBtn.IsEnabled = $false
     $StatusText.Foreground = $statusDefaultBrush
@@ -1657,16 +1847,14 @@ function Start-VerifiedUpdate {
         }
 
         if ($latestVersion -le $script:appVersion) {
-            [System.Windows.MessageBox]::Show("You already have the latest version ($($script:appVersion)).", 'Bing Wallpaper', 'OK', 'Information') | Out-Null
+            Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
             $StatusText.Text = 'You are up to date.'
             return
         }
 
         $releaseNotes = if ($release.body) { $release.body.Trim() } else { 'No release notes were provided.' }
         if ($releaseNotes.Length -gt 1800) { $releaseNotes = $releaseNotes.Substring(0, 1800) + "`n`n(Release notes shortened.)" }
-        $confirmation = [System.Windows.MessageBox]::Show(
-            "Version $latestVersion is available.`n`n$releaseNotes`n`nDownload, verify, and restart now?",
-            'Bing Wallpaper update', 'YesNo', 'Information')
+        $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Details $releaseNotes -Icon "Update" -Buttons "YesNo"
         if ($confirmation -ne 'Yes') {
             $StatusText.Text = 'Update cancelled.'
             return
@@ -1756,6 +1944,7 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
     catch {
         $StatusText.Foreground = $statusErrorBrush
         $StatusText.Text = "Update failed: $($_.Exception.Message)"
+        Show-ModernDialog -Title "Update Error" -Header "Update Check Failed" -Message "$($_.Exception.Message)" -Icon "Error" -Buttons "OK" | Out-Null
     }
     finally {
         if ($client) { $client.Dispose() }
@@ -2150,5 +2339,6 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
