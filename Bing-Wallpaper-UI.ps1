@@ -25,9 +25,128 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Windows.Forms # Kept only for the Folder Browser dialog
 Add-Type -AssemblyName System.Drawing
 
+# High-Performance Multi-Threaded Image Downloader & Color Extractor
+try {
+    $nativeHelperCode = @'
+    using System;
+    using System.Drawing;
+    using System.Drawing.Imaging;
+    using System.IO;
+    using System.Net;
+    using System.Runtime.InteropServices;
+    using System.Threading.Tasks;
+    using System.Windows.Media;
+
+    namespace BingWallpaper
+    {
+        public static class FastAccent
+        {
+            public static SolidColorBrush ExtractBrush(string path)
+            {
+                try
+                {
+                    if (!File.Exists(path))
+                    {
+                        var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
+                        fallback.Freeze();
+                        return fallback;
+                    }
+                    using (var bmp = new Bitmap(path))
+                    {
+                        using (var small = new Bitmap(bmp, new Size(24, 24)))
+                        {
+                            BitmapData data = small.LockBits(new Rectangle(0, 0, 24, 24), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                            int bytes = Math.Abs(data.Stride) * 24;
+                            byte[] rgb = new byte[bytes];
+                            Marshal.Copy(data.Scan0, rgb, 0, bytes);
+                            small.UnlockBits(data);
+
+                            int redTotal = 0, greenTotal = 0, blueTotal = 0, weightTotal = 0;
+                            for (int i = 0; i < rgb.Length; i += 4)
+                            {
+                                byte b = rgb[i];
+                                byte g = rgb[i + 1];
+                                byte r = rgb[i + 2];
+
+                                int max = Math.Max(r, Math.Max(g, b));
+                                int min = Math.Min(r, Math.Min(g, b));
+                                int weight = 1 + (((max - min) * 2) / 255);
+
+                                redTotal += r * weight;
+                                greenTotal += g * weight;
+                                blueTotal += b * weight;
+                                weightTotal += weight;
+                            }
+
+                            if (weightTotal == 0) weightTotal = 1;
+                            byte finalR = (byte)Math.Min(190, (redTotal / weightTotal) * 1.35);
+                            byte finalG = (byte)Math.Min(190, (greenTotal / weightTotal) * 1.35);
+                            byte finalB = (byte)Math.Min(190, (blueTotal / weightTotal) * 1.35);
+                            var brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, finalR, finalG, finalB));
+                            brush.Freeze();
+                            return brush;
+                        }
+                    }
+                }
+                catch
+                {
+                    var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
+                    fallback.Freeze();
+                    return fallback;
+                }
+            }
+        }
+
+        public static class FastDownloader
+        {
+            public static void DownloadThumbnailsParallel(string[] urlBases, string cacheDir)
+            {
+                try
+                {
+                    if (!Directory.Exists(cacheDir))
+                    {
+                        Directory.CreateDirectory(cacheDir);
+                    }
+
+                    Parallel.ForEach(urlBases, new ParallelOptions { MaxDegreeOfParallelism = 8 }, urlBase =>
+                    {
+                        try
+                        {
+                            string safeName = System.Text.RegularExpressions.Regex.Replace(urlBase, @"[^a-zA-Z0-9]", "");
+                            string targetFile = Path.Combine(cacheDir, safeName + "_thumb.jpg");
+                            if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 1024)
+                            {
+                                return;
+                            }
+
+                            string tempFile = targetFile + ".tmp" + Guid.NewGuid().ToString("N");
+                            string downloadUrl = "https://www.bing.com" + urlBase + "_1920x1080.jpg";
+
+                            using (var client = new WebClient())
+                            {
+                                client.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                                client.DownloadFile(downloadUrl, tempFile);
+                            }
+
+                            if (File.Exists(tempFile))
+                            {
+                                if (File.Exists(targetFile)) File.Delete(targetFile);
+                                File.Move(tempFile, targetFile);
+                            }
+                        }
+                        catch {}
+                    });
+                }
+                catch {}
+            }
+        }
+    }
+'@
+    Add-Type -TypeDefinition $nativeHelperCode -ReferencedAssemblies System.Drawing, PresentationCore, WindowsBase -IgnoreWarnings
+} catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.42'
+$script:appVersion = [Version]'1.0.43'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1042,7 +1161,7 @@ if ($AutoApply) {
 
         <!-- Smooth Modern Gallery Container -->
         <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True">
-            <ScrollViewer Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
+            <ScrollViewer Name="GalleryScrollViewer" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
                 <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
             </ScrollViewer>
         </Border>
@@ -1232,6 +1351,7 @@ $FolderBox = $window.FindName('FolderBox')
 $RefreshBtn = $window.FindName('RefreshBtn')
 $RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
+$GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
 $DownloadBtn = $window.FindName('DownloadBtn')
@@ -1469,43 +1589,11 @@ $cardUnselectedBg = (New-Object System.Windows.Media.SolidColorBrush([System.Win
 $cardHoverBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(190, 20, 22, 30)))
 
 function Get-ImageAccentBrush([string]$imagePath) {
-    $bitmap = $null
     try {
-        $bitmap = [System.Drawing.Bitmap]::new($imagePath)
-        $sampleWidth = [Math]::Min(32, $bitmap.Width)
-        $sampleHeight = [Math]::Min(32, $bitmap.Height)
-        if ($sampleWidth -lt 1 -or $sampleHeight -lt 1) { throw 'Image has no pixels' }
-
-        $redTotal = 0.0
-        $greenTotal = 0.0
-        $blueTotal = 0.0
-        $weightTotal = 0.0
-        for ($y = 0; $y -lt $sampleHeight; $y++) {
-            for ($x = 0; $x -lt $sampleWidth; $x++) {
-                $pixel = $bitmap.GetPixel([int](($x / $sampleWidth) * $bitmap.Width), [int](($y / $sampleHeight) * $bitmap.Height))
-                $red = $pixel.R
-                $green = $pixel.G
-                $blue = $pixel.B
-                $maximum = [Math]::Max($red, [Math]::Max($green, $blue))
-                $minimum = [Math]::Min($red, [Math]::Min($green, $blue))
-                $weight = 1.0 + ((($maximum - $minimum) / 255.0) * 2.0)
-                $redTotal += $red * $weight
-                $greenTotal += $green * $weight
-                $blueTotal += $blue * $weight
-                $weightTotal += $weight
-            }
-        }
-
-        $red = [Math]::Min(190, [int]($redTotal / $weightTotal * 1.35))
-        $green = [Math]::Min(190, [int]($greenTotal / $weightTotal * 1.35))
-        $blue = [Math]::Min(190, [int]($blueTotal / $weightTotal * 1.35))
-        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, $red, $green, $blue))
+        return [BingWallpaper.FastAccent]::ExtractBrush($imagePath)
     }
     catch {
         return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 70, 70, 70))
-    }
-    finally {
-        if ($bitmap) { $bitmap.Dispose() }
     }
 }
 
@@ -2104,13 +2192,19 @@ function Load-Gallery {
         $images = Get-BingImages -Region $selectedRegion
         $script:loadedImages = $images
         $total = $images.Count
+
+        $thumbCacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\Thumbnails'
+        if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
+            New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null
+        }
+
+        # Multi-threaded parallel background download of all thumbnails (fast!)
+        $urlBases = [string[]]($images | ForEach-Object { $_.urlbase })
+        [BingWallpaper.FastDownloader]::DownloadThumbnailsParallel($urlBases, $thumbCacheDir)
+
         $current = 0
-        
         foreach ($image in $images) {
             $current++
-            $StatusText.Text = "Fetching image $current of $total..."
-            Update-UI
-
             $displayTitle = Get-CleanImageTitle $image
 
             # Modern edge-to-edge flush Image Card
@@ -2230,50 +2324,44 @@ function Load-Gallery {
             
             $card.Child = $cardGrid
 
-            # Image Container (Using Image control for native aspect ratio scaling)
-            $imgBorder = New-Object System.Windows.Controls.Border
-            $imgBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
-            $imgBorder.ClipToBounds = $true
-            $imgBorder.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20)))
+            # Image Container with 16:9 Aspect Ratio
+            $imgBox = New-Object System.Windows.Controls.Grid
+            $imgBox.Height = 155
+            $imgBox.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 24, 24, 24)))
 
             $imageControl = New-Object System.Windows.Controls.Image
-            $imageControl.Stretch = [System.Windows.Media.Stretch]::Uniform
-            $imgBorder.Child = $imageControl
+            $imageControl.Stretch = 'UniformToFill'
+            $imageControl.HorizontalAlignment = 'Center'
+            $imageControl.VerticalAlignment = 'Center'
 
-            $stack.Children.Add($imgBorder)
+            $imgBox.Children.Add($imageControl) | Out-Null
+            $stack.Children.Add($imgBox)
 
-            # Download high-res thumbnail with local caching
+            # Load thumbnail from disk cache with fast LockBits accent extraction
             try {
-                $thumbCacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\Thumbnails'
-                if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
-                    New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null
-                }
                 $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
                 $thumbCachePath = Join-Path $thumbCacheDir "${safeName}_thumb.jpg"
                 if (-not (Test-Path -LiteralPath $thumbCachePath)) {
                     $wc = New-Object System.Net.WebClient
-                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
                     $wc.DownloadFile("https://www.bing.com$($image.urlbase)_1920x1080.jpg", $thumbCachePath)
                     $wc.Dispose()
                 }
-                
-                $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
-                $bitmap.BeginInit()
-                $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
-                $bitmap.DecodePixelWidth = 480
-                $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
-                $bitmap.EndInit()
-                $bitmap.Freeze()
-                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
-                
-                $window.Dispatcher.Invoke({
-                        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
-                        $imageControl.Source = $bitmap
-                    })
+                if (Test-Path -LiteralPath $thumbCachePath) {
+                    $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
+                    $bitmap.BeginInit()
+                    $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
+                    $bitmap.DecodePixelWidth = 360
+                    $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+                    $bitmap.EndInit()
+                    $bitmap.Freeze()
+
+                    [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                    $imageControl.Source = $bitmap
+                    $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+                }
             }
-            catch {
-                # Failsafe if image completely refuses to download
-            }
+            catch {}
 
             # Details Setup
             $details = New-Object System.Windows.Controls.StackPanel
@@ -2334,10 +2422,11 @@ function Load-Gallery {
 
             $GalleryPanel.Children.Add($card)
             Show-GalleryCard -Card $card
-
-            Update-UI # Force UI draw right away so the user isn't staring at a blank screen
         }
+
+        if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
         [BingWallpaperNative]::FlushMemory()
+        $StatusText.Foreground = $statusDefaultBrush
         $StatusText.Text = 'Double-click any wallpaper to apply'
     }
     catch {
@@ -2440,6 +2529,7 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
