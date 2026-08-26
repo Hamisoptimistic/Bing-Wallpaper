@@ -1327,8 +1327,6 @@ function Get-ImageAccentBrush($bitmap) {
 
         $sampleWidth = [Math]::Min(48, [int]$converted.PixelWidth)
         $sampleHeight = [Math]::Min(48, [int]$converted.PixelHeight)
-        if ($sampleWidth -lt 1 -or $sampleHeight -lt 1) { throw 'Image has no pixels' }
-
         $stride = $sampleWidth * 4
         $pixels = New-Object byte[] ($stride * $sampleHeight)
         $converted.CopyPixels($pixels, $stride, 0)
@@ -1345,8 +1343,7 @@ function Get-ImageAccentBrush($bitmap) {
                 $red = $pixels[$offset + 2]
                 $maximum = [Math]::Max($red, [Math]::Max($green, $blue))
                 $minimum = [Math]::Min($red, [Math]::Min($green, $blue))
-                $saturation = ($maximum - $minimum) / 255.0
-                $weight = 1.0 + ($saturation * 2.0)
+                $weight = 1.0 + ((($maximum - $minimum) / 255.0) * 2.0)
                 $redTotal += $red * $weight
                 $greenTotal += $green * $weight
                 $blueTotal += $blue * $weight
@@ -1585,7 +1582,7 @@ function Load-Gallery {
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
                 $bitmap.Freeze()
-                $card.Resources['ImageAccentBrush'] = Get-ImageAccentBrush $bitmap
+                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $bitmap))
                 
                 $window.Dispatcher.Invoke({
                         [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
