@@ -1150,64 +1150,66 @@ function Update-UI {
     $dispatcher.Invoke([Action] {}, [System.Windows.Threading.DispatcherPriority]::Background)
 }
 
-# Populate Settings
+# Populate Settings (Alphabetically sorted, Auto pinned at top)
 $countries = @(
     @{ Name = "Auto (Global)"; Code = "auto" },
-    @{ Name = "United States"; Code = "en-US" },
-    @{ Name = "United Kingdom"; Code = "en-GB" },
-    @{ Name = "Canada (English)"; Code = "en-CA" },
-    @{ Name = "Canada (French)"; Code = "fr-CA" },
+    @{ Name = "Arab Region"; Code = "ar-XA" },
+    @{ Name = "Argentina"; Code = "es-AR" },
     @{ Name = "Australia"; Code = "en-AU" },
-    @{ Name = "Germany"; Code = "de-DE" },
-    @{ Name = "France"; Code = "fr-FR" },
-    @{ Name = "Japan"; Code = "ja-JP" },
-    @{ Name = "China"; Code = "zh-CN" },
-    @{ Name = "India"; Code = "en-IN" },
-    @{ Name = "Brazil"; Code = "pt-BR" },
-    @{ Name = "Italy"; Code = "it-IT" },
-    @{ Name = "Spain"; Code = "es-ES" },
-    @{ Name = "Mexico"; Code = "es-MX" },
-    @{ Name = "Netherlands"; Code = "nl-NL" },
-    @{ Name = "Sweden"; Code = "sv-SE" },
-    @{ Name = "Norway"; Code = "nb-NO" },
-    @{ Name = "Finland"; Code = "fi-FI" },
-    @{ Name = "Denmark"; Code = "da-DK" },
-    @{ Name = "Poland"; Code = "pl-PL" },
-    @{ Name = "New Zealand"; Code = "en-NZ" },
-    @{ Name = "Singapore"; Code = "en-SG" },
-    @{ Name = "South Korea"; Code = "ko-KR" },
-    @{ Name = "Taiwan"; Code = "zh-TW" },
-    @{ Name = "Hong Kong"; Code = "zh-HK" },
-    @{ Name = "Switzerland (German)"; Code = "de-CH" },
-    @{ Name = "Switzerland (French)"; Code = "fr-CH" },
     @{ Name = "Austria"; Code = "de-AT" },
     @{ Name = "Belgium (Dutch)"; Code = "nl-BE" },
     @{ Name = "Belgium (French)"; Code = "fr-BE" },
-    @{ Name = "Argentina"; Code = "es-AR" },
-    @{ Name = "Chile"; Code = "es-CL" },
-    @{ Name = "Portugal"; Code = "pt-PT" },
-    @{ Name = "Turkey"; Code = "tr-TR" },
-    @{ Name = "Thailand"; Code = "th-TH" },
-    @{ Name = "Indonesia"; Code = "en-ID" },
-    @{ Name = "Malaysia"; Code = "en-MY" },
-    @{ Name = "Philippines"; Code = "en-PH" },
-    @{ Name = "Vietnam"; Code = "vi-VN" },
-    @{ Name = "Israel"; Code = "he-IL" },
-    @{ Name = "Greece"; Code = "el-GR" },
-    @{ Name = "Czech Republic"; Code = "cs-CZ" },
-    @{ Name = "Hungary"; Code = "hu-HU" },
-    @{ Name = "Romania"; Code = "ro-RO" },
+    @{ Name = "Brazil"; Code = "pt-BR" },
     @{ Name = "Bulgaria"; Code = "bg-BG" },
+    @{ Name = "Canada (English)"; Code = "en-CA" },
+    @{ Name = "Canada (French)"; Code = "fr-CA" },
+    @{ Name = "Chile"; Code = "es-CL" },
+    @{ Name = "China"; Code = "zh-CN" },
     @{ Name = "Croatia"; Code = "hr-HR" },
-    @{ Name = "Slovakia"; Code = "sk-SK" },
-    @{ Name = "Slovenia"; Code = "sl-SI" },
+    @{ Name = "Czech Republic"; Code = "cs-CZ" },
+    @{ Name = "Denmark"; Code = "da-DK" },
     @{ Name = "Estonia"; Code = "et-EE" },
+    @{ Name = "Finland"; Code = "fi-FI" },
+    @{ Name = "France"; Code = "fr-FR" },
+    @{ Name = "Germany"; Code = "de-DE" },
+    @{ Name = "Greece"; Code = "el-GR" },
+    @{ Name = "Hong Kong"; Code = "zh-HK" },
+    @{ Name = "Hungary"; Code = "hu-HU" },
+    @{ Name = "India"; Code = "en-IN" },
+    @{ Name = "Indonesia"; Code = "en-ID" },
+    @{ Name = "Israel"; Code = "he-IL" },
+    @{ Name = "Italy"; Code = "it-IT" },
+    @{ Name = "Japan"; Code = "ja-JP" },
     @{ Name = "Latvia"; Code = "lv-LV" },
     @{ Name = "Lithuania"; Code = "lt-LT" },
-    @{ Name = "Ukraine"; Code = "uk-UA" },
+    @{ Name = "Malaysia"; Code = "en-MY" },
+    @{ Name = "Mexico"; Code = "es-MX" },
+    @{ Name = "Netherlands"; Code = "nl-NL" },
+    @{ Name = "New Zealand"; Code = "en-NZ" },
+    @{ Name = "Norway"; Code = "nb-NO" },
+    @{ Name = "Philippines"; Code = "en-PH" },
+    @{ Name = "Poland"; Code = "pl-PL" },
+    @{ Name = "Portugal"; Code = "pt-PT" },
+    @{ Name = "Romania"; Code = "ro-RO" },
     @{ Name = "Russia"; Code = "ru-RU" },
-    @{ Name = "Arab Region"; Code = "ar-XA" }
+    @{ Name = "Singapore"; Code = "en-SG" },
+    @{ Name = "Slovakia"; Code = "sk-SK" },
+    @{ Name = "Slovenia"; Code = "sl-SI" },
+    @{ Name = "South Korea"; Code = "ko-KR" },
+    @{ Name = "Spain"; Code = "es-ES" },
+    @{ Name = "Sweden"; Code = "sv-SE" },
+    @{ Name = "Switzerland (French)"; Code = "fr-CH" },
+    @{ Name = "Switzerland (German)"; Code = "de-CH" },
+    @{ Name = "Taiwan"; Code = "zh-TW" },
+    @{ Name = "Thailand"; Code = "th-TH" },
+    @{ Name = "Turkey"; Code = "tr-TR" },
+    @{ Name = "Ukraine"; Code = "uk-UA" },
+    @{ Name = "United Kingdom"; Code = "en-GB" },
+    @{ Name = "United States"; Code = "en-US" },
+    @{ Name = "Vietnam"; Code = "vi-VN" }
 )
+
+$countries = @($countries[0]) + @($countries | Select-Object -Skip 1 | Sort-Object -Property { $_.Name })
 
 $RegionBox.SelectedIndex = 0
 foreach ($c in $countries) {
@@ -1407,61 +1409,30 @@ function Select-Card($card, $image) {
     }
 }
 
-# Transient Status Message System
+# Transient Status Message System (Auto-resets after N seconds)
 $statusDefaultBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 211, 153)))
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
-$statusDefaultFontSize = 14
-$statusTransientFontSize = 16
 $script:statusResetTimer = $null
-$script:statusFadeTimer = $null
 
 function Set-TransientStatus {
     param(
         [string]$Message,
         [System.Windows.Media.Brush]$Brush = $statusSuccessBrush,
-        [int]$Seconds = 4
+        [int]$Seconds = 3
     )
     if ($script:statusResetTimer) {
         $script:statusResetTimer.Stop()
     }
-    if ($script:statusFadeTimer) {
-        $script:statusFadeTimer.Stop()
-    }
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
-    $StatusText.FontSize = $statusTransientFontSize
-    $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $null)
-    $StatusText.Opacity = 0
-
-    $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation
-    $fadeIn.To = 1
-    $fadeIn.Duration = [System.Windows.Duration]::new([TimeSpan]::FromMilliseconds(260))
-    $fadeIn.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
-    $fadeIn.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-    $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeIn)
 
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
     $script:statusResetTimer.Add_Tick({
+            $StatusText.Foreground = $statusDefaultBrush
+            $StatusText.Text = 'Double-click any wallpaper to apply'
             $script:statusResetTimer.Stop()
-            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation
-            $fadeOut.To = 0
-            $fadeOut.Duration = [System.Windows.Duration]::new([TimeSpan]::FromMilliseconds(700))
-            $fadeOut.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
-            $fadeOut.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
-            $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeOut)
-
-            $script:statusFadeTimer = New-Object System.Windows.Threading.DispatcherTimer
-            $script:statusFadeTimer.Interval = [TimeSpan]::FromMilliseconds(750)
-            $script:statusFadeTimer.Add_Tick({
-                    $script:statusFadeTimer.Stop()
-                    $StatusText.Foreground = $statusDefaultBrush
-                    $StatusText.Text = 'Double-click any wallpaper to apply'
-                    $StatusText.FontSize = $statusDefaultFontSize
-                    $StatusText.Opacity = 1
-                })
-            $script:statusFadeTimer.Start()
         })
     $script:statusResetTimer.Start()
 }
@@ -1708,7 +1679,7 @@ function Load-Gallery {
                             Set-TransientStatus -Message "Success! Applied to $($TargetBox.SelectedItem)."
                         }
                         catch {
-                            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4
+                            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
                         }
                         finally {
                             $UpdateBtn.IsEnabled = $true
@@ -1747,7 +1718,7 @@ $UpdateBtn.Add_Click({
             Set-TransientStatus -Message "Success! Applied to $($TargetBox.SelectedItem)."
         }
         catch {
-            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4
+            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
         }
         finally {
             $UpdateBtn.IsEnabled = $true
@@ -1772,7 +1743,7 @@ $DownloadBtn.Add_Click({
             Set-TransientStatus -Message "Wallpaper downloaded"
         }
         catch {
-            Set-TransientStatus -Message "Download failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4
+            Set-TransientStatus -Message "Download failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
         }
         finally {
             $UpdateBtn.IsEnabled = $true
