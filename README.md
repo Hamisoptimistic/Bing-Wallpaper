@@ -115,19 +115,19 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 ## Quick Comparison
 
-| Feature | **Bing Wallpaper** | Official Bing Wallpaper | Electron / WebView Apps |
+| ![Feature](https://img.shields.io/badge/Feature-d73a49?style=for-the-badge) | ![Bing Wallpaper](https://img.shields.io/badge/Bing_Wallpaper-2ea44f?style=for-the-badge) | ![Official Bing Wallpaper](https://img.shields.io/badge/Official_Bing_Wallpaper-d73a49?style=for-the-badge) | ![Electron / WebView Apps](https://img.shields.io/badge/Electron_%2F_WebView_Apps-d73a49?style=for-the-badge) |
 | :--- | :---: | :---: | :---: |
-| **Active Memory (RAM)** | **~50–60 MB** | ~80–120 MB | ~200 MB – 400 MB |
-| **Idle Memory (When Closed)** | **0 MB** | ~80 MB *(Resident)* | ~200 MB – 400 MB *(Resident)* |
-| **4K / UHD Resolutions** | **Yes** | No | Varies |
-| **Lock Screen Support** | **Yes** | No | Rare |
-| **Wallpaper Styles (Fit, Fill, etc.)** | **Yes** | No | Rare |
-| **50+ Country Feeds** | **Yes** | No *(US only)* | Rare |
-| **High-Res Local Downloader** | **Yes** | No | Varies |
-| **Modern Fluent UI & Hover Effects** | **Yes (Native WPF)** | Outdated Win32 | WebView / Heavy |
-| **1-Click Seamless In-App Updates** | **Yes (SHA-256 Verified)** | Proprietary Updater | Large Re-downloads |
-| **Background Automation Engine** | **Native Task Scheduler** | Background Tray Daemon | Background Node.js Process |
-| **Single Portable Binary** | **Yes** | No *(MSI required)* | Large bundle |
+| **Active Memory (RAM)** | ![~50-60 MB](https://img.shields.io/badge/~50--60_MB-2ea44f?style=flat-square) | ~80–120 MB | ~200 MB – 400 MB |
+| **Idle Memory (When Closed)** | ![0 MB](https://img.shields.io/badge/0_MB-2ea44f?style=flat-square) | ~80 MB *(Resident)* | ~200 MB – 400 MB *(Resident)* |
+| **4K / UHD Resolutions** | ![Yes](https://img.shields.io/badge/✓_Yes-2ea44f?style=flat-square) | No | Varies |
+| **Lock Screen Support** | ![Yes](https://img.shields.io/badge/✓_Yes-2ea44f?style=flat-square) | No | Rare |
+| **Wallpaper Styles (Fit, Fill, etc.)** | ![Yes](https://img.shields.io/badge/✓_Yes-2ea44f?style=flat-square) | No | Rare |
+| **50+ Country Feeds** | ![Yes](https://img.shields.io/badge/✓_Yes-2ea44f?style=flat-square) | No *(US only)* | Rare |
+| **High-Res Local Downloader** | ![Yes](https://img.shields.io/badge/✓_Yes-2ea44f?style=flat-square) | No | Varies |
+| **Modern Fluent UI & Hover Effects** | ![Native WPF](https://img.shields.io/badge/✓_Native_WPF-2ea44f?style=flat-square) | Outdated Win32 | WebView / Heavy |
+| **1-Click Seamless In-App Updates** | ![SHA-256 Verified](https://img.shields.io/badge/✓_SHA--256_Verified-2ea44f?style=flat-square) | Proprietary Updater | Large Re-downloads |
+| **Background Automation Engine** | ![Task Scheduler](https://img.shields.io/badge/✓_Task_Scheduler-2ea44f?style=flat-square) | Background Tray Daemon | Background Node.js Process |
+| **Single Portable Binary** | ![Yes](https://img.shields.io/badge/✓_Yes-2ea44f?style=flat-square) | No *(MSI required)* | Large bundle |
 
 ---
 
