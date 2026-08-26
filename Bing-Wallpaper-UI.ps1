@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.68'
+$script:appVersion = [Version]'1.0.69'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1894,8 +1894,8 @@ objShell.Run cmd, 0, False
         
         if ($minutes -eq 0) {
             $trigger = New-ScheduledTaskTrigger -AtLogOn
-        } elseif ($minutes -lt 0) {
-            # Test mode: every 1 minute
+        } elseif ($minutes -le 1) {
+            # 1 minute interval
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
         } elseif ($minutes -lt 60) {
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $minutes)
@@ -2957,11 +2957,11 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 # ---- Spotlight initialisation ----
 # Populate interval dropdown
 @(
-    @{ Label = '30 sec (test)'; Minutes = -1 },
-    @{ Label = 'On Login'; Minutes = 0 },
-    @{ Label = 'Hourly';   Minutes = 60 },
-    @{ Label = 'Every 6h'; Minutes = 360 },
-    @{ Label = 'Daily';    Minutes = 1440 }
+    @{ Label = '1 min (test)'; Minutes = 1 },
+    @{ Label = 'On Login';     Minutes = 0 },
+    @{ Label = 'Hourly';       Minutes = 60 },
+    @{ Label = 'Every 6h';     Minutes = 360 },
+    @{ Label = 'Daily';        Minutes = 1440 }
 ) | ForEach-Object {
     $it = New-Object System.Windows.Controls.ComboBoxItem
     $it.Content = $_.Label
@@ -2970,7 +2970,7 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 }
 # Restore saved interval
 $savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 1440 }
-$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { -1 { 0 } 0 { 1 } 60 { 2 } 360 { 3 } default { 4 } }
+$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { { $_ -eq 1 -or $_ -eq -1 } { 0 } 0 { 1 } 60 { 2 } 360 { 3 } default { 4 } }
 
 # Populate target dropdown
 @('Desktop', 'Lock screen', 'Both') | ForEach-Object { [void]$SpotlightTargetBox.Items.Add($_) }
@@ -3024,6 +3024,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
