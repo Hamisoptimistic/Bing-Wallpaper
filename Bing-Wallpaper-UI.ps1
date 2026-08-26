@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.53'
+$script:appVersion = [Version]'1.0.54'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2105,9 +2105,7 @@ function Start-VerifiedUpdate {
             return
         }
 
-        $releaseNotes = if ($release.body) { $release.body.Trim() } else { 'No release notes were provided.' }
-        if ($releaseNotes.Length -gt 1800) { $releaseNotes = $releaseNotes.Substring(0, 1800) + "`n`n(Release notes shortened.)" }
-        $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Details $releaseNotes -Icon "Update" -Buttons "YesNo"
+        $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Icon "Update" -Buttons "YesNo"
         if ($confirmation -ne 'Yes') {
             Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush
             return
@@ -2624,6 +2622,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
