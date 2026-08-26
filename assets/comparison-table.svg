@@ -88,35 +88,22 @@
   </g>
 
   <!-- Row 1: Active Memory -->
-<!-- Row 1: Active Memory (Static Green Border + Subtle Red Ambient Shadow) -->
+<!-- Row 1: Active Memory (100% Isolated Static Border + Soft Red Glow) -->
   <text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
 
   <g>
-    <!-- Layer 1: Soft Ambient Red Shadow (Subtle Background Glow) -->
+    <!-- Layer 1: Soft Ambient Red Shadow Background Glow -->
     <rect 
-      x="296" 
-      y="82" 
-      width="138" 
-      height="32" 
+      x="295" 
+      y="81" 
+      width="140" 
+      height="34" 
       rx="10" 
       ry="10" 
-      fill="#f85149" 
-      fill-opacity="0.12" 
+      style="fill: #f85149; fill-opacity: 0.15; stroke: none;" 
     />
 
-    <!-- Layer 2: Inner Ambient Red Accent -->
-    <rect 
-      x="298" 
-      y="84" 
-      width="134" 
-      height="28" 
-      rx="8" 
-      ry="8" 
-      fill="#f85149" 
-      fill-opacity="0.18" 
-    />
-
-    <!-- Layer 3: Solid Dark Background Base -->
+    <!-- Layer 2: Dark Background Box -->
     <rect 
       x="300" 
       y="86" 
@@ -124,10 +111,10 @@
       height="24" 
       rx="6" 
       ry="6" 
-      fill="#0d1117" 
+      style="fill: #0d1117; fill-opacity: 1; stroke: none;" 
     />
 
-    <!-- Layer 4: Clean Static Green Border -->
+    <!-- Layer 3: Solid Unbroken Green Border (Explicitly Overriding Dash CSS) -->
     <rect 
       x="300" 
       y="86" 
@@ -135,13 +122,11 @@
       height="24" 
       rx="6" 
       ry="6" 
-      fill="none" 
-      stroke="#3fb950" 
-      stroke-width="1.8" 
+      style="fill: none; stroke: #3fb950; stroke-width: 2; stroke-dasharray: none; stroke-dashoffset: 0;" 
     />
   </g>
 
-  <!-- Crisp Bold White Text -->
+  <!-- High-Contrast Bold White Text -->
   <text x="365" y="102" text-anchor="middle" style="fill: #ffffff; font-weight: 800; font-size: 12.5px; letter-spacing: 0.3px;">~50–60 MB</text>
   <text x="595" y="102" text-anchor="middle" class="cell-value">~80–120 MB</text>
   <text x="825" y="102" text-anchor="middle" class="cell-value">~200 MB – 400 MB</text>
