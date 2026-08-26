@@ -1,6 +1,6 @@
 # Bing Wallpaper for Windows
 
-> A deliberately naive, low-overhead Windows wallpaper utility for people who want Bing's daily images without a heavy desktop app running all day.
+> A deliberately native, low-overhead Windows wallpaper utility for people who want Bing's daily images without a heavy desktop app running all day.
 
 This project keeps the UI intentionally simple: one PowerShell script, a small WPF surface, and a tiny launcher. There is no browser shell, background framework, or bundled runtime. The result is a focused tool designed for ultra-low RAM consumption while it is idle, with an optional headless mode for scheduled wallpaper updates.
 
