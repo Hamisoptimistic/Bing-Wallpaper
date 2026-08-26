@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.55'
+$script:appVersion = [Version]'1.0.56'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1961,13 +1961,14 @@ function Start-VerifiedUpdate {
 
         if ($latestVersion -le $script:appVersion) {
             Set-UpdateButtonState -HasUpdate $false
-            Set-TransientStatus -Message "You're all up to date (v$($script:appVersion))" -Brush $statusSuccessBrush -Seconds 3.0
+            Show-ModernDialog -Title "Bing Wallpaper" -Header "You're All Up to Date" -Message "You are running the latest version of Bing Wallpaper (v$($script:appVersion))." -Icon "Success" -Buttons "OK" -ParentWindow $window | Out-Null
+            Set-TransientStatus -Message 'You are up to date' -Brush $statusSuccessBrush -Seconds 3.0
             return
         }
 
         Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVersion
 
-        $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "Would you like to install and restart now?" -Icon "Update" -Buttons "YesNo"
+        $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "A new version of Bing Wallpaper is ready to install. Would you like to update and restart now?" -Icon "Update" -Buttons "YesNo" -ParentWindow $window
         if ($confirmation -ne 'Yes') {
             Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush -Seconds 2.5
             return
@@ -2452,6 +2453,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
