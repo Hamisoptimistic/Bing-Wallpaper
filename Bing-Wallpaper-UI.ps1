@@ -1407,7 +1407,7 @@ function Select-Card($card, $image) {
     }
 }
 
-# Transient Status Message System (Auto-resets after N seconds)
+# Transient Status Message System
 $statusDefaultBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 211, 153)))
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
@@ -1417,20 +1417,38 @@ function Set-TransientStatus {
     param(
         [string]$Message,
         [System.Windows.Media.Brush]$Brush = $statusSuccessBrush,
-        [int]$Seconds = 3
+        [int]$Seconds = 4
     )
     if ($script:statusResetTimer) {
         $script:statusResetTimer.Stop()
     }
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
+    $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $null)
+    $StatusText.Opacity = 0
+
+    $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation
+    $fadeIn.To = 1
+    $fadeIn.Duration = [System.Windows.Duration]::new([TimeSpan]::FromMilliseconds(260))
+    $fadeIn.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+    $fadeIn.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeIn)
 
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
     $script:statusResetTimer.Add_Tick({
-            $StatusText.Foreground = $statusDefaultBrush
-            $StatusText.Text = 'Double-click any wallpaper to apply'
             $script:statusResetTimer.Stop()
+            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation
+            $fadeOut.To = 0
+            $fadeOut.Duration = [System.Windows.Duration]::new([TimeSpan]::FromMilliseconds(700))
+            $fadeOut.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+            $fadeOut.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+            $fadeOut.Add_Completed({
+                    $StatusText.Foreground = $statusDefaultBrush
+                    $StatusText.Text = 'Double-click any wallpaper to apply'
+                    $StatusText.Opacity = 1
+                })
+            $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeOut)
         })
     $script:statusResetTimer.Start()
 }
@@ -1677,7 +1695,7 @@ function Load-Gallery {
                             Set-TransientStatus -Message "Success! Applied to $($TargetBox.SelectedItem)."
                         }
                         catch {
-                            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
+                            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4
                         }
                         finally {
                             $UpdateBtn.IsEnabled = $true
@@ -1716,7 +1734,7 @@ $UpdateBtn.Add_Click({
             Set-TransientStatus -Message "Success! Applied to $($TargetBox.SelectedItem)."
         }
         catch {
-            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
+            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4
         }
         finally {
             $UpdateBtn.IsEnabled = $true
@@ -1741,7 +1759,7 @@ $DownloadBtn.Add_Click({
             Set-TransientStatus -Message "Wallpaper downloaded"
         }
         catch {
-            Set-TransientStatus -Message "Download failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
+            Set-TransientStatus -Message "Download failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 4
         }
         finally {
             $UpdateBtn.IsEnabled = $true
