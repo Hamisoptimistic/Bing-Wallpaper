@@ -5,7 +5,9 @@ param(
     [ValidateSet('UHD', '1920x1080', '1366x768')]
     [string]$Resolution = 'UHD',
     [ValidateSet('Desktop', 'Lock screen', 'Both')]
-    [string]$Target = 'Desktop'
+    [string]$Target = 'Desktop',
+    [ValidateSet('Fit', 'Fill', 'Stretch', 'Center', 'Tile', 'Span')]
+    [string]$Style = 'Fit'
 )
 
 # Enforce modern security protocols to prevent connection blocks or downgrade attacks
@@ -550,11 +552,48 @@ function Get-BingImageUri {
     return "https://www.bing.com$imagePath"
 }
 
+function Set-DesktopWallpaperStyle {
+    param(
+        [ValidateSet('Fit', 'Fill', 'Stretch', 'Center', 'Tile', 'Span')]
+        [string]$Style = 'Fit'
+    )
+    $regPath = 'HKCU:\Control Panel\Desktop'
+    $styleVal = '6'
+    $tileVal = '0'
+    switch ($Style) {
+        'Fit' { $styleVal = '6'; $tileVal = '0' }
+        'Fill' { $styleVal = '10'; $tileVal = '0' }
+        'Stretch' { $styleVal = '2'; $tileVal = '0' }
+        'Center' { $styleVal = '0'; $tileVal = '0' }
+        'Tile' { $styleVal = '0'; $tileVal = '1' }
+        'Span' { $styleVal = '22'; $tileVal = '0' }
+    }
+    Set-ItemProperty -Path $regPath -Name 'WallpaperStyle' -Value $styleVal -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path $regPath -Name 'TileWallpaper' -Value $tileVal -Force -ErrorAction SilentlyContinue
+}
+
+function Get-CurrentDesktopWallpaperStyle {
+    try {
+        $reg = Get-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -ErrorAction SilentlyContinue
+        $ws = "$($reg.WallpaperStyle)"
+        $tw = "$($reg.TileWallpaper)"
+        if ($ws -eq '6') { return 'Fit' }
+        if ($ws -eq '10') { return 'Fill' }
+        if ($ws -eq '2') { return 'Stretch' }
+        if ($ws -eq '22') { return 'Span' }
+        if ($ws -eq '0' -and $tw -eq '1') { return 'Tile' }
+        if ($ws -eq '0') { return 'Center' }
+    }
+    catch {}
+    return 'Fit'
+}
+
 function Set-BingImage {
     param(
         $Image,
         [string]$Resolution,
-        [string]$Target = 'Desktop'
+        [string]$Target = 'Desktop',
+        [string]$Style = 'Fit'
     )
 
     $cacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
@@ -568,6 +607,7 @@ function Set-BingImage {
     Invoke-WebRequest -Uri $imageUri -OutFile $cachePath -UseBasicParsing -ErrorAction Stop
 
     if ($Target -eq 'Desktop' -or $Target -eq 'Both') {
+        Set-DesktopWallpaperStyle -Style $Style
         if (![BingWallpaperNative]::SystemParametersInfo(20, 0, $cachePath, 3)) {
             throw 'Windows could not apply the downloaded image as desktop wallpaper.'
         }
@@ -649,7 +689,7 @@ if ($AutoApply) {
         }
         $targetImage = $images[0]
         $title = Get-CleanImageTitle $targetImage
-        $appliedPath = Set-BingImage -Image $targetImage -Resolution $Resolution -Target $Target
+        $appliedPath = Set-BingImage -Image $targetImage -Resolution $Resolution -Target $Target -Style $Style
         Write-Output "Successfully applied Bing Wallpaper: $title ($appliedPath)"
         exit 0
     }
@@ -695,10 +735,10 @@ if ($AutoApply) {
 
         <!-- Modern Windows 11 Input Companion Button Style (Borderless Matte) -->
         <Style x:Key="ModernIconButton" TargetType="Button">
-            <Setter Property="Background" Value="#202020"/>
-            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#1FFFFFFF"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -708,11 +748,13 @@ if ($AutoApply) {
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#2C2C2C"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#181818"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                                <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
+                                <Setter Property="Foreground" Value="#0078D4"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -923,9 +965,10 @@ if ($AutoApply) {
         <!-- Settings Cards -->
         <Grid Grid.Row="1" Margin="0,0,0,24">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240"/>
-                <ColumnDefinition Width="240"/>
-                <ColumnDefinition Width="240"/>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             
@@ -937,7 +980,7 @@ if ($AutoApply) {
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <ComboBox Name="RegionBox" FontSize="13.5"/>
-                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Content="&#xE149;" FontFamily="Segoe MDL2 Assets" Grid.Column="1" Width="38" Height="38" Margin="8,0,0,0" FontSize="15" FontWeight="Bold" ToolTip="Refresh Gallery"/>
+                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Content="&#xE149;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Grid.Column="1" Width="38" Height="38" Margin="8,0,0,0" FontSize="13" ToolTip="Refresh Gallery"/>
                 </Grid>
             </StackPanel>
             
@@ -951,7 +994,12 @@ if ($AutoApply) {
                 <ComboBox Name="TargetBox" FontSize="13.5"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="3">
+            <StackPanel Grid.Column="3" Margin="0,0,16,0">
+                <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                <ComboBox Name="StyleBox" FontSize="13.5"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="4">
                 <TextBlock Text="Save Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change save folder" />
             </StackPanel>
@@ -1011,7 +1059,7 @@ $window.Add_Loaded({
     })
 
 $window.Add_MouseMove({
-        param($sender, $e)
+        param($evtSender, $e)
         foreach ($item in $script:revealElements) {
             try {
                 $pos = $e.GetPosition($item.Element)
@@ -1099,6 +1147,9 @@ $null = $helper.EnsureHandle()
 $script:settingsPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\settings.json'
 
 function Load-Settings {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    [CmdletBinding()]
+    param()
     if (Test-Path -LiteralPath $script:settingsPath) {
         try {
             return (Get-Content -LiteralPath $script:settingsPath -Raw | ConvertFrom-Json)
@@ -1109,6 +1160,7 @@ function Load-Settings {
         Region     = "auto"
         Resolution = "1920x1080"
         Target     = "Both"
+        Style      = (Get-CurrentDesktopWallpaperStyle)
         SaveFolder = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
     }
 }
@@ -1119,6 +1171,7 @@ function Save-Settings {
             Region     = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
             Resolution = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
             Target     = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
+            Style      = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
             SaveFolder = $FolderBox.Text
         }
         $dir = Split-Path -Parent $script:settingsPath
@@ -1136,8 +1189,8 @@ $script:appSettings = Load-Settings
 $RegionBox = $window.FindName('RegionBox')
 $ResolutionBox = $window.FindName('ResolutionBox')
 $TargetBox = $window.FindName('TargetBox')
+$StyleBox = $window.FindName('StyleBox')
 $FolderBox = $window.FindName('FolderBox')
-$BrowseBtn = $window.FindName('BrowseBtn')
 $RefreshBtn = $window.FindName('RefreshBtn')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $StatusText = $window.FindName('StatusText')
@@ -1241,6 +1294,20 @@ if (-not $ResolutionBox.SelectedItem) { $ResolutionBox.SelectedIndex = 1 }
 }
 if (-not $TargetBox.SelectedItem) { $TargetBox.SelectedIndex = 2 }
 
+@('Fit', 'Fill', 'Stretch', 'Center', 'Tile', 'Span') | ForEach-Object { 
+    [void]$StyleBox.Items.Add($_)
+    if ($_ -eq $script:appSettings.Style) { $StyleBox.SelectedItem = $_ }
+}
+if (-not $StyleBox.SelectedItem) { 
+    $detectedStyle = Get-CurrentDesktopWallpaperStyle
+    if ($StyleBox.Items -contains $detectedStyle) {
+        $StyleBox.SelectedItem = $detectedStyle
+    }
+    else {
+        $StyleBox.SelectedItem = 'Fit'
+    }
+}
+
 if ($script:appSettings.SaveFolder) {
     $FolderBox.Text = $script:appSettings.SaveFolder
 }
@@ -1253,6 +1320,7 @@ $saveHandler = { Save-Settings }
 $RegionBox.Add_SelectionChanged($saveHandler)
 $ResolutionBox.Add_SelectionChanged($saveHandler)
 $TargetBox.Add_SelectionChanged($saveHandler)
+$StyleBox.Add_SelectionChanged($saveHandler)
 $FolderBox.Add_TextChanged($saveHandler)
 
 # Browse Folder Logic
@@ -1401,6 +1469,8 @@ function Select-Card($card, $image) {
     }
     $script:selectedCard = $card
     $script:selectedImage = $image
+    $script:selection.Card = $card
+    $script:selection.Image = $image
     if ($card) {
         $accentBrush = $card.Resources['ImageAccentBrush']
         Set-CardAccent $card $accentBrush
@@ -1417,10 +1487,10 @@ $script:statusResetTimer = $null
 
 function Get-AppliedSuccessMessage([string]$target) {
     switch ($target) {
-        'Desktop'     { return "Success! Wallpaper applied to background" }
+        'Desktop' { return "Success! Wallpaper applied to background" }
         'Lock screen' { return "Success! Wallpaper applied to Lockscreen" }
-        'Both'        { return "Success! Wallpaper applied to background and Lockscreen" }
-        Default       { return "Success! Wallpaper applied to $target" }
+        'Both' { return "Success! Wallpaper applied to background and Lockscreen" }
+        Default { return "Success! Wallpaper applied to $target" }
     }
 }
 
@@ -1448,9 +1518,15 @@ function Set-TransientStatus {
 
 # Load Gallery Function
 function Load-Gallery {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    [CmdletBinding()]
+    param()
     $GalleryPanel.Children.Clear()
+    $script:selectedCard = $null
+    $script:selectedImage = $null
     $script:selection.Card = $null
     $script:selection.Image = $null
+    $script:loadedImages = @()
     
     # Remove old dynamic cards from reveal tracking to prevent memory leaks
     if ($script:revealElements) {
@@ -1467,6 +1543,7 @@ function Load-Gallery {
     try {
         $selectedRegion = Get-SelectedRegionCode
         $images = Get-BingImages -Region $selectedRegion
+        $script:loadedImages = $images
         $total = $images.Count
         $current = 0
         
@@ -1488,8 +1565,8 @@ function Load-Gallery {
             $cardClip.RadiusY = 12
             $card.Clip = $cardClip
             $card.Add_SizeChanged({
-                    param($sender, $e)
-                    $sender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $sender.ActualWidth, $sender.ActualHeight)
+                    param($evtSender, $e)
+                    $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
                 })
             $card.Padding = New-Object System.Windows.Thickness(0)
             $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
@@ -1549,36 +1626,36 @@ function Load-Gallery {
 
             # Hover Effects
             $card.Add_MouseEnter({ 
-                    param($sender, $e)
-                    if ($sender -ne $script:selectedCard) {
-                        $sender.Background = $cardHoverBg
+                    param($evtSender, $e)
+                    if ($evtSender -ne $script:selectedCard) {
+                        $evtSender.Background = $cardHoverBg
                     }
                 
                     # Dynamic hover shadow & reveal light lookup
-                    $sender.Effect.BlurRadius = 25
-                    $sender.Effect.ShadowDepth = 8
+                    $evtSender.Effect.BlurRadius = 25
+                    $evtSender.Effect.ShadowDepth = 8
 
-                    $grid = $sender.Child
+                    $grid = $evtSender.Child
                     if ($grid -and $grid.Children.Count -gt 1) {
                         $grid.Children[1].Opacity = 1
                     }
                 })
 
             $card.Add_MouseLeave({ 
-                    param($sender, $e)
-                    if ($sender -ne $script:selectedCard) {
-                        $sender.Background = $cardUnselectedBg
+                    param($evtSender, $e)
+                    if ($evtSender -ne $script:selectedCard) {
+                        $evtSender.Background = $cardUnselectedBg
                     }
                     else {
-                        Set-CardAccent $sender $sender.Resources['ImageAccentBrush']
+                        Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
                     }
 
                     # Reset shadow & reveal light
-                    $sender.Effect.BlurRadius = 10
-                    $sender.Effect.ShadowDepth = 2
-                    $sender.Effect.Opacity = 0.3
+                    $evtSender.Effect.BlurRadius = 10
+                    $evtSender.Effect.ShadowDepth = 2
+                    $evtSender.Effect.Opacity = 0.3
 
-                    $grid = $sender.Child
+                    $grid = $evtSender.Child
                     if ($grid -and $grid.Children.Count -gt 1) {
                         $grid.Children[1].Opacity = 0
                     }
@@ -1645,7 +1722,6 @@ function Load-Gallery {
 
             $title = New-Object System.Windows.Controls.TextBlock
             $title.Text = $displayTitle
-            $accentBrush = $card.Resources['ImageAccentBrush']
             $title.Foreground = [System.Windows.Media.Brushes]::White
             $title.FontSize = 15
             $title.FontWeight = [System.Windows.FontWeights]::SemiBold
@@ -1671,9 +1747,9 @@ function Load-Gallery {
 
             # Card Click Action: Select card on single click, apply on double click
             $card.Add_MouseLeftButtonDown({
-                    param($sender, $e)
-                    $clickedImage = $sender.Tag 
-                    Select-Card $sender $clickedImage
+                    param($evtSender, $e)
+                    $clickedImage = $evtSender.Tag 
+                    Select-Card $evtSender $clickedImage
                     
                     if ($e.ClickCount -eq 2) {
                         $actionTitle = Get-CleanImageTitle $clickedImage
@@ -1684,7 +1760,7 @@ function Load-Gallery {
                         Update-UI
 
                         try {
-                            $null = Set-BingImage -Image $clickedImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem
+                            $null = Set-BingImage -Image $clickedImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
                             Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
                         }
                         catch {
@@ -1712,7 +1788,18 @@ function Load-Gallery {
 
 # Main Apply Button Logic (Sets wallpaper without permanent disk save)
 $UpdateBtn.Add_Click({
-        $targetImage = if ($script:selection.Image) { $script:selection.Image } else { (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) }
+        $targetImage = if ($script:selectedImage) { 
+            $script:selectedImage 
+        }
+        elseif ($script:selection.Image) { 
+            $script:selection.Image 
+        }
+        elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) { 
+            $script:loadedImages[0] 
+        }
+        else { 
+            (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+        }
         if (-not $targetImage) { return }
         $actionTitle = Get-CleanImageTitle $targetImage
 
@@ -1723,7 +1810,7 @@ $UpdateBtn.Add_Click({
         Update-UI
 
         try {
-            $null = Set-BingImage -Image $targetImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem
+            $null = Set-BingImage -Image $targetImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
             Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
         }
         catch {
@@ -1737,7 +1824,18 @@ $UpdateBtn.Add_Click({
 
 # Dedicated Download Button Logic (Saves image to configured folder)
 $DownloadBtn.Add_Click({
-        $targetImage = if ($script:selection.Image) { $script:selection.Image } else { (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) }
+        $targetImage = if ($script:selectedImage) { 
+            $script:selectedImage 
+        }
+        elseif ($script:selection.Image) { 
+            $script:selection.Image 
+        }
+        elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) { 
+            $script:loadedImages[0] 
+        }
+        else { 
+            (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+        }
         if (-not $targetImage) { return }
         $actionTitle = Get-CleanImageTitle $targetImage
 
