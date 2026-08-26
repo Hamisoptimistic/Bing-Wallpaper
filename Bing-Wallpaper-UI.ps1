@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.56'
+$script:appVersion = [Version]'1.0.57'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1486,11 +1486,14 @@ function Get-SelectedRegionCode {
 # Auto-detect the user's region from Windows locale (used only on first launch)
 function Get-DetectedRegionCode {
     try {
-        # Windows stores the user's locale as a BCP-47 tag e.g. en-GB, de-DE, zh-CN
+        # Check geographical region first (e.g. IN for India)
+        $region = [System.Globalization.RegionInfo]::CurrentRegion.TwoLetterISORegionName
+        $match = $countries | Where-Object { $_.Code -match "-$region`$" } | Select-Object -First 1
+        if ($match) { return $match.Code }
+        
+        # Fallback to UI Language (e.g. en-GB)
         $culture = [System.Globalization.CultureInfo]::CurrentUICulture
-        $tag = $culture.Name   # e.g. "en-GB"
-
-        # Exact match first
+        $tag = $culture.Name
         $match = $countries | Where-Object { $_.Code -eq $tag } | Select-Object -First 1
         if ($match) { return $match.Code }
 
@@ -2658,6 +2661,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
