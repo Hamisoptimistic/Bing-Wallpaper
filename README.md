@@ -115,19 +115,84 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 ## Quick Comparison
 
-| Feature | Bing Wallpaper | Official Bing Wallpaper | Electron / Webview Apps |
-| :--- | :---: | :---: | :---: |
-| **Active Memory (RAM)** | **~50–60 MB** | ~80–120 MB | ~200 MB – 400 MB |
-| **Idle Memory (When Closed)** | **0 MB** | ~80 MB (Always resident) | ~200 MB – 400 MB (Always resident) |
-| **4K / UHD Resolutions** | **Yes** | No | Varies |
-| **Lock Screen Support** | **Yes** | No | Rare |
-| **Wallpaper Style (Fit, Fill, Stretch, Tile)** | **Yes** | No | Rare |
-| **50+ Country Feeds** | **Yes** | No (US only) | Rare |
-| **High-Res Local Downloader** | **Yes** | No | Varies |
-| **Modern Fluent UI & Hover Effects** | **Yes** (Native WPF) | Outdated Win32 | Webview / Heavy |
-| **1-Click Seamless In-App Updates** | **Yes** (SHA-256 Verified) | Proprietary Updater | Large Re-downloads |
-| **Background Automation Engine** | **Native Task Scheduler** | Background Tray Daemon | Background Node.js Process |
-| **Single Portable Binary** | **Yes** | No (MSI required) | Large bundle |
+<table>
+  <thead>
+    <tr bgcolor="#2d1519">
+      <th align="left">Feature</th>
+      <th align="center">Bing Wallpaper</th>
+      <th align="center">Official Bing Wallpaper</th>
+      <th align="center">Electron / Webview Apps</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>Active Memory (RAM)</b></td>
+      <td align="center"><b>~50–60 MB</b></td>
+      <td align="center" bgcolor="#221114">~80–120 MB</td>
+      <td align="center" bgcolor="#221114">~200 MB – 400 MB</td>
+    </tr>
+    <tr>
+      <td><b>Idle Memory (When Closed)</b></td>
+      <td align="center"><b>0 MB</b></td>
+      <td align="center" bgcolor="#221114">~80 MB (Always resident)</td>
+      <td align="center" bgcolor="#221114">~200 MB – 400 MB (Always resident)</td>
+    </tr>
+    <tr>
+      <td><b>4K / UHD Resolutions</b></td>
+      <td align="center"><b>Yes</b></td>
+      <td align="center" bgcolor="#221114">No</td>
+      <td align="center" bgcolor="#221114">Varies</td>
+    </tr>
+    <tr>
+      <td><b>Lock Screen Support</b></td>
+      <td align="center"><b>Yes</b></td>
+      <td align="center" bgcolor="#221114">No</td>
+      <td align="center" bgcolor="#221114">Rare</td>
+    </tr>
+    <tr>
+      <td><b>Wallpaper Style (Fit, Fill, Stretch, Tile)</b></td>
+      <td align="center"><b>Yes</b></td>
+      <td align="center" bgcolor="#221114">No</td>
+      <td align="center" bgcolor="#221114">Rare</td>
+    </tr>
+    <tr>
+      <td><b>50+ Country Feeds</b></td>
+      <td align="center"><b>Yes</b></td>
+      <td align="center" bgcolor="#221114">No (US only)</td>
+      <td align="center" bgcolor="#221114">Rare</td>
+    </tr>
+    <tr>
+      <td><b>High-Res Local Downloader</b></td>
+      <td align="center"><b>Yes</b></td>
+      <td align="center" bgcolor="#221114">No</td>
+      <td align="center" bgcolor="#221114">Varies</td>
+    </tr>
+    <tr>
+      <td><b>Modern Fluent UI & Hover Effects</b></td>
+      <td align="center"><b>Yes</b> (Native WPF)</td>
+      <td align="center" bgcolor="#221114">Outdated Win32</td>
+      <td align="center" bgcolor="#221114">Webview / Heavy</td>
+    </tr>
+    <tr>
+      <td><b>1-Click Seamless In-App Updates</b></td>
+      <td align="center"><b>Yes</b> (SHA-256 Verified)</td>
+      <td align="center" bgcolor="#221114">Proprietary Updater</td>
+      <td align="center" bgcolor="#221114">Large Re-downloads</td>
+    </tr>
+    <tr>
+      <td><b>Background Automation Engine</b></td>
+      <td align="center"><b>Native Task Scheduler</b></td>
+      <td align="center" bgcolor="#221114">Background Tray Daemon</td>
+      <td align="center" bgcolor="#221114">Background Node.js Process</td>
+    </tr>
+    <tr>
+      <td><b>Single Portable Binary</b></td>
+      <td align="center"><b>Yes</b></td>
+      <td align="center" bgcolor="#221114">No (MSI required)</td>
+      <td align="center" bgcolor="#221114">Large bundle</td>
+    </tr>
+  </tbody>
+</table>
 
 ---
 
