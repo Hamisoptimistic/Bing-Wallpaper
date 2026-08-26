@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.60'
+$script:appVersion = [Version]'1.0.61'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1712,6 +1712,21 @@ function Get-AppliedSuccessMessage([string]$target) {
     }
 }
 
+function Get-UserFriendlyNetworkError {
+    param(
+        [System.Exception]$Exception,
+        [string]$DefaultAction = "load wallpapers"
+    )
+    $msg = if ($Exception) { $Exception.Message } else { '' }
+    if (-not $msg -or $msg -match 'internet|connection|resolve|network|timed? out|connect|offline|webexception|remote name|host|dns|socket|no such host|server|unable to connect|404|500|502|503') {
+        return "Unable to $DefaultAction. Please check your internet connection."
+    }
+    if ($msg.Length -lt 70 -and $msg -notmatch 'Exception|System\.|at BingWallpaper|at Microsoft|Invoke-') {
+        return $msg
+    }
+    return "Unable to $DefaultAction. Please check your internet connection."
+}
+
 function Set-TransientStatus {
     param(
         [string]$Message,
@@ -2225,8 +2240,9 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
         $window.Close()
     }
     catch {
-        Set-TransientStatus -Message "Update failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
-        Show-ModernDialog -Title "Update Error" -Header "Update Check Failed" -Message "$($_.Exception.Message)" -Icon "Error" -Buttons "OK" | Out-Null
+        $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "check for updates"
+        Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+        Show-ModernDialog -Title "Update Error" -Header "Connection Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
     }
     finally {
         if ($client) { $client.Dispose() }
@@ -2292,6 +2308,9 @@ function Load-Gallery {
     try {
         $selectedRegion = Get-SelectedRegionCode
         $images = Get-BingImages -Region $selectedRegion
+        if (-not $images -or $images.Count -eq 0) {
+            throw [System.Net.WebException]::new("Unable to connect to Bing.")
+        }
         $script:loadedImages = $images
         $total = $images.Count
 
@@ -2512,7 +2531,8 @@ function Load-Gallery {
                             Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
                         }
                         catch {
-                            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
+                            $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "apply wallpaper"
+                            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
                         }
                         finally {
                             $UpdateBtn.IsEnabled = $true
@@ -2552,8 +2572,8 @@ function Load-Gallery {
     catch {
         $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
         $StatusText.Opacity = 1
-        $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
-        $StatusText.Text = "Gallery failed to load: $($_.Exception.Message)"
+        $StatusText.Foreground = $statusErrorBrush
+        $StatusText.Text = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "load wallpapers"
     }
 }
 
@@ -2585,7 +2605,8 @@ $UpdateBtn.Add_Click({
             Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
         }
         catch {
-            Set-TransientStatus -Message "Failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
+            $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "apply wallpaper"
+            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
         }
         finally {
             $UpdateBtn.IsEnabled = $true
@@ -2621,7 +2642,8 @@ $DownloadBtn.Add_Click({
             Set-TransientStatus -Message "Wallpaper downloaded"
         }
         catch {
-            Set-TransientStatus -Message "Download failed: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 5
+            $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "download wallpaper"
+            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
         }
         finally {
             $UpdateBtn.IsEnabled = $true
@@ -2655,6 +2677,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
