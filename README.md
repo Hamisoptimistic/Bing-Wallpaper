@@ -81,8 +81,8 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
       Save original, full-resolution 4K wallpaper images directly to your designated download folder with metadata and location info intact.
     </td>
     <td width="50%" valign="top">
-      <h3>🔒 Verified In-App Updates</h3>
-      Check and install updates directly from GitHub Releases with automatic SHA-256 integrity verification before execution.
+      <h3>🔄 1-Click Seamless In-App Updates</h3>
+      Click <b>Check for updates</b> to instantly check GitHub Releases. The app validates SHA-256 checksums, downloads the new version, and auto-restarts seamlessly—no installers or manual file downloads needed.
     </td>
   </tr>
 </table>
@@ -101,6 +101,7 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 | **50+ Country Feeds** | **Yes** | No (US only) | Rare |
 | **High-Res Local Downloader** | **Yes** | No | Varies |
 | **Modern Fluent UI & Hover Effects** | **Yes** (Native WPF) | Outdated Win32 | Webview / Heavy |
+| **1-Click Seamless In-App Updates** | **Yes** (SHA-256 Verified) | Proprietary Updater | Large Re-downloads |
 | **Background Automation Engine** | **Native Task Scheduler** | Background Tray Daemon | Background Node.js Process |
 | **Single Portable Binary** | **Yes** | No (MSI required) | Large bundle |
 
@@ -117,7 +118,13 @@ Inside the application, turn the **Auto** toggle to **ON**:
 2. Choose a target (*Desktop*, *Lock screen*, or *Both*) and style (*Fit*, *Fill*, *Stretch*, etc.).
 3. Close the app. Windows will automatically rotate your wallpaper silently in the background, even after restarting your PC.
 
-### 3. Headless CLI
+### 3. Effortless 1-Click Updates
+Whenever a new update is released, staying up to date is completely effortless:
+1. Click **Check for updates** in the bottom-left corner of the app.
+2. If a new version is found, click **Yes** to update.
+3. The app automatically downloads the release, verifies its SHA-256 checksum for security, replaces the executable, and relaunches the newest version in seconds.
+
+### 4. Headless CLI
 You can also run silent updates directly from scripts or the command line:
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "Bing-Wallpaper-UI.ps1" -AutoApply -Region "en-US" -Resolution "UHD" -Target "Both" -Style "Fit"
@@ -139,7 +146,7 @@ powershell.exe -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.p
 
 - **Encrypted Connections**: Enforces TLS 1.2 and TLS 1.3 across all network requests.
 - **User-Space Only**: Runs with standard user privileges without administrative rights.
-- **Integrity Verified**: Releases are signed with SHA-256 checksums verified before updating.
+- **Cryptographic Verification**: In-app updates verify cryptographic SHA-256 checksums before applying to prevent corrupted or unauthorized binaries.
 
 ---
 
