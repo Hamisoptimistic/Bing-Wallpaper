@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.34'
+$script:appVersion = [Version]'1.0.36'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2150,4 +2150,5 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
