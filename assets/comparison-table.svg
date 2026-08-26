@@ -91,22 +91,22 @@
   <text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
   <g>
     <defs>
-      <linearGradient id="special-glow-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#2ea44f" stop-opacity="0.6" />
-        <stop offset="100%" stop-color="#238636" stop-opacity="0.3" />
-      </linearGradient>
       <style>
-        @keyframes pulse-special {
-          0% { opacity: 0.7; filter: drop-shadow(0 0 2px #3fb950); }
-          50% { opacity: 1.0; filter: drop-shadow(0 0 8px #3fb950); }
-          100% { opacity: 0.7; filter: drop-shadow(0 0 2px #3fb950); }
+        @keyframes dash-clockwise {
+          to {
+            stroke-dashoffset: -320;
+          }
         }
-        .special-badge-glow {
-          animation: pulse-special 2s infinite ease-in-out;
+        .clockwise-glow {
+          stroke-dasharray: 60 100;
+          stroke-dashoffset: 0;
+          animation: dash-clockwise 2.5s linear infinite;
+          filter: drop-shadow(0px 0px 6px #3fb950);
         }
       </style>
     </defs>
 
+    <!-- Base Fill Box -->
     <rect 
       x="300" 
       y="86" 
@@ -114,10 +114,22 @@
       height="24" 
       rx="6" 
       ry="6" 
-      class="badge special-badge-glow" 
-      fill="url(#special-glow-grad)" 
+      fill="#238636" 
+      fill-opacity="0.3" 
+    />
+
+    <!-- Clockwise Animated Glowing Border -->
+    <rect 
+      x="300" 
+      y="86" 
+      width="130" 
+      height="24" 
+      rx="6" 
+      ry="6" 
+      class="clockwise-glow" 
+      fill="none" 
       stroke="#3fb950" 
-      stroke-width="1.5" 
+      stroke-width="2" 
     />
   </g>
   <text x="365" y="102" text-anchor="middle" class="cell-winner">~50–60 MB</text>
