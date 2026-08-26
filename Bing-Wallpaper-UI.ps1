@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.44'
+$script:appVersion = [Version]'1.0.45'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2142,7 +2142,10 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 }
 
 function Show-GalleryCard {
-    param([System.Windows.Controls.Border]$Card)
+    param(
+        [System.Windows.Controls.Border]$Card,
+        [int]$DelayMs = 0
+    )
 
     # Native WPF transforms keep card arrivals smooth without layout work,
     # timers, or a background rendering loop.
@@ -2150,12 +2153,16 @@ function Show-GalleryCard {
     $translate = New-Object System.Windows.Media.TranslateTransform(0, 12)
     $Card.RenderTransform = $translate
 
-    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(320))
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(400))
+    $beginTime = [TimeSpan]::FromMilliseconds($DelayMs)
+
     $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $duration)
+    $fade.BeginTime = $beginTime
     $fade.EasingFunction = New-Object System.Windows.Media.Animation.SineEase
     $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
 
     $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(12, 0, $duration)
+    $slide.BeginTime = $beginTime
     $slide.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
     $slide.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
 
@@ -2420,7 +2427,10 @@ function Load-Gallery {
                 })
 
             $GalleryPanel.Children.Add($card)
-            Show-GalleryCard -Card $card
+            
+            # Stagger the animation by 35ms per card for a cascading effect
+            $staggerDelay = ($current - 1) * 35
+            Show-GalleryCard -Card $card -DelayMs $staggerDelay
         }
 
         if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
@@ -2528,6 +2538,7 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
