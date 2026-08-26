@@ -1,11 +1,11 @@
 <div align="center">
 
-<h1>
-  <img src="assets/bing-color.svg" width="36" height="36" alt="Bing Logo" style="vertical-align: middle; margin-right: 8px;" />
-  Bing Wallpaper for Windows
+<h1 align="center">
+  <img src="./assets/bing-color.svg" width="34" height="34" alt="Bing" valign="middle" style="vertical-align: -5px; margin-right: 6px;" />
+  <span>Bing Wallpaper for Windows</span>
 </h1>
 
-<p><b>Daily 4K Bing photography delivered to your Desktop & Lock Screen with near-zero resource consumption.</b></p>
+<p><b>Daily Bing photography for your Desktop & Lock Screen — lightweight, native, and silent.</b></p>
 
 <p align="center">
   <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
