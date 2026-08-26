@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.54'
+$script:appVersion = [Version]'1.0.55'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2032,15 +2032,21 @@ function Show-ModernDialog {
 }
 
 function Check-ForUpdatesInBackground {
+    # Capture the dispatcher on the UI thread before handing off to the background worker
+    $dispatcher = $window.Dispatcher
+    $repo       = $script:updateRepository
+    $appVer     = $script:appVersion
+
     $worker = New-Object System.ComponentModel.BackgroundWorker
     $worker.Add_DoWork({
             param($sender, $e)
             $wc = New-Object System.Net.WebClient
             $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
+            $releaseUri = "https://api.github.com/repos/$($e.Argument)/releases/latest"
             try {
                 $e.Result = $wc.DownloadString($releaseUri)
-            } catch {
+            }
+            catch {
                 $e.Result = $null
             }
             $wc.Dispose()
@@ -2049,18 +2055,21 @@ function Check-ForUpdatesInBackground {
             param($sender, $e)
             if ($e.Result) {
                 try {
-                    $latestRel = $e.Result | ConvertFrom-Json
+                    $latestRel     = $e.Result | ConvertFrom-Json
                     $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-                    if ($latestVersion -gt $script:appVersion) {
-                        if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = 'Visible' }
-                        if ($UpdateBtnText) { $UpdateBtnText.Text = 'Update Now' }
+                    if ($latestVersion -gt $appVer) {
+                        # Must update WPF elements from the UI thread
+                        $dispatcher.Invoke([Action]{
+                            if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = [System.Windows.Visibility]::Visible }
+                            if ($UpdateBtnText)  { $UpdateBtnText.Text = 'Update Now' }
+                        })
                     }
                 }
                 catch {}
             }
             $sender.Dispose()
         })
-    $worker.RunWorkerAsync()
+    $worker.RunWorkerAsync($repo)
 }
 
 function Start-VerifiedUpdate {
@@ -2622,6 +2631,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
