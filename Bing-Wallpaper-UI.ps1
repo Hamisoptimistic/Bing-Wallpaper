@@ -1186,8 +1186,25 @@ $trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $restoreItem = $trayMenu.Items.Add('Open Bing Wallpaper')
 $exitItem = $trayMenu.Items.Add('Exit')
 
+$ensureTrayIcon = {
+    if (-not $script:trayIcon -and $script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
+        $script:trayIcon = New-Object System.Windows.Forms.NotifyIcon
+        $script:trayIcon.Icon = New-Object System.Drawing.Icon($script:taskbarIconPath)
+        $script:trayIcon.Text = 'Bing Wallpaper'
+        $script:trayIcon.ContextMenuStrip = $trayMenu
+        $script:trayIcon.Add_DoubleClick($showMainWindow)
+    }
+    if ($script:trayIcon -and $MinimizeToTrayToggle.IsChecked -eq $true) {
+        $script:trayIcon.Visible = $false
+        $script:trayIcon.Visible = $true
+    }
+}
+
 $setTrayVisibility = {
     param([bool]$visible)
+    if ($visible) {
+        & $ensureTrayIcon
+    }
     if ($script:trayIcon) {
         $script:trayIcon.Visible = $visible
     }
@@ -1206,23 +1223,18 @@ $exitItem.Add_Click({
         if ($script:trayIcon) {
             $script:trayIcon.Visible = $false
             $script:trayIcon.Dispose()
+            $script:trayIcon = $null
         }
         $window.Close()
     })
 
-if ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
-    $script:trayIcon = New-Object System.Windows.Forms.NotifyIcon
-    $script:trayIcon.Icon = New-Object System.Drawing.Icon($script:taskbarIconPath)
-    $script:trayIcon.Text = 'Bing Wallpaper'
-    $script:trayIcon.ContextMenuStrip = $trayMenu
-    $script:trayIcon.Add_DoubleClick($showMainWindow)
-    $script:trayIcon.Visible = ($MinimizeToTrayToggle.IsChecked -eq $true)
-}
+$window.Add_ContentRendered({ & $ensureTrayIcon })
 
 $window.Add_Closing({
         param($sender, $e)
         if (-not $script:trayExitRequested -and $MinimizeToTrayToggle.IsChecked -eq $true) {
             $e.Cancel = $true
+            & $ensureTrayIcon
             $window.ShowInTaskbar = $false
             $window.Hide()
             try {
@@ -1236,6 +1248,7 @@ $window.Add_Closing({
 
 $window.Add_StateChanged({
         if ($MinimizeToTrayToggle.IsChecked -eq $true -and $window.WindowState -eq [System.Windows.WindowState]::Minimized) {
+            & $ensureTrayIcon
             $window.ShowInTaskbar = $false
             $window.Hide()
         }
