@@ -25,9 +25,83 @@ Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Windows.Forms # Kept only for the Folder Browser dialog
 Add-Type -AssemblyName System.Drawing
 
+# High-Performance Image Accent Color Extractor (LockBits native execution)
+try {
+    $accentCode = @'
+    using System;
+    using System.Drawing;
+    using System.Drawing.Imaging;
+    using System.IO;
+    using System.Runtime.InteropServices;
+    using System.Windows.Media;
+
+    namespace BingWallpaper
+    {
+        public static class FastAccent
+        {
+            public static SolidColorBrush ExtractBrush(string path)
+            {
+                try
+                {
+                    if (!File.Exists(path))
+                    {
+                        var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
+                        fallback.Freeze();
+                        return fallback;
+                    }
+                    using (var bmp = new Bitmap(path))
+                    {
+                        using (var small = new Bitmap(bmp, new Size(24, 24)))
+                        {
+                            BitmapData data = small.LockBits(new Rectangle(0, 0, 24, 24), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                            int bytes = Math.Abs(data.Stride) * 24;
+                            byte[] rgb = new byte[bytes];
+                            Marshal.Copy(data.Scan0, rgb, 0, bytes);
+                            small.UnlockBits(data);
+
+                            int redTotal = 0, greenTotal = 0, blueTotal = 0, weightTotal = 0;
+                            for (int i = 0; i < rgb.Length; i += 4)
+                            {
+                                byte b = rgb[i];
+                                byte g = rgb[i + 1];
+                                byte r = rgb[i + 2];
+
+                                int max = Math.Max(r, Math.Max(g, b));
+                                int min = Math.Min(r, Math.Min(g, b));
+                                int weight = 1 + (((max - min) * 2) / 255);
+
+                                redTotal += r * weight;
+                                greenTotal += g * weight;
+                                blueTotal += b * weight;
+                                weightTotal += weight;
+                            }
+
+                            if (weightTotal == 0) weightTotal = 1;
+                            byte finalR = (byte)Math.Min(190, (redTotal / weightTotal) * 1.35);
+                            byte finalG = (byte)Math.Min(190, (greenTotal / weightTotal) * 1.35);
+                            byte finalB = (byte)Math.Min(190, (blueTotal / weightTotal) * 1.35);
+                            var brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, finalR, finalG, finalB));
+                            brush.Freeze();
+                            return brush;
+                        }
+                    }
+                }
+                catch
+                {
+                    var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
+                    fallback.Freeze();
+                    return fallback;
+                }
+            }
+        }
+    }
+'@
+    Add-Type -TypeDefinition $accentCode -ReferencedAssemblies System.Drawing, PresentationCore, WindowsBase -IgnoreWarnings
+} catch {}
+
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.59'
+$script:appVersion = [Version]'1.0.60'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1486,43 +1560,11 @@ $cardUnselectedBg = (New-Object System.Windows.Media.SolidColorBrush([System.Win
 $cardHoverBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(190, 20, 22, 30)))
 
 function Get-ImageAccentBrush([string]$imagePath) {
-    $bitmap = $null
     try {
-        $bitmap = [System.Drawing.Bitmap]::new($imagePath)
-        $sampleWidth = [Math]::Min(32, $bitmap.Width)
-        $sampleHeight = [Math]::Min(32, $bitmap.Height)
-        if ($sampleWidth -lt 1 -or $sampleHeight -lt 1) { throw 'Image has no pixels' }
-
-        $redTotal = 0.0
-        $greenTotal = 0.0
-        $blueTotal = 0.0
-        $weightTotal = 0.0
-        for ($y = 0; $y -lt $sampleHeight; $y++) {
-            for ($x = 0; $x -lt $sampleWidth; $x++) {
-                $pixel = $bitmap.GetPixel([int](($x / $sampleWidth) * $bitmap.Width), [int](($y / $sampleHeight) * $bitmap.Height))
-                $red = $pixel.R
-                $green = $pixel.G
-                $blue = $pixel.B
-                $maximum = [Math]::Max($red, [Math]::Max($green, $blue))
-                $minimum = [Math]::Min($red, [Math]::Min($green, $blue))
-                $weight = 1.0 + ((($maximum - $minimum) / 255.0) * 2.0)
-                $redTotal += $red * $weight
-                $greenTotal += $green * $weight
-                $blueTotal += $blue * $weight
-                $weightTotal += $weight
-            }
-        }
-
-        $red = [Math]::Min(190, [int]($redTotal / $weightTotal * 1.35))
-        $green = [Math]::Min(190, [int]($greenTotal / $weightTotal * 1.35))
-        $blue = [Math]::Min(190, [int]($blueTotal / $weightTotal * 1.35))
-        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, $red, $green, $blue))
+        return [BingWallpaper.FastAccent]::ExtractBrush($imagePath)
     }
     catch {
         return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 70, 70, 70))
-    }
-    finally {
-        if ($bitmap) { $bitmap.Dispose() }
     }
 }
 
@@ -2065,20 +2107,26 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 }
 
 function Show-GalleryCard {
-    param([System.Windows.Controls.Border]$Card)
+    param(
+        [System.Windows.Controls.Border]$Card,
+        [int]$Index = 0
+    )
 
-    # Native WPF transforms keep card arrivals smooth without layout work,
-    # timers, or a background rendering loop.
+    # Native WPF hardware transform: smooth arrival fade-in & slide-up
     $Card.Opacity = 0
-    $translate = New-Object System.Windows.Media.TranslateTransform(0, 12)
+    $translate = New-Object System.Windows.Media.TranslateTransform(0, 14)
     $Card.RenderTransform = $translate
 
-    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(320))
-    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $duration)
-    $fade.EasingFunction = New-Object System.Windows.Media.Animation.SineEase
-    $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $beginTime = [TimeSpan]::FromMilliseconds($Index * 28)
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(340))
 
-    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(12, 0, $duration)
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $duration)
+    $fade.BeginTime = $beginTime
+    $fade.EasingFunction = New-Object System.Windows.Media.Animation.SineEase
+    $fade.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+
+    $slide = New-Object System.Windows.Media.Animation.DoubleAnimation(14, 0, $duration)
+    $slide.BeginTime = $beginTime
     $slide.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
     $slide.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
 
@@ -2344,7 +2392,7 @@ function Load-Gallery {
                 })
 
             $GalleryPanel.Children.Add($card)
-            Show-GalleryCard -Card $card
+            Show-GalleryCard -Card $card -Index ($current - 1)
 
             Update-UI # Force UI draw right away so the user isn't staring at a blank screen
         }
@@ -2453,6 +2501,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
