@@ -119,7 +119,9 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
   <img src="assets/comparison-table.svg" width="100%" alt="Bing Wallpaper Comparison Table" />
 </p>
 
+
 ---
+
 
 ## Getting Started
 
