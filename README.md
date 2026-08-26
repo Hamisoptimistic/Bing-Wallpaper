@@ -1,48 +1,162 @@
+<div align="center">
+
 # 🖼️ Bing Wallpaper for Windows
 
-> **A lightweight, native Windows utility for discovering, downloading, and applying Bing's daily wallpapers.**
+### A lightweight, native Windows utility for discovering, downloading, and applying Bing's daily wallpapers.
 
-[![Download Executable](https://img.shields.io/badge/Download-BingWallpaper.exe-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1)
+<br>
 
-![](https://img.shields.io/badge/OS-Windows_10_%7C_11-0078D4?style=flat-square&logo=windows&logoColor=white)
-![](https://img.shields.io/badge/Engine-PowerShell_5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white)
-![](https://img.shields.io/badge/UI-Native_WPF-68217A?style=flat-square)
-![](https://img.shields.io/badge/License-MIT-2EA44F?style=flat-square)
+<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
+  <img src="https://img.shields.io/badge/DOWNLOAD-BingWallpaper.exe-0078D4?style=for-the-badge&logo=bing&logoColor=white" alt="Download BingWallpaper.exe">
+</a>
 
----
+<br><br>
 
-## ⚡ Overview
+<img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows">
+<img src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white" alt="PowerShell">
+<img src="https://img.shields.io/badge/UI-Native%20WPF-68217A?style=flat-square" alt="WPF">
+<img src="https://img.shields.io/badge/License-MIT-2EA44F?style=flat-square" alt="MIT License">
 
-**Bing Wallpaper for Windows** brings Bing's daily photography directly to your desktop without heavy browser dependencies or bloatware. Designed natively using **PowerShell + WPF**, it provides a sleek, modern Windows 11 interface with interactive wallpaper galleries, regional controls, and background automation via standard Windows Task Scheduler.
+<br><br>
 
-<div align="center">
-  <img src="assets/Preview.jpg" alt="Bing Wallpaper Preview" width="800" style="border-radius: 8px;">
+<img src="assets/Preview.jpg" alt="Bing Wallpaper Preview" width="850">
+
 </div>
 
 ---
 
-## ✨ Key Features
+## Overview
 
-| Feature | Description |
-| :--- | :--- |
-| **🎨 Native WPF UI** | Ultra-lightweight Windows 10/11 interface featuring rounded corners, compact controls, and zero browser engine overhead. |
-| **🌍 Live Gallery** | Explore daily high-res previews from **50+ international Bing markets** (US, UK, JP, DE, IN, and more). |
-| **⏱️ Silent Automation** | Background updates managed securely via Windows Task Scheduler. Runs on login, hourly, or daily. |
-| **🎯 Flexible Targets** | Apply up to **4K / UHD** wallpapers directly to Desktop, Lock Screen, or both simultaneously. |
-| **🔒 Secure & Portable** | Standalone `.exe` with TLS 1.2/1.3, SHA-256 update verification, and zero admin permissions required. |
+**Bing Wallpaper for Windows** brings Bing's daily photography directly to your desktop.
+
+Browse recent wallpapers, choose your preferred region and resolution, apply images to your Desktop or Lock Screen, and optionally automate wallpaper changes in the background.
+
+The application is designed to stay lightweight and use native Windows components rather than a heavyweight application framework.
 
 ---
 
-## 🚀 Quick Start
+## Features
 
-### 1. Download & Launch
-Download [`BingWallpaper.exe`](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1) and double-click to launch. **No installer required.**
+<table>
+<tr>
+<td width="50%" valign="top">
 
-### 2. Configure Preferences
-Select your preferred region, target resolution (**UHD**, **1080p**, **768p**), and target screen:
+### 💻 Native Windows Experience
+
+Built with **PowerShell + WPF**, using native Windows components for a lightweight desktop application.
+
+* Windows 10 and Windows 11 support
+* Modern Windows 11-inspired interface
+* Rounded corners and compact controls
+* Borderless inputs
+* Slim overlay scrollbars
+* No heavyweight browser engine
+
+</td>
+<td width="50%" valign="top">
+
+### 🎨 Live Wallpaper Gallery
+
+Browse recent Bing wallpapers directly from the application.
+
+* Interactive wallpaper gallery
+* High-resolution previews
+* Recent daily wallpapers
+* Multiple international regions
+* Clean title parsing
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+
+### ⏱️ Automatic Background Updates
+
+Set your wallpaper to update automatically without keeping the application open.
+
+**Available intervals:**
+* On Login
+* 1 minute — test mode
+* Hourly
+* Every 6 hours
+* Daily
+
+Updates are handled through Windows Task Scheduler and continue after system restarts.
+
+</td>
+<td width="50%" valign="top">
+
+### ⚙️ Flexible Personalization
+
+Choose exactly where and how your wallpaper should be applied.
+
+**Targets:**
+* Desktop
+* Lock Screen
+* Both
+
+**Resolutions:**
+* UHD / 4K
+* 1920 × 1080
+* 1366 × 768
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+
+### 📥 Download & Apply
+
+Use wallpapers directly from the local cache or save high-resolution copies for later use.
+
+* Apply directly
+* Save wallpapers locally[cite: 1]
+* Select a destination folder[cite: 1]
+* High-resolution downloads[cite: 1]
+
+</td>
+<td width="50%" valign="top">
+
+### 🔒 Verified Updates
+
+The built-in updater checks GitHub Releases and verifies downloaded updates before installation[cite: 1].
+
+* Release checking[cite: 1]
+* Release notes[cite: 1]
+* SHA-256 verification[cite: 1]
+* Verified executable updates[cite: 1]
+
+</td>
+</tr>
+</table>
+
+---
+
+## Download
+
+<div align="center">
+
+<a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
+  <img src="https://img.shields.io/badge/Download%20for%20Windows-0078D4?style=for-the-badge&logo=bing&logoColor=white" alt="Download for Windows">
+</a>
+
+<br><br>
+
+**Standalone executable — no additional installation required[cite: 1].**
+
+</div>
+
+The standalone `BingWallpaper.exe` contains everything required to run the application[cite: 1].
+
+---
+
+## Getting Started
+
+### 1. Launch
+
+Run:
 
 ```text
-┌────────────────────────────────────────────────────────┐
-│  Region: [ United States ▾ ]   Resolution: [ UHD ▾ ]   │
-│  Target: [ Desktop & Lock Screen ▾ ]                   │
-└────────────────────────────────────────────────────────┘
+BingWallpaper.exe
