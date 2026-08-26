@@ -12,6 +12,10 @@ This project keeps the UI intentionally simple: one PowerShell script, a small W
 
 ![Bing Wallpaper preview](assets/Preview.png)
 
+## 📦 Download
+
+Download the latest **Windows ZIP package** from the [Releases](https://github.com/Hamisoptimistic/Bing-Wallpaper/releases) page and extract the whole folder before launching `BingWallpaper.exe`. The `.exe` is a small launcher and requires `Bing-Wallpaper-UI.ps1` beside it; downloading the `.exe` by itself will not work.
+
 ---
 
 ## ✨ Features
