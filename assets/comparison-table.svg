@@ -91,10 +91,23 @@
 
 <!-- Row 1: Active Memory -->
 <!-- Row 1: Active Memory (GitHub-Safe Static Glow) -->
+<!-- Row 1: Active Memory (Static Green Border + Subtle Red Ambient Shadow) -->
   <text x="40" y="102" class="cell-label">Active Memory (RAM)</text>
 
   <g>
-    <!-- Outer Glow Layer -->
+    <!-- Layer 1: Soft Ambient Red Shadow (Subtle Background Glow) -->
+    <rect 
+      x="296" 
+      y="82" 
+      width="138" 
+      height="32" 
+      rx="10" 
+      ry="10" 
+      fill="#f85149" 
+      fill-opacity="0.12" 
+    />
+
+    <!-- Layer 2: Inner Ambient Red Accent -->
     <rect 
       x="298" 
       y="84" 
@@ -102,11 +115,11 @@
       height="28" 
       rx="8" 
       ry="8" 
-      fill="#2ea44f" 
-      fill-opacity="0.2" 
+      fill="#f85149" 
+      fill-opacity="0.18" 
     />
 
-    <!-- Main Solid Box -->
+    <!-- Layer 3: Solid Dark Background Base -->
     <rect 
       x="300" 
       y="86" 
@@ -114,13 +127,24 @@
       height="24" 
       rx="6" 
       ry="6" 
-      fill="#12381b" 
+      fill="#0d1117" 
+    />
+
+    <!-- Layer 4: Clean Static Green Border -->
+    <rect 
+      x="300" 
+      y="86" 
+      width="130" 
+      height="24" 
+      rx="6" 
+      ry="6" 
+      fill="none" 
       stroke="#3fb950" 
-      stroke-width="1.5" 
+      stroke-width="1.8" 
     />
   </g>
 
-  <!-- High-Contrast Bold White Text -->
+  <!-- Crisp Bold White Text -->
   <text x="365" y="102" text-anchor="middle" style="fill: #ffffff; font-weight: 800; font-size: 12.5px; letter-spacing: 0.3px;">~50–60 MB</text>
   <text x="595" y="102" text-anchor="middle" class="cell-value">~80–120 MB</text>
   <text x="825" y="102" text-anchor="middle" class="cell-value">~200 MB – 400 MB</text>
