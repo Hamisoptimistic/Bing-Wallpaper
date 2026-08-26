@@ -1837,9 +1837,11 @@ if ($SpotlightPill) {
 
 $script:SpotlightScriptPath = if ($PSCommandPath) {
     (Resolve-Path -LiteralPath $PSCommandPath).Path
-} elseif ($PSScriptRoot) {
+}
+elseif ($PSScriptRoot) {
     (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1')).Path
-} else {
+}
+else {
     (Resolve-Path -LiteralPath 'Bing-Wallpaper-UI.ps1').Path
 }
 
@@ -1863,9 +1865,11 @@ function Update-SpotlightScheduledTaskAsync {
         $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
         $currentScript = if ($script:SpotlightScriptPath -and (Test-Path -LiteralPath $script:SpotlightScriptPath)) {
             $script:SpotlightScriptPath
-        } elseif ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
+        }
+        elseif ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
             $PSCommandPath
-        } else {
+        }
+        else {
             (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1') -ErrorAction SilentlyContinue).Path
         }
 
@@ -1894,20 +1898,25 @@ objShell.Run cmd, 0, False
         
         if ($minutes -eq 0) {
             $trigger = New-ScheduledTaskTrigger -AtLogOn
-        } elseif ($minutes -le 1) {
+        }
+        elseif ($minutes -le 1) {
             # 1 minute interval
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
-        } elseif ($minutes -lt 60) {
+        }
+        elseif ($minutes -lt 60) {
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $minutes)
-        } elseif ($minutes -lt 1440) {
+        }
+        elseif ($minutes -lt 1440) {
             $hours = [math]::Max(1, [int]($minutes / 60))
             $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
-        } else {
+        }
+        else {
             $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
         }
         
         Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-    } else {
+    }
+    else {
         Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
@@ -2957,11 +2966,11 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 # ---- Spotlight initialisation ----
 # Populate interval dropdown
 @(
-    @{ Label = '1 min (test)'; Minutes = 1 },
-    @{ Label = 'On Login';     Minutes = 0 },
-    @{ Label = 'Hourly';       Minutes = 60 },
-    @{ Label = 'Every 6h';     Minutes = 360 },
-    @{ Label = 'Daily';        Minutes = 1440 }
+    @{ Label = '1 minute'; Minutes = 1 },
+    @{ Label = 'On Login'; Minutes = 0 },
+    @{ Label = 'Hourly'; Minutes = 60 },
+    @{ Label = 'Every 6h'; Minutes = 360 },
+    @{ Label = 'Daily'; Minutes = 1440 }
 ) | ForEach-Object {
     $it = New-Object System.Windows.Controls.ComboBoxItem
     $it.Content = $_.Label
@@ -2988,13 +2997,13 @@ if ($spotlightWasEnabled) {
 
 # Wire up pill click with instant down-press response
 $SpotlightPill.Add_PreviewMouseLeftButtonDown({
-    param($sender, $e)
-    $e.Handled = $true
-    $newState = -not $script:SpotlightEnabled
-    Set-SpotlightState -Enabled $newState
-    Update-SpotlightScheduledTaskAsync -Enable $newState
-    Save-Settings
-})
+        param($sender, $e)
+        $e.Handled = $true
+        $newState = -not $script:SpotlightEnabled
+        Set-SpotlightState -Enabled $newState
+        Update-SpotlightScheduledTaskAsync -Enable $newState
+        Save-Settings
+    })
 
 # Re-register task asynchronously when interval or target changes while ON
 $SpotlightIntervalBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
