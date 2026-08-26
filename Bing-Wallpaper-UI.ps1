@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.40'
+$script:appVersion = [Version]'1.0.41'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1041,7 +1041,12 @@ if ($AutoApply) {
             <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
             
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
+                <Button Name="CheckUpdateBtn" Width="165" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Ellipse Name="UpdateBadgeDot" Width="8" Height="8" Fill="#EF4444" Margin="0,0,8,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+                        <TextBlock Name="CheckUpdateBtnText" Text="Check for updates" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
                 <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
             </StackPanel>
@@ -1219,6 +1224,8 @@ $RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
+$UpdateBadgeDot = $window.FindName('UpdateBadgeDot')
+$CheckUpdateBtnText = $window.FindName('CheckUpdateBtnText')
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
 
@@ -1890,6 +1897,68 @@ function Show-ModernDialog {
     return $script:dialogChoice
 }
 
+function Set-UpdateButtonState {
+    param(
+        [bool]$HasUpdate,
+        [Version]$NewVersion = $null
+    )
+    if ($HasUpdate) {
+        if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = [System.Windows.Visibility]::Visible }
+        if ($CheckUpdateBtnText) { $CheckUpdateBtnText.Text = 'Update Now' }
+        if ($CheckUpdateBtn) {
+            $CheckUpdateBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 45, 26, 32))
+            $CheckUpdateBtn.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(180, 239, 68, 68))
+            $verText = if ($NewVersion) { "Version $NewVersion is available! " } else { "" }
+            $CheckUpdateBtn.ToolTip = "${verText}Click to update now."
+        }
+    }
+    else {
+        if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($CheckUpdateBtnText) { $CheckUpdateBtnText.Text = 'Check for updates' }
+        if ($CheckUpdateBtn) {
+            $CheckUpdateBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 38, 38, 38))
+            $CheckUpdateBtn.BorderBrush = [System.Windows.Media.Brushes]::Transparent
+            $CheckUpdateBtn.ToolTip = 'Check GitHub for a verified app update'
+        }
+    }
+}
+
+function Check-BackgroundUpdate {
+    [System.Threading.Tasks.Task]::Run([Action]{
+        try {
+            $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
+            $latestRel = Invoke-GitHubApiJson -Uri $releaseUri
+            $latestVer = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
+            
+            if ($latestVer -gt $script:appVersion) {
+                $window.Dispatcher.Invoke([Action]{
+                    Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
+                })
+            }
+        }
+        catch {
+            try {
+                $allReleasesUri = "https://api.github.com/repos/$($script:updateRepository)/releases?per_page=5"
+                $allReleases = Invoke-GitHubApiJson -Uri $allReleasesUri
+                $latestVer = $null
+                foreach ($rel in $allReleases) {
+                    try {
+                        $v = Get-ReleaseVersion -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
+                        if ($null -eq $latestVer -or $v -gt $latestVer) {
+                            $latestVer = $v
+                        }
+                    } catch {}
+                }
+                if ($latestVer -and ($latestVer -gt $script:appVersion)) {
+                    $window.Dispatcher.Invoke([Action]{
+                        Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVer
+                    })
+                }
+            } catch {}
+        }
+    })
+}
+
 function Start-VerifiedUpdate {
     $CheckUpdateBtn.IsEnabled = $false
     $StatusText.Foreground = $statusDefaultBrush
@@ -1927,10 +1996,13 @@ function Start-VerifiedUpdate {
         }
 
         if ($latestVersion -le $script:appVersion) {
+            Set-UpdateButtonState -HasUpdate $false
             Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
             $StatusText.Text = 'You are up to date.'
             return
         }
+
+        Set-UpdateButtonState -HasUpdate $true -NewVersion $latestVersion
 
         $releaseNotes = if ($release.body) { $release.body.Trim() } else { 'No release notes were provided.' }
         if ($releaseNotes.Length -gt 1800) { $releaseNotes = $releaseNotes.Substring(0, 1800) + "`n`n(Release notes shortened.)" }
@@ -2415,10 +2487,14 @@ $RefreshBtn.Add_Click({
         $RefreshBtn.IsEnabled = $false
         Start-RefreshAnimation
     })
-$window.Add_ContentRendered({ Load-Gallery })
+$window.Add_ContentRendered({
+    Load-Gallery
+    Check-BackgroundUpdate
+})
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
