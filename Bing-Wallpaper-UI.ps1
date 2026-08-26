@@ -1186,6 +1186,13 @@ $trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $restoreItem = $trayMenu.Items.Add('Open Bing Wallpaper')
 $exitItem = $trayMenu.Items.Add('Exit')
 
+$setTrayVisibility = {
+    param([bool]$visible)
+    if ($script:trayIcon) {
+        $script:trayIcon.Visible = $visible
+    }
+}
+
 $showMainWindow = {
     $window.ShowInTaskbar = $true
     $window.Show()
@@ -1209,7 +1216,7 @@ if ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath
     $script:trayIcon.Text = 'Bing Wallpaper'
     $script:trayIcon.ContextMenuStrip = $trayMenu
     $script:trayIcon.Add_DoubleClick($showMainWindow)
-    $script:trayIcon.Visible = $true
+    $script:trayIcon.Visible = ($MinimizeToTrayToggle.IsChecked -eq $true)
 }
 
 $window.Add_Closing({
@@ -1224,6 +1231,13 @@ $window.Add_Closing({
                 }
             }
             catch {}
+        }
+    })
+
+$window.Add_StateChanged({
+        if ($MinimizeToTrayToggle.IsChecked -eq $true -and $window.WindowState -eq [System.Windows.WindowState]::Minimized) {
+            $window.ShowInTaskbar = $false
+            $window.Hide()
         }
     })
 
@@ -1335,8 +1349,17 @@ $RegionBox.Add_SelectionChanged($saveHandler)
 $ResolutionBox.Add_SelectionChanged($saveHandler)
 $TargetBox.Add_SelectionChanged($saveHandler)
 $FolderBox.Add_TextChanged($saveHandler)
-$MinimizeToTrayToggle.Add_Checked($saveHandler)
-$MinimizeToTrayToggle.Add_Unchecked($saveHandler)
+$MinimizeToTrayToggle.Add_Checked({
+        Save-Settings
+        & $setTrayVisibility $true
+    })
+$MinimizeToTrayToggle.Add_Unchecked({
+        Save-Settings
+        & $setTrayVisibility $false
+        if (-not $window.IsVisible) {
+            & $showMainWindow
+        }
+    })
 
 # Browse Folder Logic
 # Browse Folder Logic (modern Windows 11 dark-mode folder picker)
