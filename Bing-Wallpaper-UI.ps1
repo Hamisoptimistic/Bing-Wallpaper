@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.66'
+$script:appVersion = [Version]'1.0.67'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1163,7 +1163,7 @@ if ($AutoApply) {
                                 Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                 Cursor="Hand" VerticalAlignment="Center">
                             <Border.Effect>
-                                <DropShadowEffect Name="SpotlightGlow" Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
                             </Border.Effect>
                             <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
@@ -1285,7 +1285,7 @@ catch {}
 # Set authentic Bing icon for window titlebar and taskbar
 $exeDir = Split-Path -Parent ([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
 $scriptDir = $PSScriptRoot
-if (-not $scriptDir) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $scriptDir -and $MyInvocation.MyCommand.Path) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
 $iconCandidates = @(
@@ -1402,7 +1402,7 @@ $DownloadBtn           = $window.FindName('DownloadBtn')
 $UpdateBtn             = $window.FindName('UpdateBtn')
 $SpotlightPill             = $window.FindName('SpotlightPill')
 $SpotlightThumb            = $window.FindName('SpotlightThumb')
-$SpotlightGlow             = $window.FindName('SpotlightGlow')
+$SpotlightGlow             = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
 $SpotlightOptionsContainer = $window.FindName('SpotlightOptionsContainer')
 $SpotlightIntervalBox      = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox        = $window.FindName('SpotlightTargetBox')
@@ -1838,7 +1838,7 @@ function Update-SpotlightScheduledTaskAsync {
 }
 
 function Set-SpotlightState {
-    param([bool]$Enabled, [bool]$Animate = $true)
+    param([bool]$Enabled, [bool]$Animate = $true, [bool]$UpdateTask = $true)
     $script:SpotlightEnabled = $Enabled
 
     # Cancel any pending hide-collapse timer
@@ -1908,7 +1908,7 @@ function Set-SpotlightState {
     } else {
         # Instant set without animation (startup)
         $SpotlightThumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-        [System.Windows.Media.TranslateTransform]$SpotlightThumb.RenderTransform.X = $targetX
+        $SpotlightThumb.RenderTransform.X = $targetX
 
         $script:pillBgBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
         $script:pillBgBrush.Color = $targetBgColor
@@ -1931,9 +1931,10 @@ function Set-SpotlightState {
         }
     }
 
-    # Asynchronously register/unregister task without freezing UI
-    Update-SpotlightScheduledTaskAsync -Enable $Enabled
-    Save-Settings
+    if ($UpdateTask) {
+        Update-SpotlightScheduledTaskAsync -Enable $Enabled
+        Save-Settings
+    }
 }
 
 function Set-TransientStatus {
@@ -2904,7 +2905,7 @@ try {
 } catch {}
 
 if ($taskExists) {
-    Set-SpotlightState -Enabled $true -Animate $false
+    Set-SpotlightState -Enabled $true -Animate $false -UpdateTask $false
 }
 
 # Wire up pill click with instant down-press response
@@ -2942,6 +2943,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
