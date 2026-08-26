@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.50'
+$script:appVersion = [Version]'1.0.51'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1659,6 +1659,25 @@ $statusDefaultBrush = (New-Object System.Windows.Media.SolidColorBrush([System.W
 $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 211, 153)))
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
 $script:statusResetTimer = $null
+$script:fadeTimer = $null
+
+function Restore-StatusTextDefaultWithFade {
+    $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+    $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
+    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+    
+    if ($script:fadeTimer) { $script:fadeTimer.Stop() }
+    $script:fadeTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:fadeTimer.Interval = [TimeSpan]::FromMilliseconds(320)
+    $script:fadeTimer.Add_Tick({
+        $script:fadeTimer.Stop()
+        $StatusText.Foreground = $statusDefaultBrush
+        $StatusText.Text = 'Double-click any wallpaper to apply'
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+    })
+    $script:fadeTimer.Start()
+}
 
 function Get-AppliedSuccessMessage([string]$target) {
     switch ($target) {
@@ -1678,15 +1697,17 @@ function Set-TransientStatus {
     if ($script:statusResetTimer) {
         $script:statusResetTimer.Stop()
     }
+    
+    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+    $StatusText.Opacity = 1
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
 
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
     $script:statusResetTimer.Add_Tick({
-            $StatusText.Foreground = $statusDefaultBrush
-            $StatusText.Text = 'Double-click any wallpaper to apply'
             $script:statusResetTimer.Stop()
+            Restore-StatusTextDefaultWithFade
         })
     $script:statusResetTimer.Start()
 }
@@ -2073,30 +2094,16 @@ function Start-VerifiedUpdate {
             Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
             $StatusText.Text = 'You are up to date.'
             
-            $timer = New-Object System.Windows.Threading.DispatcherTimer
-            $timer.Interval = [TimeSpan]::FromSeconds(3)
-            $timer.Add_Tick({
-                $timer.Stop()
+            if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
+            $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds(3)
+            $script:statusResetTimer.Add_Tick({
+                $script:statusResetTimer.Stop()
                 if ($StatusText.Text -eq 'You are up to date.') {
-                    $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-                    
-                    # 1. Fade out gracefully
-                    $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
-                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-                    
-                    # 2. Wait for fade out to complete, then change text and fade back in
-                    $timer2 = New-Object System.Windows.Threading.DispatcherTimer
-                    $timer2.Interval = [TimeSpan]::FromMilliseconds(320)
-                    $timer2.Add_Tick({
-                        $timer2.Stop()
-                        $StatusText.Text = 'Double-click any wallpaper to apply'
-                        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
-                        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-                    })
-                    $timer2.Start()
+                    Restore-StatusTextDefaultWithFade
                 }
             })
-            $timer.Start()
+            $script:statusResetTimer.Start()
             
             return
         }
@@ -2250,6 +2257,8 @@ function Load-Gallery {
     }
     
     [BingWallpaperNative]::FlushMemory()
+    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+    $StatusText.Opacity = 1
     $StatusText.Text = 'Connecting to Bing...'
     $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
     Update-UI
@@ -2495,24 +2504,13 @@ function Load-Gallery {
 
         if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
         [BingWallpaperNative]::FlushMemory()
-        $StatusText.Foreground = $statusDefaultBrush
         
         # Smoothly transition from 'Connecting to Bing...' to 'Double-click any wallpaper to apply'
-        $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-        $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-        
-        $loadTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $loadTimer.Interval = [TimeSpan]::FromMilliseconds(320)
-        $loadTimer.Add_Tick({
-            $loadTimer.Stop()
-            $StatusText.Text = 'Double-click any wallpaper to apply'
-            $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
-            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-        })
-        $loadTimer.Start()
+        Restore-StatusTextDefaultWithFade
     }
     catch {
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $StatusText.Opacity = 1
         $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
         $StatusText.Text = "Gallery failed to load: $($_.Exception.Message)"
     }
@@ -2615,6 +2613,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
