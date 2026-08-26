@@ -55,13 +55,20 @@ namespace BingWallpaperLauncher
         static void Main()
         {
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string psScript = Path.Combine(Path.GetTempPath(), "BingWallpaper", "Bing-Wallpaper-UI.ps1");
+            string tempDir = Path.Combine(Path.GetTempPath(), "BingWallpaper");
+            string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
+            string iconPath = Path.Combine(tempDir, "assets", "bing.ico");
 
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(psScript));
+                Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
                 using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.Bing-Wallpaper-UI.ps1"))
                 using (FileStream destination = File.Create(psScript))
+                {
+                    source.CopyTo(destination);
+                }
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.bing.ico"))
+                using (FileStream destination = File.Create(iconPath))
                 {
                     source.CopyTo(destination);
                 }
@@ -93,6 +100,7 @@ namespace BingWallpaperLauncher
         "/platform:anycpu",
         "/win32icon:`"$icoPath`"",
         "/resource:`"$uiPath`",BingWallpaperLauncher.Bing-Wallpaper-UI.ps1",
+        "/resource:`"$icoPath`",BingWallpaperLauncher.bing.ico",
         "/out:`"$exePath`"",
         "`"$csTemp`""
     )
