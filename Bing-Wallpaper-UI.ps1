@@ -1216,11 +1216,14 @@ $window.Add_Closing({
         param($sender, $e)
         if (-not $script:trayExitRequested -and $MinimizeToTrayToggle.IsChecked -eq $true) {
             $e.Cancel = $true
-            $window.Hide()
             $window.ShowInTaskbar = $false
-            if ($script:trayIcon) {
-                $script:trayIcon.ShowBalloonTip(1500, 'Bing Wallpaper', 'The app is still running in the notification area.', [System.Windows.Forms.ToolTipIcon]::Info)
+            $window.Hide()
+            try {
+                if ($script:trayIcon) {
+                    $script:trayIcon.ShowBalloonTip(1500, 'Bing Wallpaper', 'The app is still running in the notification area.', [System.Windows.Forms.ToolTipIcon]::Info)
+                }
             }
+            catch {}
         }
     })
 
