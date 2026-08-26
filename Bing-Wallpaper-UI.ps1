@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.38'
+$script:appVersion = [Version]'1.0.39'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1620,6 +1620,36 @@ function Invoke-GitHubApiJson([string]$Uri) {
     }
 }
 
+function Format-MarkdownForDialog {
+    param([string]$Text)
+    if (-not $Text) { return '' }
+    $lines = $Text -split "\r?\n"
+    $cleanLines = @()
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed) { 
+            if ($cleanLines.Count -gt 0 -and $cleanLines[-1] -ne '') { $cleanLines += '' }
+            continue 
+        }
+        # Strip header markers ###
+        $cleaned = $trimmed -replace '^#{1,6}\s*', ''
+        # Convert links [Title](URL) -> Title
+        $cleaned = $cleaned -replace '\[([^\]]+)\]\([^\)]+\)', '$1'
+        # Strip bold/italic markup
+        $cleaned = $cleaned -replace '\*\*([^\*]+)\*\*', '$1'
+        $cleaned = $cleaned -replace '\*([^\*]+)\*', '$1'
+        $cleaned = $cleaned -replace '__([^_]+)__', '$1'
+        # Strip backticks
+        $cleaned = $cleaned -replace '`([^`]+)`', '$1'
+        # Replace list markers with clean bullet dots
+        $cleaned = $cleaned -replace '^[-*]\s+', 'â€¢ '
+        # Shorten full commit SHAs to 7 characters
+        $cleaned = $cleaned -replace '\b([a-f0-9]{7})[a-f0-9]{33}\b', '$1'
+        $cleanLines += $cleaned
+    }
+    return ($cleanLines -join "`n").Trim()
+}
+
 function Show-ModernDialog {
     param(
         [string]$Title = 'Bing Wallpaper',
@@ -1636,11 +1666,50 @@ function Show-ModernDialog {
     $dialogXaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="$Title" Width="450" SizeToContent="Height"
+        Title="$Title" Width="460" SizeToContent="Height"
         Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         ResizeMode="NoResize" WindowStyle="SingleBorderWindow">
     <Window.Resources>
+        <!-- Windows 11 Fluent Dark ScrollBar Style -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track Name="PART_Track" IsDirectionReversed="true">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.LineUpCommand}" Opacity="0" Focusable="False"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border Name="ThumbBorder" Background="#4A4A4A" CornerRadius="4" Margin="2,0,2,0"/>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#6E6E6E"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#888888"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.LineDownCommand}" Opacity="0" Focusable="False"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DialogBtn" TargetType="Button">
             <Setter Property="Height" Value="36"/>
             <Setter Property="MinWidth" Value="100"/>
@@ -1693,9 +1762,9 @@ function Show-ModernDialog {
             </Grid>
 
             <!-- Release Details (Collapsible) -->
-            <Border Name="DetailsCard" Grid.Row="1" Background="#212121" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16" MaxHeight="140" Visibility="Collapsed">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" FocusVisualStyle="{x:Null}">
-                    <TextBlock Name="DetailsContent" FontSize="12.5" Foreground="#A8A8A8" TextWrapping="Wrap" FontFamily="Consolas, Segoe UI"/>
+            <Border Name="DetailsCard" Grid.Row="1" Background="#212121" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,18" MaxHeight="145" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
+                    <TextBlock Name="DetailsContent" FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" FontFamily="Segoe UI"/>
                 </ScrollViewer>
             </Border>
 
@@ -1756,7 +1825,7 @@ function Show-ModernDialog {
     }
 
     if ($Details) {
-        $detailsContent.Text = $Details
+        $detailsContent.Text = Format-MarkdownForDialog $Details
         $detailsCard.Visibility = [System.Windows.Visibility]::Visible
     }
 
@@ -2339,6 +2408,7 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
