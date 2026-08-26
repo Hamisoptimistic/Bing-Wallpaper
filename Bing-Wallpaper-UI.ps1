@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.69'
+$script:appVersion = [Version]'1.0.71'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2966,8 +2966,8 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
 # ---- Spotlight initialisation ----
 # Populate interval dropdown
 @(
-    @{ Label = '1 minute'; Minutes = 1 },
     @{ Label = 'On Login'; Minutes = 0 },
+    @{ Label = '1 minute'; Minutes = 1 },
     @{ Label = 'Hourly'; Minutes = 60 },
     @{ Label = 'Every 6h'; Minutes = 360 },
     @{ Label = 'Daily'; Minutes = 1440 }
@@ -3033,6 +3033,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
