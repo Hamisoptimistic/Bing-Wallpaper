@@ -1359,6 +1359,19 @@ function Get-ImageAccentBrush([string]$imagePath) {
     }
 }
 
+function Get-AccentTextBrush($accentBrush, [byte]$alpha = 255) {
+    if (-not $accentBrush) {
+        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb($alpha, 255, 255, 255))
+    }
+
+    $color = $accentBrush.Color
+    $brightness = (0.299 * $color.R) + (0.587 * $color.G) + (0.114 * $color.B)
+    if ($brightness -gt 145) {
+        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb($alpha, 18, 18, 18))
+    }
+    return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb($alpha, 255, 255, 255))
+}
+
 function Select-Card($card, $image) {
     if ($script:selectedCard -and $script:selectedCard -ne $card) {
         $script:selectedCard.Background = $cardUnselectedBg
@@ -1597,7 +1610,8 @@ function Load-Gallery {
 
             $title = New-Object System.Windows.Controls.TextBlock
             $title.Text = $displayTitle
-            $title.Foreground = [System.Windows.Media.Brushes]::White
+            $accentBrush = $card.Resources['ImageAccentBrush']
+            $title.Foreground = Get-AccentTextBrush $accentBrush
             $title.FontSize = 15
             $title.FontWeight = [System.Windows.FontWeights]::SemiBold
             $title.TextTrimming = 'CharacterEllipsis'
@@ -1611,7 +1625,7 @@ function Load-Gallery {
             catch {
                 $date.Text = "Bing Wallpaper"
             }
-            $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
+            $date.Foreground = Get-AccentTextBrush $accentBrush 205
             $date.FontSize = 13.5
             $details.Children.Add($date)
 
