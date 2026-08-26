@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.43'
+$script:appVersion = [Version]'1.0.44'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2324,18 +2324,17 @@ function Load-Gallery {
             
             $card.Child = $cardGrid
 
-            # Image Container with 16:9 Aspect Ratio
-            $imgBox = New-Object System.Windows.Controls.Grid
-            $imgBox.Height = 155
-            $imgBox.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 24, 24, 24)))
+            # Image Container (Using Image control for native aspect ratio scaling)
+            $imgBorder = New-Object System.Windows.Controls.Border
+            $imgBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
+            $imgBorder.ClipToBounds = $true
+            $imgBorder.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20)))
 
             $imageControl = New-Object System.Windows.Controls.Image
-            $imageControl.Stretch = 'UniformToFill'
-            $imageControl.HorizontalAlignment = 'Center'
-            $imageControl.VerticalAlignment = 'Center'
+            $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
+            $imgBorder.Child = $imageControl
 
-            $imgBox.Children.Add($imageControl) | Out-Null
-            $stack.Children.Add($imgBox)
+            $stack.Children.Add($imgBorder)
 
             # Load thumbnail from disk cache with fast LockBits accent extraction
             try {
@@ -2529,6 +2528,7 @@ $window.Add_ContentRendered({ Load-Gallery })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
