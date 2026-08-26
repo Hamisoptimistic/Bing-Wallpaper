@@ -3,8 +3,8 @@
     <style>
       .hdr-text { font-size: 13px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
       .row-lbl { font-size: 12.5px; font-weight: 600; fill: #e6edf3; }
-      .win-val { font-size: 12.5px; font-weight: 700; fill: #56d364; text-anchor: middle; }
-      .loss-val { font-size: 12px; font-weight: 500; fill: #f85149; text-anchor: middle; }
+      .win-val { font-size: 12.5px; font-weight: 700; fill: #7ee787; text-anchor: middle; }
+      .loss-val { font-size: 12px; font-weight: 500; fill: #c98a8e; text-anchor: middle; }
       .muted-val { font-size: 12px; font-weight: 500; fill: #8b949e; text-anchor: middle; }
       .grid-line { stroke: #30363d; stroke-width: 1; }
     </style>
@@ -32,11 +32,11 @@
   <rect x="0" y="444" width="235" height="40" fill="#161b22" />
   <rect x="450" y="444" width="430" height="40" fill="#161b22" />
 
-  <!-- Top Header Row Backgrounds (Red for non-winners, Vibrant Green for Bing Wallpaper) -->
-  <rect x="0" y="0" width="235" height="44" fill="#a4262c" />
+  <!-- Top Header Row Backgrounds (Muted Dark Crimson for non-winners, Vibrant Green for Bing Wallpaper) -->
+  <rect x="0" y="0" width="235" height="44" fill="#6e1b21" />
   <rect x="235" y="0" width="215" height="44" fill="#238636" />
-  <rect x="450" y="0" width="215" height="44" fill="#a4262c" />
-  <rect x="665" y="0" width="215" height="44" fill="#a4262c" />
+  <rect x="450" y="0" width="215" height="44" fill="#6e1b21" />
+  <rect x="665" y="0" width="215" height="44" fill="#6e1b21" />
 
   <!-- Header Text -->
   <text x="117" y="27" class="hdr-text">Feature</text>
