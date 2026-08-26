@@ -1414,6 +1414,7 @@ $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Win
 $statusDefaultFontSize = 14
 $statusTransientFontSize = 16
 $script:statusResetTimer = $null
+$script:statusFadeTimer = $null
 
 function Set-TransientStatus {
     param(
@@ -1423,6 +1424,9 @@ function Set-TransientStatus {
     )
     if ($script:statusResetTimer) {
         $script:statusResetTimer.Stop()
+    }
+    if ($script:statusFadeTimer) {
+        $script:statusFadeTimer.Stop()
     }
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
@@ -1446,13 +1450,18 @@ function Set-TransientStatus {
             $fadeOut.Duration = [System.Windows.Duration]::new([TimeSpan]::FromMilliseconds(700))
             $fadeOut.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
             $fadeOut.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
-            $fadeOut.Add_Completed({
+            $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeOut)
+
+            $script:statusFadeTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:statusFadeTimer.Interval = [TimeSpan]::FromMilliseconds(750)
+            $script:statusFadeTimer.Add_Tick({
+                    $script:statusFadeTimer.Stop()
                     $StatusText.Foreground = $statusDefaultBrush
                     $StatusText.Text = 'Double-click any wallpaper to apply'
                     $StatusText.FontSize = $statusDefaultFontSize
                     $StatusText.Opacity = 1
                 })
-            $StatusText.BeginAnimation([System.Windows.Controls.TextBlock]::OpacityProperty, $fadeOut)
+            $script:statusFadeTimer.Start()
         })
     $script:statusResetTimer.Start()
 }
