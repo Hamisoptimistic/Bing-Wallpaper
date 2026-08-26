@@ -22,7 +22,7 @@ The standalone EXE embeds the PowerShell UI and works by itself. No additional f
 
 ## ✨ Features
 
-- 🪶 **Naive by design**: A straightforward PowerShell + WPF UI with minimal moving parts and no heavyweight application framework.
+- 🪶 **Native by design**: A straightforward PowerShell + WPF UI with minimal moving parts and no heavyweight application framework.
 - 🧠 **Ultra-low RAM footprint**: The app avoids a resident browser engine and runs only when you need to choose or apply a wallpaper.
 - 🎨 **Clean Windows 11 UI**: Native dark title bar with rounded corners, a compact gallery, borderless inputs, and slim overlay scrollbars.
 - 🚀 **Zero-Console Standalone Launcher (`BingWallpaper.exe`)**: Launches immediately with zero terminal flash and the authentic high-resolution Bing icon.
