@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.44'
+$script:appVersion = [Version]'1.0.45'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1564,21 +1564,33 @@ function Set-TransientStatus {
     param(
         [string]$Message,
         [System.Windows.Media.Brush]$Brush = $statusSuccessBrush,
-        [double]$Seconds = 3.5
+        [double]$Seconds = 3.0
     )
     if ($script:statusResetTimer) {
         $script:statusResetTimer.Stop()
     }
+    
     $StatusText.Foreground = $Brush
     $StatusText.Text = $Message
+    $StatusText.Opacity = 1.0
 
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
     $script:statusResetTimer.Add_Tick({
+        $script:statusResetTimer.Stop()
+        
+        # Smooth fade transition
+        $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+        $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, $duration)
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
+        
+        $fadeOut.Add_Completed({
             $StatusText.Foreground = $statusDefaultBrush
             $StatusText.Text = 'Double-click any wallpaper to apply'
-            $script:statusResetTimer.Stop()
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
         })
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+    })
     $script:statusResetTimer.Start()
 }
 
@@ -1953,7 +1965,7 @@ function Start-VerifiedUpdate {
         if ($latestVersion -le $script:appVersion) {
             Set-UpdateButtonState -HasUpdate $false
             Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
-            $StatusText.Text = 'You are up to date.'
+            Set-TransientStatus -Message 'You are up to date.' -Brush $statusSuccessBrush -Seconds 3.0
             return
         }
 
@@ -1961,7 +1973,7 @@ function Start-VerifiedUpdate {
 
         $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersion is Available" -Message "Would you like to install and restart now?" -Icon "Update" -Buttons "YesNo"
         if ($confirmation -ne 'Yes') {
-            $StatusText.Text = 'Update cancelled.'
+            Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush -Seconds 2.5
             return
         }
 
@@ -2453,6 +2465,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
