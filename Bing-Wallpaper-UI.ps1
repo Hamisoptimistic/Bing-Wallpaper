@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.45'
+$script:appVersion = [Version]'1.0.48'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1175,7 +1175,12 @@ if ($AutoApply) {
             <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
             
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
+                <Button Name="CheckUpdateBtn" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update">
+                    <Grid>
+                        <TextBlock Name="UpdateBtnText" Text="Check for updates" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <Ellipse Name="UpdateBadgeDot" Width="8" Height="8" Fill="#F87171" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-12,0" Visibility="Collapsed" />
+                    </Grid>
+                </Button>
                 <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
                 <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
             </StackPanel>
@@ -1354,6 +1359,8 @@ $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
+$UpdateBtnText = $window.FindName('UpdateBtnText')
+$UpdateBadgeDot = $window.FindName('UpdateBadgeDot')
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
 
@@ -1999,6 +2006,33 @@ function Show-ModernDialog {
     return $script:dialogChoice
 }
 
+function Check-ForUpdatesInBackground {
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+    $releaseUri = "https://api.github.com/repos/$($script:updateRepository)/releases/latest"
+    
+    $wc.DownloadStringCompleted.Add({
+        param($sender, $e)
+        if ($e.Error) { return }
+        try {
+            $latestRel = $e.Result | ConvertFrom-Json
+            $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
+            if ($latestVersion -gt $script:appVersion) {
+                $dispatcher = [System.Windows.Threading.Dispatcher]::CurrentDispatcher
+                $dispatcher.Invoke([Action]{
+                    if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = 'Visible' }
+                    if ($UpdateBtnText) { $UpdateBtnText.Text = 'Update Now' }
+                })
+            }
+        }
+        catch {}
+        finally {
+            $sender.Dispose()
+        }
+    })
+    $wc.DownloadStringAsync((New-Object System.Uri($releaseUri)))
+}
+
 function Start-VerifiedUpdate {
     $CheckUpdateBtn.IsEnabled = $false
     $StatusText.Foreground = $statusDefaultBrush
@@ -2038,6 +2072,24 @@ function Start-VerifiedUpdate {
         if ($latestVersion -le $script:appVersion) {
             Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
             $StatusText.Text = 'You are up to date.'
+            
+            $timer = New-Object System.Windows.Threading.DispatcherTimer
+            $timer.Interval = [TimeSpan]::FromSeconds(3)
+            $timer.Add_Tick({
+                $timer.Stop()
+                if ($StatusText.Text -eq 'You are up to date.') {
+                    $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+                    $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, $fadeDuration)
+                    $fadeOut.Completed.Add({
+                        $StatusText.Text = 'Double-click any wallpaper to apply'
+                        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, $fadeDuration)
+                        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+                    })
+                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+                }
+            })
+            $timer.Start()
+            
             return
         }
 
@@ -2534,10 +2586,14 @@ $RefreshBtn.Add_Click({
         $RefreshBtn.IsEnabled = $false
         Start-RefreshAnimation
     })
-$window.Add_ContentRendered({ Load-Gallery })
+$window.Add_ContentRendered({ 
+    Load-Gallery 
+    Check-ForUpdatesInBackground
+})
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
