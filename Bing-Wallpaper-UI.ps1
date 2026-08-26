@@ -1372,6 +1372,25 @@ function Get-AccentTextBrush($accentBrush, [byte]$alpha = 255) {
     return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb($alpha, 255, 255, 255))
 }
 
+function Set-CardAccent($card, $accentBrush) {
+    if (-not $card -or -not $accentBrush) { return }
+
+    $fromColor = [System.Windows.Media.Color]::FromRgb(10, 12, 18)
+    if ($card.Background -is [System.Windows.Media.SolidColorBrush]) {
+        $fromColor = $card.Background.Color
+    }
+
+    $animatedBrush = New-Object System.Windows.Media.SolidColorBrush($fromColor)
+    $card.Background = $animatedBrush
+    $animation = New-Object System.Windows.Media.Animation.ColorAnimation
+    $animation.From = $fromColor
+    $animation.To = $accentBrush.Color
+    $animation.Duration = [System.Windows.Duration]::new([TimeSpan]::FromMilliseconds(220))
+    $animation.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+    $animation.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $animatedBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $animation)
+}
+
 function Select-Card($card, $image) {
     if ($script:selectedCard -and $script:selectedCard -ne $card) {
         $script:selectedCard.Background = $cardUnselectedBg
@@ -1381,8 +1400,8 @@ function Select-Card($card, $image) {
     $script:selectedCard = $card
     $script:selectedImage = $image
     if ($card) {
-        $card.Background = $card.Resources['ImageAccentBrush']
         $accentBrush = $card.Resources['ImageAccentBrush']
+        Set-CardAccent $card $accentBrush
         $card.Resources['TitleText'].Foreground = Get-AccentTextBrush $accentBrush
         $card.Resources['DateText'].Foreground = Get-AccentTextBrush $accentBrush 205
     }
@@ -1540,7 +1559,7 @@ function Load-Gallery {
                         $sender.Background = $cardUnselectedBg
                     }
                     else {
-                        $sender.Background = $sender.Resources['ImageAccentBrush']
+                        Set-CardAccent $sender $sender.Resources['ImageAccentBrush']
                     }
 
                     # Reset shadow & reveal light
