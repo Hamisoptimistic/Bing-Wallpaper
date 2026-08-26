@@ -146,7 +146,7 @@ try {
 } catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.64'
+$script:appVersion = [Version]'1.0.65'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1158,10 +1158,10 @@ if ($AutoApply) {
             <StackPanel Grid.Column="4" Margin="0,0,16,0" Orientation="Horizontal">
                 <StackPanel Margin="0,0,10,0">
                     <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <Border Name="SpotlightPill" Width="54" Height="30" CornerRadius="15"
+                    <Border Name="SpotlightPill" Width="64" Height="34" CornerRadius="17"
                             Background="#2D2D2D" BorderBrush="#444444" BorderThickness="1.5"
-                            Cursor="Hand" VerticalAlignment="Center">
-                        <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="White"
+                            Cursor="Hand">
+                        <Ellipse Name="SpotlightThumb" Width="26" Height="26" Fill="White"
                                  HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0">
                             <Ellipse.RenderTransform>
                                 <TranslateTransform/>
@@ -1812,49 +1812,83 @@ function Unregister-SpotlightTask {
     Unregister-ScheduledTask -TaskName $script:SpotlightTaskName -Confirm:$false -ErrorAction SilentlyContinue
 }
 
+$script:SpotlightHideTimer = $null
+$script:SpotlightRegTimer  = $null
+
 function Set-SpotlightState {
     param([bool]$Enabled, [bool]$Animate = $true)
     $script:SpotlightEnabled = $Enabled
 
+    # Cancel any pending hide-collapse timer when turning ON
+    if ($script:SpotlightHideTimer) { $script:SpotlightHideTimer.Stop() }
+
+    # --- Animate pill thumb ---
+    # Pill is 64px wide, thumb is 26px, margin 4px each side â†’ travel = 64-4-26-4 = 30
     $transform = $SpotlightThumb.RenderTransform
-    $targetX   = if ($Enabled) { 24.0 } else { 0.0 }
-    $dur       = if ($Animate)  { [TimeSpan]::FromMilliseconds(220) } else { [TimeSpan]::Zero }
-    $anim      = New-Object System.Windows.Media.Animation.DoubleAnimation($targetX, (New-Object System.Windows.Duration($dur)))
-    $anim.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
-    $anim.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
-    $anim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
-    $transform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $anim)
+    $targetX   = if ($Enabled) { 30.0 } else { 0.0 }
+    $thumbDur  = if ($Animate) { [TimeSpan]::FromMilliseconds(200) } else { [TimeSpan]::Zero }
+    $thumbAnim = New-Object System.Windows.Media.Animation.DoubleAnimation($targetX, (New-Object System.Windows.Duration($thumbDur)))
+    $thumbAnim.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+    $thumbAnim.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $transform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $thumbAnim)
 
     if ($Enabled) {
-        $SpotlightPill.Background   = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
-        $SpotlightPill.BorderBrush  = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
+        $SpotlightPill.Background  = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
+        $SpotlightPill.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
 
-        # Fade the extra controls in
+        # Clear any old opacity animations before showing
+        $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
         $SpotlightIntervalPanel.Opacity  = 0
         $SpotlightTargetPanel.Opacity    = 0
         $SpotlightIntervalPanel.Visibility = [System.Windows.Visibility]::Visible
         $SpotlightTargetPanel.Visibility   = [System.Windows.Visibility]::Visible
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 1, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(250))))
-        $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-        $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
 
-        Register-SpotlightTask
+        if ($Animate) {
+            # SEPARATE animation objects â€” sharing one object causes the first panel to lose it
+            $fi1 = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220))))
+            $fi2 = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220))))
+            $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fi1)
+            $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fi2)
+        } else {
+            $SpotlightIntervalPanel.Opacity = 1
+            $SpotlightTargetPanel.Opacity   = 1
+        }
+
+        # Defer task registration so UI renders first (Register-ScheduledTask blocks the thread)
+        $script:SpotlightRegTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:SpotlightRegTimer.Interval = [TimeSpan]::FromMilliseconds(60)
+        $script:SpotlightRegTimer.Add_Tick({
+            $script:SpotlightRegTimer.Stop()
+            Register-SpotlightTask
+        })
+        $script:SpotlightRegTimer.Start()
     } else {
         $SpotlightPill.Background  = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(45, 45, 45))
         $SpotlightPill.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(68, 68, 68))
 
-        # Fade out then hide
-        $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1, 0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180))))
-        $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-        $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-        $t = New-Object System.Windows.Threading.DispatcherTimer
-        $t.Interval = [TimeSpan]::FromMilliseconds(200)
-        $t.Add_Tick({
-            $t.Stop()
+        if ($Animate) {
+            # SEPARATE animation objects for fade-out
+            $fo1 = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(160))))
+            $fo2 = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(160))))
+            $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fo1)
+            $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fo2)
+
+            # Use script-scoped timer so the Tick handler can reference it to call Stop()
+            $script:SpotlightHideTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:SpotlightHideTimer.Interval = [TimeSpan]::FromMilliseconds(180)
+            $script:SpotlightHideTimer.Add_Tick({
+                $script:SpotlightHideTimer.Stop()
+                $SpotlightIntervalPanel.Visibility = [System.Windows.Visibility]::Collapsed
+                $SpotlightTargetPanel.Visibility   = [System.Windows.Visibility]::Collapsed
+            })
+            $script:SpotlightHideTimer.Start()
+        } else {
+            $SpotlightIntervalPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $SpotlightTargetPanel.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
             $SpotlightIntervalPanel.Visibility = [System.Windows.Visibility]::Collapsed
             $SpotlightTargetPanel.Visibility   = [System.Windows.Visibility]::Collapsed
-        })
-        $t.Start()
+        }
 
         Unregister-SpotlightTask
     }
@@ -2856,6 +2890,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
