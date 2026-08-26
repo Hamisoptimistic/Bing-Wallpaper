@@ -27,7 +27,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.45'
+$script:appVersion = [Version]'1.0.46'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1084,6 +1084,7 @@ function Find-RevealBorders($visual) {
 
 $window.Add_Loaded({
         Find-RevealBorders $window
+        Start-BackgroundUpdateCheck
     })
 
 $window.Add_MouseMove({
@@ -1864,33 +1865,53 @@ function Start-BackgroundUpdateCheck {
 
         $ps.AddScript({
             param($repo, $currentVer)
+            
+            function Parse-VersionString($text) {
+                if (-not $text) { return $null }
+                $clean = ($text -replace '^[vV]', '').Trim()
+                if ($clean -match '^\d+(\.\d+){1,3}$') {
+                    return [Version]$clean
+                }
+                if ($text -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                    $v = $Matches[1]
+                    if ($v -notmatch '\.') { $v = "$v.0" }
+                    if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                }
+                return $null
+            }
+
             try {
                 $wc = New-Object System.Net.WebClient
                 $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-                $json = $wc.DownloadString("https://api.github.com/repos/$repo/releases/latest") | ConvertFrom-Json
                 
-                $cleanTag = ($json.tag_name -replace '^[vV]', '').Trim()
-                if ($cleanTag -match '^\d+(\.\d+){1,3}$') {
-                    $ver = [Version]$cleanTag
-                    if ($ver -gt [Version]$currentVer) {
-                        return @{ HasUpdate = $true; Version = $ver.ToString() }
-                    }
+                $highestVer = $null
+
+                # 1. Check latest release
+                try {
+                    $jsonLatest = $wc.DownloadString("https://api.github.com/repos/$repo/releases/latest") | ConvertFrom-Json
+                    $v = Parse-VersionString $jsonLatest.tag_name
+                    if (-not $v) { $v = Parse-VersionString $jsonLatest.name }
+                    if (-not $v) { $v = Parse-VersionString $jsonLatest.body }
+                    if ($v) { $highestVer = $v }
+                } catch {}
+
+                # 2. Check recent releases as fallback
+                if (-not $highestVer) {
+                    try {
+                        $allReleases = $wc.DownloadString("https://api.github.com/repos/$repo/releases?per_page=10") | ConvertFrom-Json
+                        foreach ($rel in $allReleases) {
+                            $v = Parse-VersionString $rel.tag_name
+                            if (-not $v) { $v = Parse-VersionString $rel.name }
+                            if (-not $v) { $v = Parse-VersionString $rel.body }
+                            if ($v -and ($null -eq $highestVer -or $v -gt $highestVer)) {
+                                $highestVer = $v
+                            }
+                        }
+                    } catch {}
                 }
-                if ($json.name -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    $ver = [Version]$v
-                    if ($ver -gt [Version]$currentVer) {
-                        return @{ HasUpdate = $true; Version = $ver.ToString() }
-                    }
-                }
-                if ($json.body -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    $ver = [Version]$v
-                    if ($ver -gt [Version]$currentVer) {
-                        return @{ HasUpdate = $true; Version = $ver.ToString() }
-                    }
+
+                if ($highestVer -and ($highestVer -gt [Version]$currentVer)) {
+                    return @{ HasUpdate = $true; Version = $highestVer.ToString() }
                 }
             }
             catch {}
@@ -1900,7 +1921,7 @@ function Start-BackgroundUpdateCheck {
         $asyncHandle = $ps.BeginInvoke()
 
         $script:bgPollTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:bgPollTimer.Interval = [TimeSpan]::FromMilliseconds(150)
+        $script:bgPollTimer.Interval = [TimeSpan]::FromMilliseconds(100)
         $script:bgPollTimer.Add_Tick({
             if ($asyncHandle.IsCompleted) {
                 $script:bgPollTimer.Stop()
@@ -2460,11 +2481,11 @@ $RefreshBtn.Add_Click({
     })
 $window.Add_ContentRendered({
     Load-Gallery
-    Start-BackgroundUpdateCheck
 })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
