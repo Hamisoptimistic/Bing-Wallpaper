@@ -31,6 +31,20 @@ $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
 
 Add-Type -AssemblyName System.Drawing
 
+# Auto-sync version with Git commit count if in a git repository
+try {
+    $commitCount = (git rev-list --count HEAD 2>$null)
+    if ($commitCount -and ($commitCount.Trim() -match '^\d+$')) {
+        $autoVer = "1.0.$($commitCount.Trim())"
+        $uiRaw = Get-Content -LiteralPath $uiPath -Raw
+        if ($uiRaw -match '\$script:appVersion\s*=\s*\[Version\][''"][^''"]+[''"]') {
+            $updatedRaw = $uiRaw -replace '\$script:appVersion\s*=\s*\[Version\][''"][^''"]+[''"]', "`$script:appVersion = [Version]'$autoVer'"
+            Set-Content -LiteralPath $uiPath -Value $updatedRaw -Encoding UTF8
+            Write-Output "--> Synced App Version: $autoVer (commit #$($commitCount.Trim()))"
+        }
+    }
+} catch {}
+
 # 1. Compile standalone Windows GUI executable (BingWallpaper.exe) with embedded icon
 Write-Output "--> Compiling BingWallpaper.exe (zero-console launcher)..."
 $cscCandidates = @(

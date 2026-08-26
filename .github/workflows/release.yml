@@ -19,10 +19,24 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Compile BingWallpaper.exe and Checksum
+      - name: Auto-Increment Version & Compile
+        id: build_step
         shell: powershell
         run: |
+          $commitCount = (git rev-list --count HEAD).Trim()
+          if (-not ($commitCount -match '^\d+$')) { $commitCount = '1' }
+          $ver = "1.0.$commitCount"
+          Write-Output "Generated Auto-Version: $ver"
+
+          # Automatically update $script:appVersion in Bing-Wallpaper-UI.ps1
+          $uiContent = Get-Content -LiteralPath .\Bing-Wallpaper-UI.ps1 -Raw
+          $uiContent = $uiContent -replace '\$script:appVersion\s*=\s*\[Version\][''"][^''"]+[''"]', "`$script:appVersion = [Version]'$ver'"
+          Set-Content -LiteralPath .\Bing-Wallpaper-UI.ps1 -Value $uiContent -Encoding UTF8
+
+          # Compile executable
           powershell -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
           if (-not (Test-Path .\BingWallpaper.exe)) {
             throw "BingWallpaper.exe failed to compile"
@@ -32,26 +46,15 @@ jobs:
             Set-Content -LiteralPath .\BingWallpaper.exe.sha256 -Value "$hash  BingWallpaper.exe" -Encoding ASCII
           }
 
-      - name: Determine Version
-        id: get_version
-        shell: powershell
-        run: |
-          $uiContent = Get-Content -LiteralPath .\Bing-Wallpaper-UI.ps1 -Raw
-          if ($uiContent -match '\$script:appVersion\s*=\s*\[Version\][''"]([^''"]+)[''"]') {
-            $ver = $Matches[1]
-          } else {
-            $ver = "1.0.0"
-          }
-          Write-Output "App Version: $ver"
           "version=$ver" >> $env:GITHUB_OUTPUT
 
       - name: Publish Latest Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "Bing Wallpaper v${{ steps.get_version.outputs.version }} (Latest)"
+          name: "Bing Wallpaper v${{ steps.build_step.outputs.version }} (Latest)"
           body: |
-            ### 🚀 Bing Wallpaper Latest Build (v${{ steps.get_version.outputs.version }})
+            ### 🚀 Bing Wallpaper Latest Build (v${{ steps.build_step.outputs.version }})
             Automatically built from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
 
             #### 📦 Downloads
@@ -86,5 +89,6 @@ jobs:
             BingWallpaper.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
