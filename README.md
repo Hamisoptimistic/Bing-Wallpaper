@@ -115,19 +115,19 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 ## Quick Comparison
 
-| $\colorbox{#8b1c24}{\color{white}\textsf{\textbf{\enspace Feature\enspace}}}$ | $\colorbox{#1b683b}{\color{white}\textsf{\textbf{\enspace Bing Wallpaper\enspace}}}$ | $\colorbox{#8b1c24}{\color{white}\textsf{\textbf{\enspace Official Bing Wallpaper\enspace}}}$ | $\colorbox{#8b1c24}{\color{white}\textsf{\textbf{\enspace Electron / Webview Apps\enspace}}}$ |
+| Feature | **Bing Wallpaper** | Official Bing Wallpaper | Electron / WebView Apps |
 | :--- | :---: | :---: | :---: |
-| **Active Memory (RAM)** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace ~50–60 MB\enspace}}$ | $\color{#f85149}{\text{~80–120 MB}}$ | $\color{#f85149}{\text{~200 MB – 400 MB}}$ |
-| **Idle Memory (When Closed)** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace 0 MB\enspace}}$ | $\color{#f85149}{\text{~80 MB (Always resident)}}$ | $\color{#f85149}{\text{~200 MB – 400 MB (Always resident)}}$ |
-| **4K / UHD Resolutions** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes\enspace}}$ | $\color{#f85149}{\text{No}}$ | $\color{#f85149}{\text{Varies}}$ |
-| **Lock Screen Support** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes\enspace}}$ | $\color{#f85149}{\text{No}}$ | $\color{#f85149}{\text{Rare}}$ |
-| **Wallpaper Style (Fit, Fill, Stretch, Tile)** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes\enspace}}$ | $\color{#f85149}{\text{No}}$ | $\color{#f85149}{\text{Rare}}$ |
-| **50+ Country Feeds** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes\enspace}}$ | $\color{#f85149}{\text{No (US only)}}$ | $\color{#f85149}{\text{Rare}}$ |
-| **High-Res Local Downloader** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes\enspace}}$ | $\color{#f85149}{\text{No}}$ | $\color{#f85149}{\text{Varies}}$ |
-| **Modern Fluent UI & Hover Effects** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes (Native WPF)\enspace}}$ | $\color{#f85149}{\text{Outdated Win32}}$ | $\color{#f85149}{\text{Webview / Heavy}}$ |
-| **1-Click Seamless In-App Updates** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes (SHA-256 Verified)\enspace}}$ | $\color{#f85149}{\text{Proprietary Updater}}$ | $\color{#f85149}{\text{Large Re-downloads}}$ |
-| **Background Automation Engine** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Native Task Scheduler\enspace}}$ | $\color{#f85149}{\text{Background Tray Daemon}}$ | $\color{#f85149}{\text{Background Node.js Process}}$ |
-| **Single Portable Binary** | $\colorbox{#134026}{\color{#56d364}\textbf{\enspace Yes\enspace}}$ | $\color{#f85149}{\text{No (MSI required)}}$ | $\color{#f85149}{\text{Large bundle}}$ |
+| **Active Memory (RAM)** | **~50–60 MB** | ~80–120 MB | ~200 MB – 400 MB |
+| **Idle Memory (When Closed)** | **0 MB** | ~80 MB *(Resident)* | ~200 MB – 400 MB *(Resident)* |
+| **4K / UHD Resolutions** | **Yes** | No | Varies |
+| **Lock Screen Support** | **Yes** | No | Rare |
+| **Wallpaper Styles (Fit, Fill, etc.)** | **Yes** | No | Rare |
+| **50+ Country Feeds** | **Yes** | No *(US only)* | Rare |
+| **High-Res Local Downloader** | **Yes** | No | Varies |
+| **Modern Fluent UI & Hover Effects** | **Yes (Native WPF)** | Outdated Win32 | WebView / Heavy |
+| **1-Click Seamless In-App Updates** | **Yes (SHA-256 Verified)** | Proprietary Updater | Large Re-downloads |
+| **Background Automation Engine** | **Native Task Scheduler** | Background Tray Daemon | Background Node.js Process |
+| **Single Portable Binary** | **Yes** | No *(MSI required)* | Large bundle |
 
 ---
 
