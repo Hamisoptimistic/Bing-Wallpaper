@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.144'
+$script:appVersion = [Version]'1.0.145'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1345,7 +1345,8 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 if (-not [System.Windows.Application]::Current) {
     $script:wpfApp = New-Object System.Windows.Application
     $script:wpfApp.ShutdownMode = [System.Windows.ShutdownMode]::OnExplicitShutdown
-} else {
+}
+else {
     $script:wpfApp = [System.Windows.Application]::Current
     $script:wpfApp.ShutdownMode = [System.Windows.ShutdownMode]::OnExplicitShutdown
 }
@@ -2583,9 +2584,11 @@ function Show-ModernDialog {
     
     $resolvedOwner = if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
         $script:activeGuideDialog
-    } elseif ($ParentWindow -and $ParentWindow.IsVisible) {
+    }
+    elseif ($ParentWindow -and $ParentWindow.IsVisible) {
         $ParentWindow
-    } else {
+    }
+    else {
         $window
     }
     if ($resolvedOwner -and $resolvedOwner.IsVisible) {
@@ -2863,7 +2866,7 @@ function Start-VerifiedUpdate {
                 }
 
                 # New update is available
-                $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Icon "Update" -Buttons "YesNo"
+                $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new update is available. Would you like to install it now? The app will restart automatically when finished." -Icon "Update" -Buttons "YesNo"
                 if ($confirmation -ne 'Yes') {
                     Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush
                     return
@@ -4245,6 +4248,7 @@ $window.Add_Closed({
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
 
 
