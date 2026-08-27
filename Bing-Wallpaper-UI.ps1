@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.133'
+$script:appVersion = [Version]'1.0.134'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1416,9 +1416,9 @@ if ($AutoApply) {
                             <Border Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="12" Padding="16,14">
                                 <StackPanel>
                                     <TextBlock Text="Default Behavior" FontSize="15" FontWeight="SemiBold" Foreground="#00CACC" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Ã¢â‚¬Â¢ Auto 4K: Automatically fetches and sets UHD wallpapers directly." FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" Margin="0,0,0,6"/>
-                                    <TextBlock Text="Ã¢â‚¬Â¢ Dual Target: Changes both your Desktop and Lock Screen simultaneously." FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" Margin="0,0,0,6"/>
-                                    <TextBlock Text="Ã¢â‚¬Â¢ Background Sync: Keeps wallpapers fresh silently using Windows Task Scheduler." FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19"/>
+                                    <TextBlock Text="ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Auto 4K: Automatically fetches and sets UHD wallpapers directly." FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" Margin="0,0,0,6"/>
+                                    <TextBlock Text="ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Dual Target: Changes both your Desktop and Lock Screen simultaneously." FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" Margin="0,0,0,6"/>
+                                    <TextBlock Text="ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Background Sync: Keeps wallpapers fresh silently using Windows Task Scheduler." FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -1539,15 +1539,22 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 $script:revealElements = New-Object System.Collections.ArrayList
 
 function Find-RevealBorders($visual) {
+    if (-not $visual) { return }
     if ($visual -is [System.Windows.Controls.Border] -and $visual.Name -eq "RevealBorder") {
-        $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
-        $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-        $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(60, 255, 255, 255), 0.0)))
-        $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-        $revealBrush.RadiusX = 160
-        $revealBrush.RadiusY = 160
-        $visual.BorderBrush = $revealBrush
-        $script:revealElements.Add(@{ Element = $visual; Brush = $revealBrush }) | Out-Null
+        $alreadyAdded = $false
+        foreach ($item in $script:revealElements) {
+            if ($item.Element -eq $visual) { $alreadyAdded = $true; break }
+        }
+        if (-not $alreadyAdded) {
+            $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
+            $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(60, 255, 255, 255), 0.0)))
+            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+            $revealBrush.RadiusX = 160
+            $revealBrush.RadiusY = 160
+            $visual.BorderBrush = $revealBrush
+            $script:revealElements.Add(@{ Element = $visual; Brush = $revealBrush }) | Out-Null
+        }
     }
     
     $count = [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($visual)
@@ -3906,6 +3913,7 @@ $window.Add_ContentRendered({
 # =========================================================
 $script:isGuideAnimating = $false
 $script:guideRevealsInitialized = $false
+$script:currentGuideThumbPath = $null
 
 function Open-UserGuide {
     if ($script:isGuideAnimating) { return }
@@ -3915,8 +3923,9 @@ function Open-UserGuide {
     $script:isGuideAnimating = $true
     $ModalOverlay.Visibility = [System.Windows.Visibility]::Visible
 
-    # Dynamically update the latest wallpaper preview card inside the guide
+    # Dynamically update the latest wallpaper preview card inside the guide (zero redundant allocations)
     try {
+        $targetThumb = $null
         if ($script:loadedImages -and $script:loadedImages.Count -gt 0) {
             $latest = $script:loadedImages[0]
             if ($GuideLatestTitle) { $GuideLatestTitle.Text = Get-CleanImageTitle $latest }
@@ -3925,25 +3934,25 @@ function Open-UserGuide {
             $thumbDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\Thumbnails'
             $thumbPath = Join-Path $thumbDir "${safeName}_thumb.jpg"
             if (Test-Path -LiteralPath $thumbPath) {
-                $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
-                $bmp.BeginInit()
-                $bmp.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbPath).Path)
-                $bmp.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
-                $bmp.EndInit()
-                $bmp.Freeze()
-                if ($GuideLatestImage) { $GuideLatestImage.Source = $bmp }
+                $targetThumb = (Resolve-Path -LiteralPath $thumbPath).Path
             }
         }
         elseif (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\current_wallpaper.jpg')) {
-            $cPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\current_wallpaper.jpg'
+            $targetThumb = (Resolve-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\current_wallpaper.jpg')).Path
+            if ($GuideLatestTitle) { $GuideLatestTitle.Text = "Bing Wallpaper" }
+        }
+
+        # Only decode once with thumbnail pixel width to save RAM (~200KB vs 33MB)
+        if ($targetThumb -and $script:currentGuideThumbPath -ne $targetThumb) {
+            $script:currentGuideThumbPath = $targetThumb
             $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
             $bmp.BeginInit()
-            $bmp.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $cPath).Path)
+            $bmp.UriSource = New-Object System.Uri($targetThumb)
+            $bmp.DecodePixelWidth = 320
             $bmp.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
             $bmp.EndInit()
             $bmp.Freeze()
             if ($GuideLatestImage) { $GuideLatestImage.Source = $bmp }
-            if ($GuideLatestTitle) { $GuideLatestTitle.Text = "Bing Wallpaper" }
         }
     } catch {}
 
@@ -4034,6 +4043,7 @@ function Close-UserGuide {
         $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $null)
         $translateTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $null)
         $script:isGuideAnimating = $false
+        [BingWallpaperNative]::FlushMemory()
     })
 
     $ModalBackdrop.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $backdropFade)
@@ -4093,6 +4103,8 @@ $window.Add_KeyDown({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
 
 
 
