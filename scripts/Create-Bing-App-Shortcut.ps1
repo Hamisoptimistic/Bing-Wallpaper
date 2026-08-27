@@ -23,7 +23,18 @@ $rootFolder = if (Test-Path (Join-Path $scriptDir 'Bing-Wallpaper-UI.ps1')) {
 }
 
 $assetsFolder = Join-Path $rootFolder 'assets'
-$icoPath = Join-Path $assetsFolder 'bing.ico'
+$icoCandidates = @(
+    (Join-Path $assetsFolder 'app.ico'),
+    (Join-Path $assetsFolder 'bing.ico')
+)
+$icoPath = $icoCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $icoPath) {
+    $genScript = Join-Path $scriptDir 'Generate-App-Icon.ps1'
+    if (Test-Path $genScript) {
+        & $genScript
+        $icoPath = Join-Path $assetsFolder 'app.ico'
+    }
+}
 $exePath = Join-Path $rootFolder 'BingWallpaper.exe'
 $desktopPath = [Environment]::GetFolderPath('Desktop')
 $desktopShortcutPath = Join-Path $desktopPath 'Bing Wallpaper.lnk'
@@ -71,7 +82,7 @@ namespace BingWallpaperLauncher
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
             string tempDir = Path.Combine(Path.GetTempPath(), "BingWallpaper");
             string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
-            string iconPath = Path.Combine(tempDir, "assets", "bing.ico");
+            string iconPath = Path.Combine(tempDir, "assets", "app.ico");
 
             try
             {
@@ -81,10 +92,15 @@ namespace BingWallpaperLauncher
                 {
                     source.CopyTo(destination);
                 }
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.bing.ico"))
-                using (FileStream destination = File.Create(iconPath))
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.app.ico"))
                 {
-                    source.CopyTo(destination);
+                    if (source != null)
+                    {
+                        using (FileStream destination = File.Create(iconPath))
+                        {
+                            source.CopyTo(destination);
+                        }
+                    }
                 }
             }
             catch
@@ -114,7 +130,7 @@ namespace BingWallpaperLauncher
         "/platform:anycpu",
         "/win32icon:`"$icoPath`"",
         "/resource:`"$uiPath`",BingWallpaperLauncher.Bing-Wallpaper-UI.ps1",
-        "/resource:`"$icoPath`",BingWallpaperLauncher.bing.ico",
+        "/resource:`"$icoPath`",BingWallpaperLauncher.app.ico",
         "/out:`"$exePath`"",
         "`"$csTemp`""
     )
@@ -132,8 +148,8 @@ namespace BingWallpaperLauncher
     }
 }
 
-# 2. Create Desktop Shortcut
-Write-Output "--> Creating Desktop shortcut..."
+# 2. Create Desktop & Start Menu Shortcuts
+Write-Output "--> Creating Desktop & Start Menu shortcuts..."
 $wsh = New-Object -ComObject WScript.Shell
 
 function Create-Shortcut($targetPath, $outLnkPath, $iconLocation, $args = '') {
@@ -154,10 +170,18 @@ if (Test-Path $desktopPath) {
     Write-Output "    Created Desktop shortcut: $desktopShortcutPath"
 }
 
+$startMenuPrograms = [Environment]::GetFolderPath('Programs')
+if ($startMenuPrograms -and (Test-Path $startMenuPrograms)) {
+    $startMenuShortcutPath = Join-Path $startMenuPrograms 'Bing Wallpaper.lnk'
+    Create-Shortcut -targetPath $targetExe -outLnkPath $startMenuShortcutPath -iconLocation $icoPath -args $targetArgs
+    Write-Output "    Created Start Menu shortcut: $startMenuShortcutPath"
+}
+
 Write-Output ""
 Write-Output "========================================================="
 Write-Output " Setup Complete!"
 Write-Output " You can launch the app directly from:"
-Write-Output "   1. Desktop shortcut: 'Bing Wallpaper'"
-Write-Output "   2. Project root:     'BingWallpaper.exe'"
+Write-Output "   1. Desktop shortcut:    'Bing Wallpaper'"
+Write-Output "   2. Start Menu shortcut: 'Bing Wallpaper'"
+Write-Output "   3. Project root:        'BingWallpaper.exe'"
 Write-Output "========================================================="

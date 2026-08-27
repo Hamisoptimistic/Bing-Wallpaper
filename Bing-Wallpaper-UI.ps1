@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.145'
+$script:appVersion = [Version]'1.0.147'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1197,11 +1197,69 @@ if ($AutoApply) {
             <Grid Margin="0,0,0,32">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <Border Background="#141212ff" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0">
-                        <Viewbox Margin="9">
-                            <Canvas Width="24" Height="24">
-                                <Path Data="M11.97 7.569a.92.92 0 00-.805.863c-.013.195-.01.209.43 1.347 1 2.59 1.242 3.214 1.283 3.302.099.213.237.413.41.592.134.138.222.212.37.311.26.176.39.224 1.405.527.989.295 1.529.49 1.994.723.603.302 1.024.644 1.29 1.051.191.292.36.815.434 1.342.029.206.029.661 0 .847a2.491 2.491 0 01-.376 1.026c-.1.151-.065.126.081-.058.415-.52.838-1.408 1.054-2.213a6.728 6.728 0 00.102-3.012 6.626 6.626 0 00-3.291-4.53c-.34-.19-.879-.473-1.322-.698l-.254-.133a737.941 737.941 0 01-1.575-.827c-.548-.29-.78-.406-.846-.426a1.376 1.376 0 00-.29-.045l-.093.01z" Fill="#00CACC"/>
-                                <Path Data="M13.164 17.24a4.385 4.385 0 00-.202.125 511.45 511.45 0 00-1.795 1.115 163.087 163.087 0 01-.989.614l-.463.288a99.198 99.198 0 01-1.502.941c-.326.2-.704.334-1.09.387-.18.024-.52.024-.7 0a2.807 2.807 0 01-1.318-.538 3.665 3.665 0 01-.543-.545 2.837 2.837 0 01-.506-1.141 2.161 2.161 0 00-.041-.182c-.008-.008.006.138.032.33.027.199.085.487.147.733.482 1.907 1.85 3.457 3.705 4.195a6.31 6.31 0 001.658.412c.22.025.844.035 1.074.017 1.054-.08 1.972-.393 2.913-.992a325.28 325.28 0 01.937-.596l.384-.244.684-.435.234-.149.009-.005.025-.017.013-.007.172-.11.597-.38c.76-.481.987-.65 1.34-.998.148-.146.37-.394.381-.425.002-.007.042-.068.088-.136a2.49 2.49 0 00.373-1.023 4.181 4.181 0 000-.847 4.336 4.336 0 00-.318-1.137c-.224-.472-.7-.9-1.383-1.245a2.972 2.972 0 00-.406-.181c-.01 0-.646.392-1.413.87a7089.171 7089.171 0 01-1.658 1.031l-.439.274z" Fill="#2756A9"/>
-                                <Path Data="M4.003 14.946l.004 3.33.042.193c.134.604.366 1.04.77 1.445a2.701 2.701 0 001.955.814c.536 0 1-.135 1.479-.43l.703-.435.556-.346V8.003c0-2.306-.004-3.675-.012-3.782a2.734 2.734 0 00-.797-1.765c-.145-.144-.268-.24-.637-.496A1780.102 1780.102 0 015.762.362C5.406.115 5.38.098 5.271.059a.943.943 0 00-1.254.696C4.003.818 4 1.659 4 6.223v5.394H4l.003 3.329z" Fill="#00BBEC"/>
+                        <Viewbox Margin="3">
+                            <Canvas Width="760" Height="720">
+                                <Canvas Canvas.Left="-135" Canvas.Top="-135" Width="1024" Height="1024">
+                                    <Canvas.Resources>
+                                        <LinearGradientBrush x:Key="b1" StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#174BCB" Offset="0"/>
+                                            <GradientStop Color="#0B3AA5" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <LinearGradientBrush x:Key="b2" StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#1470D5" Offset="0"/>
+                                            <GradientStop Color="#0758BD" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <LinearGradientBrush x:Key="sky" StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#54A8F4" Offset="0"/>
+                                            <GradientStop Color="#8BC8F6" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <LinearGradientBrush x:Key="m1" StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#08459F" Offset="0"/>
+                                            <GradientStop Color="#0A62C2" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <LinearGradientBrush x:Key="m2" StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#2C72CB" Offset="0"/>
+                                            <GradientStop Color="#5E9FDF" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <LinearGradientBrush x:Key="m3" StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#79B5EA" Offset="0"/>
+                                            <GradientStop Color="#9CCDF0" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <LinearGradientBrush x:Key="snow" StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#E5EEFF" Offset="0"/>
+                                            <GradientStop Color="#FFFFFF" Offset="1"/>
+                                        </LinearGradientBrush>
+                                        <RectangleGeometry x:Key="clip" Rect="173,263,678,539" RadiusX="36" RadiusY="36"/>
+                                    </Canvas.Resources>
+
+                                    <Rectangle Canvas.Left="245" Canvas.Top="147" Width="534" Height="151" RadiusX="34" RadiusY="34" Fill="{StaticResource b1}">
+                                        <Rectangle.Effect>
+                                            <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
+                                        </Rectangle.Effect>
+                                    </Rectangle>
+
+                                    <Rectangle Canvas.Left="209" Canvas.Top="205" Width="606" Height="168" RadiusX="36" RadiusY="36" Fill="{StaticResource b2}"/>
+
+                                    <Rectangle Canvas.Left="173" Canvas.Top="263" Width="678" Height="539" RadiusX="36" RadiusY="36" Fill="{StaticResource sky}">
+                                        <Rectangle.Effect>
+                                            <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
+                                        </Rectangle.Effect>
+                                    </Rectangle>
+
+                                    <Canvas Clip="{StaticResource clip}">
+                                        <Ellipse Canvas.Left="80" Canvas.Top="175" Width="820" Height="380" Fill="#B9DEFA" Opacity="0.18"/>
+                                        <Ellipse Canvas.Left="642" Canvas.Top="295" Width="110" Height="110" Fill="#FFE995"/>
+                                        <Path Data="M235 625L360 510L425 558L495 424L570 505L635 450L810 616L880 690V830H205V830Z" Fill="{StaticResource m3}"/>
+                                        <Path Data="M360 510L495 424L570 505L532 485L500 535L468 501L430 552L403 531Z" Fill="{StaticResource snow}"/>
+                                        <Path Data="M175 657L302 544L376 600L458 516L553 625L610 561L720 671L858 760V830H175Z" Fill="{StaticResource m2}"/>
+                                        <Path Data="M302 544L376 600L346 584L325 608L302 590L275 613Z" Fill="#BBDCF5" Opacity="0.9"/>
+                                        <Path Data="M458 516L553 625L514 601L486 630L458 602L432 625Z" Fill="#CDE5FA" Opacity="0.85"/>
+                                        <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z" Fill="{StaticResource m1}"/>
+                                        <Path Data="M268 590L337 632L420 695L505 751L590 793L458 741L382 699L320 653Z" Fill="#165DB8" Opacity="0.82"/>
+                                        <Path Data="M515 830L590 760L675 700L760 747L880 683L900 830Z" Fill="#3984D4" Opacity="0.78"/>
+                                        <Path Data="M675 700L760 747L720 735L690 759L654 730Z" Fill="#79B6E9" Opacity="0.62"/>
+                                    </Canvas>
+                                </Canvas>
                             </Canvas>
                         </Viewbox>
                     </Border>
@@ -1421,6 +1479,10 @@ if (-not $scriptDir -and $MyInvocation.MyCommand.Path) { $scriptDir = Split-Path
 if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
 $iconCandidates = @(
+    (Join-Path $exeDir 'assets\app.ico'),
+    (Join-Path $exeDir 'app.ico'),
+    (Join-Path $scriptDir 'assets\app.ico'),
+    (Join-Path $scriptDir 'app.ico'),
     (Join-Path $exeDir 'assets\bing.ico'),
     (Join-Path $exeDir 'bing.ico'),
     (Join-Path $scriptDir 'assets\bing.ico'),
@@ -3844,11 +3906,69 @@ function Show-UserGuideDialog {
             <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,24" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <Viewbox Width="32" Height="32" Margin="0,0,14,0">
-                        <Canvas Width="24" Height="24">
-                            <Path Data="M11.97 7.569a.92.92 0 00-.805.863c-.013.195-.01.209.43 1.347 1 2.59 1.242 3.214 1.283 3.302.099.213.237.413.41.592.134.138.222.212.37.311.26.176.39.224 1.405.527.989.295 1.529.49 1.994.723.603.302 1.024.644 1.29 1.051.191.292.36.815.434 1.342.029.206.029.661 0 .847a2.491 2.491 0 01-.376 1.026c-.1.151-.065.126.081-.058.415-.52.838-1.408 1.054-2.213a6.728 6.728 0 00.102-3.012 6.626 6.626 0 00-3.291-4.53c-.34-.19-.879-.473-1.322-.698l-.254-.133a737.941 737.941 0 01-1.575-.827c-.548-.29-.78-.406-.846-.426a1.376 1.376 0 00-.29-.045l-.093.01z" Fill="#00CACC"/>
-                            <Path Data="M13.164 17.24a4.385 4.385 0 00-.202.125 511.45 511.45 0 00-1.795 1.115 163.087 163.087 0 01-.989.614l-.463.288a99.198 99.198 0 01-1.502.941c-.326.2-.704.334-1.09.387-.18.024-.52.024-.7 0a2.807 2.807 0 01-1.318-.538 3.665 3.665 0 01-.543-.545 2.837 2.837 0 01-.506-1.141 2.161 2.161 0 00-.041-.182c-.008-.008.006.138.032.33.027.199.085.487.147.733.482 1.907 1.85 3.457 3.705 4.195a6.31 6.31 0 001.658.412c.22.025.844.035 1.074.017 1.054-.08 1.972-.393 2.913-.992a325.28 325.28 0 01.937-.596l.384-.244.684-.435.234-.149.009-.005.025-.017.013-.007.172-.11.597-.38c.76-.481.987-.65 1.34-.998.148-.146.37-.394.381-.425.002-.007.042-.068.088-.136a2.49 2.49 0 00.373-1.023 4.181 4.181 0 000-.847 4.336 4.336 0 00-.318-1.137c-.224-.472-.7-.9-1.383-1.245a2.972 2.972 0 00-.406-.181c-.01 0-.646.392-1.413.87a7089.171 7089.171 0 01-1.658 1.031l-.439.274z" Fill="#2756A9"/>
-                            <Path Data="M4.003 14.946l.004 3.33.042.193c.134.604.366 1.04.77 1.445a2.701 2.701 0 001.955.814c.536 0 1-.135 1.479-.43l.703-.435.556-.346V8.003c0-2.306-.004-3.675-.012-3.782a2.734 2.734 0 00-.797-1.765c-.145-.144-.268-.24-.637-.496A1780.102 1780.102 0 015.762.362C5.406.115 5.38.098 5.271.059a.943.943 0 00-1.254.696C4.003.818 4 1.659 4 6.223v5.394H4l.003 3.329z" Fill="#00BBEC"/>
+                    <Viewbox Width="36" Height="36" Margin="0,0,14,0">
+                        <Canvas Width="760" Height="720">
+                            <Canvas Canvas.Left="-135" Canvas.Top="-135" Width="1024" Height="1024">
+                                <Canvas.Resources>
+                                    <LinearGradientBrush x:Key="guide_b1" StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#174BCB" Offset="0"/>
+                                        <GradientStop Color="#0B3AA5" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <LinearGradientBrush x:Key="guide_b2" StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#1470D5" Offset="0"/>
+                                        <GradientStop Color="#0758BD" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <LinearGradientBrush x:Key="guide_sky" StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#54A8F4" Offset="0"/>
+                                        <GradientStop Color="#8BC8F6" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <LinearGradientBrush x:Key="guide_m1" StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#08459F" Offset="0"/>
+                                        <GradientStop Color="#0A62C2" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <LinearGradientBrush x:Key="guide_m2" StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#2C72CB" Offset="0"/>
+                                        <GradientStop Color="#5E9FDF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <LinearGradientBrush x:Key="guide_m3" StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#79B5EA" Offset="0"/>
+                                        <GradientStop Color="#9CCDF0" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <LinearGradientBrush x:Key="guide_snow" StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#E5EEFF" Offset="0"/>
+                                        <GradientStop Color="#FFFFFF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                    <RectangleGeometry x:Key="guide_clip" Rect="173,263,678,539" RadiusX="36" RadiusY="36"/>
+                                </Canvas.Resources>
+
+                                <Rectangle Canvas.Left="245" Canvas.Top="147" Width="534" Height="151" RadiusX="34" RadiusY="34" Fill="{StaticResource guide_b1}">
+                                    <Rectangle.Effect>
+                                        <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
+                                    </Rectangle.Effect>
+                                </Rectangle>
+
+                                <Rectangle Canvas.Left="209" Canvas.Top="205" Width="606" Height="168" RadiusX="36" RadiusY="36" Fill="{StaticResource guide_b2}"/>
+
+                                <Rectangle Canvas.Left="173" Canvas.Top="263" Width="678" Height="539" RadiusX="36" RadiusY="36" Fill="{StaticResource guide_sky}">
+                                    <Rectangle.Effect>
+                                        <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
+                                    </Rectangle.Effect>
+                                </Rectangle>
+
+                                <Canvas Clip="{StaticResource guide_clip}">
+                                    <Ellipse Canvas.Left="80" Canvas.Top="175" Width="820" Height="380" Fill="#B9DEFA" Opacity="0.18"/>
+                                    <Ellipse Canvas.Left="642" Canvas.Top="295" Width="110" Height="110" Fill="#FFE995"/>
+                                    <Path Data="M235 625L360 510L425 558L495 424L570 505L635 450L810 616L880 690V830H205V830Z" Fill="{StaticResource guide_m3}"/>
+                                    <Path Data="M360 510L495 424L570 505L532 485L500 535L468 501L430 552L403 531Z" Fill="{StaticResource guide_snow}"/>
+                                    <Path Data="M175 657L302 544L376 600L458 516L553 625L610 561L720 671L858 760V830H175Z" Fill="{StaticResource guide_m2}"/>
+                                    <Path Data="M302 544L376 600L346 584L325 608L302 590L275 613Z" Fill="#BBDCF5" Opacity="0.9"/>
+                                    <Path Data="M458 516L553 625L514 601L486 630L458 602L432 625Z" Fill="#CDE5FA" Opacity="0.85"/>
+                                    <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z" Fill="{StaticResource guide_m1}"/>
+                                    <Path Data="M268 590L337 632L420 695L505 751L590 793L458 741L382 699L320 653Z" Fill="#165DB8" Opacity="0.82"/>
+                                    <Path Data="M515 830L590 760L675 700L760 747L880 683L900 830Z" Fill="#3984D4" Opacity="0.78"/>
+                                    <Path Data="M675 700L760 747L720 735L690 759L654 730Z" Fill="#79B6E9" Opacity="0.62"/>
+                                </Canvas>
+                            </Canvas>
                         </Canvas>
                     </Viewbox>
                     <TextBlock Text="Bing Wallpaper" FontSize="26" FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
@@ -4248,6 +4368,9 @@ $window.Add_Closed({
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
 
 
 
