@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.141'
+$script:appVersion = [Version]'1.0.142'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -4120,6 +4120,9 @@ function Show-UserGuideDialog {
     $dlg.Add_Closed({
             $script:activeGuideDialog = $null
             Set-AppDimState $false
+            if ($window -and $window.IsVisible) {
+                try { $window.Activate() | Out-Null } catch {}
+            }
         })
 
     $dlg.Add_KeyDown({
@@ -4168,6 +4171,8 @@ $window.Add_Closed({
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
 
 
 
