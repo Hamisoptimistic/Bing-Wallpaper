@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Generates a transparent multi-resolution Windows icon (assets\app.ico)
-    from the master vector PeakView_logo_vector.svg, tightly fitted to maximize icon visibility.
+    from the master vector PeakView_logo_vector.svg.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +11,8 @@ if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
 $rootFolder = if (Test-Path (Join-Path $scriptDir 'Bing-Wallpaper-UI.ps1')) {
     $scriptDir
-} else {
+}
+else {
     Split-Path -Parent $scriptDir
 }
 
@@ -112,7 +113,7 @@ $outStream = [System.IO.File]::Create($tempPng)
 $enc.Save($outStream)
 $outStream.Close()
 
-Write-Output "--> Cropping transparent padding & generating full-frame multi-resolution frames (16, 24, 32, 48, 64, 128, 256px) into $icoPath..."
+Write-Output "--> Generating multi-resolution frames (16, 24, 32, 48, 64, 128, 256px) into $icoPath..."
 
 $pyScript = @"
 import sys
@@ -122,30 +123,45 @@ temp_png = sys.argv[1]
 ico_path = sys.argv[2]
 
 img = Image.open(temp_png)
-bbox = img.getbbox()
-if bbox:
-    cropped = img.crop(bbox)
-    max_dim = max(cropped.width, cropped.height)
-    # 3% minimal margin to keep soft drop-shadow / antialiasing clean
-    pad = int(max_dim * 0.03)
-    new_size = max_dim + 2 * pad
-    square_img = Image.new('RGBA', (new_size, new_size), (0, 0, 0, 0))
-    offset_x = (new_size - cropped.width) // 2
-    offset_y = (new_size - cropped.height) // 2
-    square_img.paste(cropped, (offset_x, offset_y))
-    img = square_img
-
 sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 imgs = [img.resize(s, Image.Resampling.LANCZOS) for s in sizes]
 
 # Save as Windows multi-resolution ICO with PNG/BMP frame encoding
 imgs[-1].save(ico_path, format='ICO', sizes=sizes, append_images=imgs[:-1])
-print(f'Successfully generated full-frame multi-res ICO with sizes: {sizes}')
+print(f'Successfully generated multi-res ICO with sizes: {sizes}')
 "@
 
 $pyTemp = [System.IO.Path]::GetTempFileName() + ".py"
 Set-Content -Path $pyTemp -Value $pyScript -Encoding UTF8
 
+$proc = Start-Process -FilePath "python.exe" -ArgumentList "`"$pyTemp`" `"$tempPng`" `"$icoPath`"" -NoNewWindow -Wait -PassThru
+
+Remove-Item -Path $tempPng -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $pyTemp -Force -ErrorAction SilentlyContinue
+
+if ($proc.ExitCode -ne 0 -or -not (Test-Path $icoPath)) {
+    throw "Failed to generate $icoPath (Exit code: $($proc.ExitCode))"
+}
+
+# Verify generated ICO
+$decoder = [System.Windows.Media.Imaging.IconBitmapDecoder]::new([System.Uri]::new((Resolve-Path -LiteralPath $icoPath).Path), [System.Windows.Media.Imaging.BitmapCreateOptions]::None, [System.Windows.Media.Imaging.BitmapCacheOption]::Default)
+Write-Output "--> Verified assets\app.ico: $($decoder.Frames.Count) frames embedded:"
+foreach ($f in $decoder.Frames) {
+    Write-Output "    - $($f.PixelWidth)x$($f.PixelHeight) ($($f.Format))"
+}
+Remove-Item -Path $tempPng -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $pyTemp -Force -ErrorAction SilentlyContinue
+
+if ($proc.ExitCode -ne 0 -or -not (Test-Path $icoPath)) {
+    throw "Failed to generate $icoPath (Exit code: $($proc.ExitCode))"
+}
+
+# Verify generated ICO
+$decoder = [System.Windows.Media.Imaging.IconBitmapDecoder]::new([System.Uri]::new((Resolve-Path -LiteralPath $icoPath).Path), [System.Windows.Media.Imaging.BitmapCreateOptions]::None, [System.Windows.Media.Imaging.BitmapCacheOption]::Default)
+Write-Output "--> Verified assets\app.ico: $($decoder.Frames.Count) frames embedded:"
+foreach ($f in $decoder.Frames) {
+    Write-Output "    - $($f.PixelWidth)x$($f.PixelHeight) ($($f.Format))"
+}
 $proc = Start-Process -FilePath "python.exe" -ArgumentList "`"$pyTemp`" `"$tempPng`" `"$icoPath`"" -NoNewWindow -Wait -PassThru
 
 Remove-Item -Path $tempPng -Force -ErrorAction SilentlyContinue
