@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.121'
+$script:appVersion = [Version]'1.0.123'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2976,6 +2976,25 @@ $SpotlightPill.Add_PreviewMouseLeftButtonDown({
         Set-SpotlightState -Enabled $newState
         Update-SpotlightScheduledTaskAsync -Enable $newState
         Save-Settings
+        
+        $whiteBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Colors]::White)
+        $runPrefix = New-Object System.Windows.Documents.Run("Automatic wallpaper changing ")
+        $runPrefix.Foreground = $whiteBrush
+
+        Set-TransientStatus -Message ""
+        $StatusText.Inlines.Clear()
+        $StatusText.Inlines.Add($runPrefix)
+
+        if ($newState) {
+            $runState = New-Object System.Windows.Documents.Run("enabled.")
+            $runState.Foreground = $statusSuccessBrush
+            $StatusText.Inlines.Add($runState)
+        }
+        else {
+            $runState = New-Object System.Windows.Documents.Run("disabled.")
+            $runState.Foreground = $statusErrorBrush
+            $StatusText.Inlines.Add($runState)
+        }
     })
 
 # Re-register task asynchronously when interval or target changes while ON
@@ -3005,6 +3024,9 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
 
 
 
