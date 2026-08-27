@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.123'
+$script:appVersion = [Version]'1.0.125'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -835,12 +835,14 @@ function Load-Settings {
         catch {}
     }
     return @{
-        Region           = "auto"
-        Resolution       = "1920x1080"
-        Target           = "Both"
-        Style            = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder       = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
-        SpotlightEnabled = $false
+        Region            = "auto"
+        Resolution        = "4K"
+        Target            = "Both"
+        Style             = (Get-CurrentDesktopWallpaperStyle)
+        SaveFolder        = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        SpotlightEnabled  = $false
+        SpotlightInterval = 60
+        SpotlightTarget   = "Desktop"
     }
 }
 
@@ -1382,12 +1384,14 @@ function Load-Settings {
         catch {}
     }
     return @{
-        Region           = "auto"
-        Resolution       = "1920x1080"
-        Target           = "Both"
-        Style            = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder       = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
-        SpotlightEnabled = $false
+        Region            = "auto"
+        Resolution        = "4K"
+        Target            = "Both"
+        Style             = (Get-CurrentDesktopWallpaperStyle)
+        SaveFolder        = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        SpotlightEnabled  = $false
+        SpotlightInterval = 60
+        SpotlightTarget   = "Desktop"
     }
 }
 
@@ -1395,12 +1399,12 @@ function Save-Settings {
     try {
         $settingsObj = @{
             Region            = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
-            Resolution        = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "1920x1080" }
+            Resolution        = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "4K" }
             Target            = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
             Style             = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
             SaveFolder        = $FolderBox.Text
-            SpotlightInterval = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { $SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
-            SpotlightTarget   = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedItem } else { 'Both' }
+            SpotlightInterval = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { $SpotlightIntervalBox.SelectedItem.Tag } else { 60 }
+            SpotlightTarget   = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedItem } else { 'Desktop' }
             SpotlightEnabled  = [bool]$script:SpotlightEnabled
         }
         $dir = Split-Path -Parent $script:settingsPath
@@ -1848,8 +1852,8 @@ function Update-SpotlightScheduledTaskAsync {
 
     # Snapshot all UI-thread values NOW before handing off to background
     $bgEnable = $Enable
-    $bgMinutes = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
-    $bgTarget = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { [string]$SpotlightTargetBox.SelectedItem } else { 'Both' }
+    $bgMinutes = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 60 }
+    $bgTarget = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { [string]$SpotlightTargetBox.SelectedItem } else { 'Desktop' }
     $bgScriptPath = $script:SpotlightScriptPath
     $bgAppDataRoot = $env:LOCALAPPDATA
 
@@ -1921,7 +1925,8 @@ objShell.Run cmd, 0, False
                         $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
                     }
                     else {
-                        $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
+                        # Daily trigger at 12:00 AM (midnight) using culture-agnostic DateTime
+                        $trigger = New-ScheduledTaskTrigger -Daily -At ((Get-Date).Date)
                     }
 
                     Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
@@ -2952,15 +2957,15 @@ $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
     $it.Tag = $_.Minutes
     [void]$SpotlightIntervalBox.Items.Add($it)
 }
-# Restore saved interval
-$savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 1440 }
+# Restore saved interval (defaults to Hourly)
+$savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 60 }
 $SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { 0 { 0 } { $_ -eq 1 -or $_ -eq -1 } { 1 } 60 { 2 } 360 { 3 } default { 4 } }
 
-# Populate target dropdown
+# Populate target dropdown (defaults to Desktop)
 @('Desktop', 'Lock screen', 'Both') | ForEach-Object { [void]$SpotlightTargetBox.Items.Add($_) }
-$savedTarget = if ($script:appSettings.SpotlightTarget) { $script:appSettings.SpotlightTarget } else { 'Both' }
+$savedTarget = if ($script:appSettings.SpotlightTarget) { $script:appSettings.SpotlightTarget } else { 'Desktop' }
 $SpotlightTargetBox.SelectedItem = $SpotlightTargetBox.Items | Where-Object { $_ -eq $savedTarget } | Select-Object -First 1
-if (-not $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedIndex = 2 }
+if (-not $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedIndex = 0 }
 
 # Reflect Auto toggle state from saved settings (instant, no schtasks overhead)
 $spotlightWasEnabled = ($script:appSettings.SpotlightEnabled -eq $true)
@@ -3026,6 +3031,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
