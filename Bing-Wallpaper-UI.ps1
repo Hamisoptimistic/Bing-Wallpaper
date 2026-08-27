@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -1827,14 +1827,18 @@ if ($SpotlightPill) {
     $SpotlightPill.BorderBrush = $script:pillBorderBrush
 }
 
-$script:SpotlightScriptPath = if ($PSCommandPath) {
+$processPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+$script:SpotlightScriptPath = if ($processPath -match '\.exe$' -and $processPath -notmatch 'powershell\.exe|pwsh\.exe|pwsh-login\.exe') {
+    $processPath
+}
+elseif ($PSCommandPath) {
     (Resolve-Path -LiteralPath $PSCommandPath).Path
 }
 elseif ($PSScriptRoot) {
     (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1')).Path
 }
 else {
-    (Resolve-Path -LiteralPath 'Bing-Wallpaper-UI.ps1').Path
+    try { (Resolve-Path -LiteralPath 'Bing-Wallpaper-UI.ps1' -ErrorAction Stop).Path } catch { $null }
 }
 
 function Update-SpotlightScheduledTaskAsync {
@@ -1858,35 +1862,51 @@ function Update-SpotlightScheduledTaskAsync {
                         New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
                     }
 
-                    # Copy the current running script to a persistent AppData location so background tasks always find it
-                    $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
-                    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                        try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
-                    }
+                    $isExe = ($ScriptPath -match '\.exe$')
 
-                    # Remove any legacy cmd wrappers that cause console popups
-                    $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
-                    if (Test-Path -LiteralPath $legacyCmd) {
-                        Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
+                    if ($isExe) {
+                        # If running from a compiled EXE, we copy the EXE to AppData and run it directly.
+                        $persistentScriptPath = Join-Path $appDataDir 'BingWallpaper.exe'
+                        if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                            try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                        }
+                        
+                        $actionArgs = "-AutoApply -Target `"$Target`""
+                        $action = New-ScheduledTaskAction -Execute $persistentScriptPath -Argument $actionArgs
                     }
+                    else {
+                        # Copy the current running script to a persistent AppData location
+                        $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
+                        if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                            try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                        }
 
-                    # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
-                    $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
-                    $vbsCode = @"
+                        # Remove any legacy cmd wrappers that cause console popups
+                        $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
+                        if (Test-Path -LiteralPath $legacyCmd) {
+                            Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
+                        }
+
+                        # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
+                        $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
+                        $vbsCode = @"
 Set objShell = WScript.CreateObject("WScript.Shell")
 scriptPath = WScript.Arguments(0)
 target = WScript.Arguments(1)
 cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & scriptPath & """ -AutoApply -Target """ & target & """"
 objShell.Run cmd, 0, False
 "@
-                    Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
+                        Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
 
-                    $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
-                    $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
+                        $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
+                        $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
+                    }
+
                     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
                     if ($Minutes -eq 0) {
-                        $trigger = New-ScheduledTaskTrigger -AtLogOn
+                        # CRITICAL: -AtLogOn requires -User to succeed without Admin rights
+                        $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
                     }
                     elseif ($Minutes -le 1) {
                         $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
