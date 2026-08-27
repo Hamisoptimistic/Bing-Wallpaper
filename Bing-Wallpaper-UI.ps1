@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.137'
+$script:appVersion = [Version]'1.0.138'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -653,8 +653,22 @@ function Get-BingImages {
     $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
     $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
     
-    $batch1 = (Invoke-RestMethod -Uri $uri1 -ErrorAction SilentlyContinue).images
-    $batch2 = (Invoke-RestMethod -Uri $uri2 -ErrorAction SilentlyContinue).images
+    $wc = New-Object System.Net.WebClient
+    $wc.Encoding = [System.Text.Encoding]::UTF8
+    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    try {
+        $json1 = $wc.DownloadString($uri1)
+        $json2 = $wc.DownloadString($uri2)
+        $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
+        $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
+    }
+    catch {
+        $batch1 = @()
+        $batch2 = @()
+    }
+    finally {
+        $wc.Dispose()
+    }
     
     # Combine the arrays and ensure no duplicates based on urlbase
     $allImages = @()
@@ -3078,10 +3092,10 @@ function Load-Gallery {
                 $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
             
                 $wc = New-Object System.Net.WebClient
+                $wc.Encoding = [System.Text.Encoding]::UTF8
                 $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 $json1 = $wc.DownloadString($uri1)
                 $json2 = $wc.DownloadString($uri2)
-                $wc.Dispose()
 
                 $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
                 $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
@@ -3092,31 +3106,23 @@ function Load-Gallery {
 
                 $uniqueImages = $allImages | Group-Object -Property urlbase | ForEach-Object { $_.Group[0] } | Sort-Object -Property enddate -Descending
                 if (-not $uniqueImages -or $uniqueImages.Count -eq 0) {
+                    $wc.Dispose()
                     return @{ Success = $false; Error = "Unable to connect to Bing."; Images = @() }
                 }
 
-                # Parallel download of missing thumbnails in background thread pool
-                $tasks = [System.Collections.Generic.List[System.Threading.Tasks.Task]]::new()
+                # Download missing thumbnails reliably in background runspace
                 foreach ($img in $uniqueImages) {
                     $safeName = $img.urlbase -replace '[^a-zA-Z0-9]', ''
                     $thumbPath = Join-Path $CacheDir "${safeName}_thumb.jpg"
                     if (-not (Test-Path -LiteralPath $thumbPath)) {
                         $imgUrl = "https://www.bing.com$($img.urlbase)_1920x1080.jpg"
-                        $task = [System.Threading.Tasks.Task]::Run([Action] {
-                                try {
-                                    $dlClient = New-Object System.Net.WebClient
-                                    $dlClient.Headers.Add("User-Agent", "Mozilla/5.0")
-                                    $dlClient.DownloadFile($imgUrl, $thumbPath)
-                                    $dlClient.Dispose()
-                                }
-                                catch {}
-                            })
-                        $tasks.Add($task)
+                        try {
+                            $wc.DownloadFile($imgUrl, $thumbPath)
+                        }
+                        catch {}
                     }
                 }
-                if ($tasks.Count -gt 0) {
-                    [System.Threading.Tasks.Task]::WaitAll($tasks.ToArray(), 10000) | Out-Null
-                }
+                $wc.Dispose()
 
                 # Return image objects array
                 $resultImages = @()
@@ -3699,7 +3705,16 @@ $window.Add_ContentRendered({
 # =========================================================
 # User Guide Dialog (Native Win32/WPF modal matching Show-ModernDialog)
 # =========================================================
+$script:activeGuideDialog = $null
+
 function Show-UserGuideDialog {
+    if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+        try {
+            $script:activeGuideDialog.Close()
+        }
+        catch {}
+        return
+    }
     $cleanTitle = "Bing Wallpaper"
     $cleanDate = "Today's Wallpaper"
     $thumbPath = $null
@@ -3883,7 +3898,7 @@ function Show-UserGuideDialog {
                 <Border Grid.Column="2" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
                         <StackPanel>
-                            <TextBlock Text="Essential Features" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,14"/>
+                            <TextBlock Text="Essential Features" FontSize="16" FontWeight="SemiBold" Foreground="#0078d4" Margin="0,0,0,14"/>
 
                             <Border Background="#1A1A1A" CornerRadius="8" Padding="16,12" Margin="0,0,0,10">
                                 <Grid VerticalAlignment="Center">
@@ -4108,23 +4123,24 @@ function Show-UserGuideDialog {
             })
     }
 
-    # Close modal on click outside (window deactivation) or Escape key
-    $dlg.Add_Deactivated({
-        try {
-            $dlg.Close()
-        } catch {}
-    })
+    # Track active dialog instance
+    $script:activeGuideDialog = $dlg
+
+    $dlg.Add_Closed({
+            $script:activeGuideDialog = $null
+        })
 
     $dlg.Add_KeyDown({
-        param($s, $e)
-        if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
-            try {
-                $dlg.Close()
-            } catch {}
-        }
-    })
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
+                try {
+                    $dlg.Close()
+                }
+                catch {}
+            }
+        })
 
-    $dlg.ShowDialog() | Out-Null
+    $dlg.Show()
 }
 
 # Header Info / User Guide button opens modal dialog
@@ -4134,8 +4150,26 @@ if ($GuideBtn) {
         })
 }
 
+# Dismiss guide dialog when clicking anywhere inside the main app window
+$window.Add_PreviewMouseDown({
+        param($s, $e)
+        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+            try {
+                $script:activeGuideDialog.Close()
+                $e.Handled = $true
+            }
+            catch {}
+        }
+    })
+
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
+
+
+
 
 
 
