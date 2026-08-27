@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.157'
+$script:appVersion = [Version]'1.0.158'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1362,8 +1362,8 @@ if ($AutoApply) {
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="150"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="150"/>
                     <ColumnDefinition Width="120"/>
                     <ColumnDefinition Width="310"/>
                     <ColumnDefinition Width="Auto"/>
@@ -1443,7 +1443,7 @@ if ($AutoApply) {
                     </StackPanel>
                     <StackPanel Margin="0,0,0,0">
                         <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
+                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="145" Height="38"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -1959,26 +1959,29 @@ function Start-CardDownloadAnimation($card) {
     $transform = $card.Resources['ShimmerTransform']
     if (-not $shimmer -or -not $transform) { return }
 
-    # Reset any previous animations cleanly
+    # Reset any previous animations cleanly and initialize off-screen
     $transform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
     $shimmer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
     $shimmer.Opacity = 0
+    $transform.X = -160
 
-    # 1. Silky smooth, calm frosted-white shimmer wave
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(850))
+
+    # Fast, silky smooth sweep across the entire text area
     $sweepAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
-    $sweepAnim.From = -150
-    $sweepAnim.To = 450
-    $sweepAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1550))
+    $sweepAnim.From = -160
+    $sweepAnim.To = 460
+    $sweepAnim.Duration = $duration
     $sweepAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
-    $sine = New-Object System.Windows.Media.Animation.SineEase
-    $sine.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
-    $sweepAnim.EasingFunction = $sine
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $sweepAnim.EasingFunction = $ease
 
-    # Fade shimmer in and out smoothly across the full calm sweep
+    # Maintain constant solid visibility during the sweep, cleanly resetting to 0 when finished
     $shimmerOpacityAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
     $shimmerOpacityAnim.From = 1.0
-    $shimmerOpacityAnim.To = 0.0
-    $shimmerOpacityAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1550))
+    $shimmerOpacityAnim.To = 1.0
+    $shimmerOpacityAnim.Duration = $duration
     $shimmerOpacityAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
 
     # Launch native WPF animations
@@ -2036,9 +2039,11 @@ function Apply-WallpaperAsync {
     $cachePath = Join-Path $cacheDir "current_wallpaper.jpg"
     $tempPath = "$cachePath.tmp"
 
+    $fnLockScreenCode = "function Set-LockScreenImageIsolated { " + ${function:Set-LockScreenImageIsolated}.ToString() + " }"
+
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam)
+            param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam, [string]$LockScreenFnCode)
             try {
                 # 1. Download image in background thread (0ms UI freeze)
                 $wc = New-Object System.Net.WebClient
@@ -2069,12 +2074,24 @@ function Apply-WallpaperAsync {
                     }
                 }
 
+                # 3. Apply Lock Screen in background thread (0ms UI freeze!)
+                if ($TargetParam -eq 'Lock screen' -or $TargetParam -eq 'Both') {
+                    Invoke-Expression $LockScreenFnCode
+                    $cacheDirectory = Split-Path -Parent $Dest
+                    $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
+                    Copy-Item -LiteralPath $Dest -Destination $lockScreenCachePath -Force
+                    $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
+                    if (-not $resLock) {
+                        throw 'Windows could not apply the lock screen image.'
+                    }
+                }
+
                 return @{ Success = $true; Error = $null; Dest = $Dest }
             }
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
             }
-        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style)
+        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style).AddArgument($fnLockScreenCode)
 
     $asyncOp = $ps.BeginInvoke()
 
@@ -2110,19 +2127,6 @@ function Apply-WallpaperAsync {
                     $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
                     $isSuccess = ($res -and $res.Success -eq $true)
                     $errorMsg = if ($res) { $res.Error } else { $null }
-
-                    # Apply Lockscreen if needed
-                    if ($isSuccess -and ($ctx.Target -eq 'Lock screen' -or $ctx.Target -eq 'Both')) {
-                        $cPath = $res.Dest
-                        $fullCachePath = (Resolve-Path -LiteralPath $cPath).Path
-                        $cacheDirectory = Split-Path -Parent $fullCachePath
-                        $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
-                        Copy-Item -LiteralPath $fullCachePath -Destination $lockScreenCachePath -Force
-                        $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
-                        if (-not $resLock) {
-                            throw 'Windows could not apply the lock screen image.'
-                        }
-                    }
                 }
                 catch {
                     $isSuccess = $false
@@ -3400,7 +3404,7 @@ function Load-Gallery {
                     }
                 
                     # Card glow border: visually identical to DropShadowEffect but uses
-                    # no WPF software-render pass ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â zero per-frame GPU compositing cost.
+                    # no WPF software-render pass ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â zero per-frame GPU compositing cost.
                     $card.BorderThickness = New-Object System.Windows.Thickness(0)
                     $card.BorderBrush = $null
 
@@ -3648,7 +3652,7 @@ function Load-Gallery {
 # Scroll-aware rendering: BitmapCache + LowQuality during scroll
 # (WPF caches each card as a flat texture, skipping per-card compositing).
 # HighQuality restored 150ms after scroll stops.
-# Uses pre-built flat arrays ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â zero PowerShell pipeline work per tick.
+# Uses pre-built flat arrays ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â zero PowerShell pipeline work per tick.
 # =================================================================
 $script:isScrolling = $false
 $script:scrollIdleTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -4557,6 +4561,10 @@ $script:memTrimTimer.Start()
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
 
 
 
