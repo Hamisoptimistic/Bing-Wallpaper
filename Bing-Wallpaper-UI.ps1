@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.143'
+$script:appVersion = [Version]'1.0.144'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1304,7 +1304,7 @@ if ($AutoApply) {
                 <!-- Far Right: User Guide Button -->
                 <StackPanel Grid.Column="8" HorizontalAlignment="Right" VerticalAlignment="Bottom">
                     <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="User Guide">
-                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#E0E0E0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#60CDFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
                 </StackPanel>
             </Grid>
@@ -4180,8 +4180,41 @@ function Show-UserGuideDialog {
     $dlg.Show()
 }
 
-# Header Info / User Guide button opens modal dialog
+# Header Info / User Guide button opens modal dialog & ambient breathing blue glow
 if ($GuideBtn) {
+    try {
+        $guideGlow = New-Object System.Windows.Media.Effects.DropShadowEffect
+        $guideGlow.Color = [System.Windows.Media.Color]::FromRgb(0, 144, 255)
+        $guideGlow.ShadowDepth = 0
+        $guideGlow.BlurRadius = 10
+        $guideGlow.Opacity = 0.4
+        $GuideBtn.Effect = $guideGlow
+
+        # Smooth, continuous breathing blue glow animation
+        $glowEase = New-Object System.Windows.Media.Animation.QuadraticEase
+        $glowEase.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+
+        $glowOpacityAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
+        $glowOpacityAnim.From = 0.25
+        $glowOpacityAnim.To = 0.85
+        $glowOpacityAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1800))
+        $glowOpacityAnim.AutoReverse = $true
+        $glowOpacityAnim.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
+        $glowOpacityAnim.EasingFunction = $glowEase
+
+        $glowBlurAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
+        $glowBlurAnim.From = 6.0
+        $glowBlurAnim.To = 16.0
+        $glowBlurAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1800))
+        $glowBlurAnim.AutoReverse = $true
+        $glowBlurAnim.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
+        $glowBlurAnim.EasingFunction = $glowEase
+
+        $guideGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowOpacityAnim)
+        $guideGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::BlurRadiusProperty, $glowBlurAnim)
+    }
+    catch {}
+
     $GuideBtn.Add_Click({
             Show-UserGuideDialog
         })
@@ -4212,6 +4245,7 @@ $window.Add_Closed({
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
 
 
