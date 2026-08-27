@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.131'
+$script:appVersion = [Version]'1.0.132'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1140,143 +1140,346 @@ if ($AutoApply) {
         </Style>
     </Window.Resources>
 
-    <Grid Margin="32">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Grid Background="#121212">
+        <!-- Main Application Content -->
+        <Grid Name="MainContent" Margin="32">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <Grid Margin="0,0,0,32">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Border Background="#141212ff" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0">
-                    <Viewbox Margin="9">
-                        <Canvas Width="24" Height="24">
-                            <Path Data="M11.97 7.569a.92.92 0 00-.805.863c-.013.195-.01.209.43 1.347 1 2.59 1.242 3.214 1.283 3.302.099.213.237.413.41.592.134.138.222.212.37.311.26.176.39.224 1.405.527.989.295 1.529.49 1.994.723.603.302 1.024.644 1.29 1.051.191.292.36.815.434 1.342.029.206.029.661 0 .847a2.491 2.491 0 01-.376 1.026c-.1.151-.065.126.081-.058.415-.52.838-1.408 1.054-2.213a6.728 6.728 0 00.102-3.012 6.626 6.626 0 00-3.291-4.53c-.34-.19-.879-.473-1.322-.698l-.254-.133a737.941 737.941 0 01-1.575-.827c-.548-.29-.78-.406-.846-.426a1.376 1.376 0 00-.29-.045l-.093.01z" Fill="#00CACC"/>
-                            <Path Data="M13.164 17.24a4.385 4.385 0 00-.202.125 511.45 511.45 0 00-1.795 1.115 163.087 163.087 0 01-.989.614l-.463.288a99.198 99.198 0 01-1.502.941c-.326.2-.704.334-1.09.387-.18.024-.52.024-.7 0a2.807 2.807 0 01-1.318-.538 3.665 3.665 0 01-.543-.545 2.837 2.837 0 01-.506-1.141 2.161 2.161 0 00-.041-.182c-.008-.008.006.138.032.33.027.199.085.487.147.733.482 1.907 1.85 3.457 3.705 4.195a6.31 6.31 0 001.658.412c.22.025.844.035 1.074.017 1.054-.08 1.972-.393 2.913-.992a325.28 325.28 0 01.937-.596l.384-.244.684-.435.234-.149.009-.005.025-.017.013-.007.172-.11.597-.38c.76-.481.987-.65 1.34-.998.148-.146.37-.394.381-.425.002-.007.042-.068.088-.136a2.49 2.49 0 00.373-1.023 4.181 4.181 0 000-.847 4.336 4.336 0 00-.318-1.137c-.224-.472-.7-.9-1.383-1.245a2.972 2.972 0 00-.406-.181c-.01 0-.646.392-1.413.87a7089.171 7089.171 0 01-1.658 1.031l-.439.274z" Fill="#2756A9"/>
-                            <Path Data="M4.003 14.946l.004 3.33.042.193c.134.604.366 1.04.77 1.445a2.701 2.701 0 001.955.814c.536 0 1-.135 1.479-.43l.703-.435.556-.346V8.003c0-2.306-.004-3.675-.012-3.782a2.734 2.734 0 00-.797-1.765c-.145-.144-.268-.24-.637-.496A1780.102 1780.102 0 015.762.362C5.406.115 5.38.098 5.271.059a.943.943 0 00-1.254.696C4.003.818 4 1.659 4 6.223v5.394H4l.003 3.329z" Fill="#00BBEC"/>
-                        </Canvas>
-                    </Viewbox>
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Bing Wallpaper" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,4"/>
+            <!-- Header -->
+            <Grid Margin="0,0,0,32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Border Background="#141212ff" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0">
+                        <Viewbox Margin="9">
+                            <Canvas Width="24" Height="24">
+                                <Path Data="M11.97 7.569a.92.92 0 00-.805.863c-.013.195-.01.209.43 1.347 1 2.59 1.242 3.214 1.283 3.302.099.213.237.413.41.592.134.138.222.212.37.311.26.176.39.224 1.405.527.989.295 1.529.49 1.994.723.603.302 1.024.644 1.29 1.051.191.292.36.815.434 1.342.029.206.029.661 0 .847a2.491 2.491 0 01-.376 1.026c-.1.151-.065.126.081-.058.415-.52.838-1.408 1.054-2.213a6.728 6.728 0 00.102-3.012 6.626 6.626 0 00-3.291-4.53c-.34-.19-.879-.473-1.322-.698l-.254-.133a737.941 737.941 0 01-1.575-.827c-.548-.29-.78-.406-.846-.426a1.376 1.376 0 00-.29-.045l-.093.01z" Fill="#00CACC"/>
+                                <Path Data="M13.164 17.24a4.385 4.385 0 00-.202.125 511.45 511.45 0 00-1.795 1.115 163.087 163.087 0 01-.989.614l-.463.288a99.198 99.198 0 01-1.502.941c-.326.2-.704.334-1.09.387-.18.024-.52.024-.7 0a2.807 2.807 0 01-1.318-.538 3.665 3.665 0 01-.543-.545 2.837 2.837 0 01-.506-1.141 2.161 2.161 0 00-.041-.182c-.008-.008.006.138.032.33.027.199.085.487.147.733.482 1.907 1.85 3.457 3.705 4.195a6.31 6.31 0 001.658.412c.22.025.844.035 1.074.017 1.054-.08 1.972-.393 2.913-.992a325.28 325.28 0 01.937-.596l.384-.244.684-.435.234-.149.009-.005.025-.017.013-.007.172-.11.597-.38c.76-.481.987-.65 1.34-.998.148-.146.37-.394.381-.425.002-.007.042-.068.088-.136a2.49 2.49 0 00.373-1.023 4.181 4.181 0 000-.847 4.336 4.336 0 00-.318-1.137c-.224-.472-.7-.9-1.383-1.245a2.972 2.972 0 00-.406-.181c-.01 0-.646.392-1.413.87a7089.171 7089.171 0 01-1.658 1.031l-.439.274z" Fill="#2756A9"/>
+                                <Path Data="M4.003 14.946l.004 3.33.042.193c.134.604.366 1.04.77 1.445a2.701 2.701 0 001.955.814c.536 0 1-.135 1.479-.43l.703-.435.556-.346V8.003c0-2.306-.004-3.675-.012-3.782a2.734 2.734 0 00-.797-1.765c-.145-.144-.268-.24-.637-.496A1780.102 1780.102 0 015.762.362C5.406.115 5.38.098 5.271.059a.943.943 0 00-1.254.696C4.003.818 4 1.659 4 6.223v5.394H4l.003 3.329z" Fill="#00BBEC"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Bing Wallpaper" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,4"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="40" Height="40" ToolTip="User Guide" Margin="0,0,4,0">
+                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#E0E0E0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- Settings Cards -->
+            <Grid Grid.Row="1" Margin="0,0,0,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="310"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                    <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="RegionBox" FontSize="13.5" Height="38"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="0,0,16,0" VerticalAlignment="Bottom">
+                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
+                        <Viewbox Width="19" Height="19" Margin="0,2,0,0">
+                            <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+                                <Canvas.RenderTransform>
+                                <RotateTransform/>
+                                </Canvas.RenderTransform>
+                                <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Path Data="M18.5,5 V10 H13.5"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                    <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Margin="0,0,16,0">
+                    <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="TargetBox" FontSize="13.5" Height="38"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="4" Margin="0,0,16,0">
+                    <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
+                </StackPanel>
+
+                <!-- Download Image To -->
+                <StackPanel Grid.Column="5" Margin="0,0,16,0">
+                    <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder" />
+                </StackPanel>
+
+                <!-- Spotlight / Auto Wallpaper pill -->
+                <StackPanel Grid.Column="6" Margin="0,0,16,0">
+                    <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <Grid Height="38" VerticalAlignment="Center">
+                        <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
+                                Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
+                                Cursor="Hand" VerticalAlignment="Center">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
+                            </Border.Effect>
+                            <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
+                                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform X="0" Y="0"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Container for Every + Apply To options -->
+                <StackPanel Name="SpotlightOptionsContainer" Grid.Column="7" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
+                    <StackPanel Margin="0,0,16,0">
+                        <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,0">
+                        <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- Smooth Modern Gallery Container -->
+            <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True">
+                <ScrollViewer Name="GalleryScrollViewer" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
+                    <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
+                </ScrollViewer>
+            </Border>
+
+            <!-- Footer / Action Area -->
+            <Grid Grid.Row="3" Margin="0,28,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
+                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
+                    <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
+                </StackPanel>
+            </Grid>
         </Grid>
 
-        <!-- Settings Cards -->
-        <Grid Grid.Row="1" Margin="0,0,0,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="120"/>
-                <ColumnDefinition Width="120"/>
-                <ColumnDefinition Width="120"/>
-                <ColumnDefinition Width="310"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            
-            <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="RegionBox" FontSize="13.5" Height="38"/>
-            </StackPanel>
+        <!-- In-App Modal Overlay Layer -->
+        <Grid Name="ModalOverlay" Visibility="Collapsed" Panel.ZIndex="999">
+            <!-- Dimmed Backdrop -->
+            <Border Name="ModalBackdrop" Background="#B8000000" Focusable="False"/>
 
-            <StackPanel Grid.Column="1" Margin="0,0,16,0" VerticalAlignment="Bottom">
-                <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
-                    <Viewbox Width="19" Height="19" Margin="0,2,0,0">
-                        <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
-                            <Canvas.RenderTransform>
-                            <RotateTransform/>
-                            </Canvas.RenderTransform>
-                            <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                            <Path Data="M18.5,5 V10 H13.5"
-                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                        </Canvas>
-                    </Viewbox>
-                </Button>
-            </StackPanel>
-            
-            <StackPanel Grid.Column="2" Margin="0,0,16,0">
-                <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38"/>
-            </StackPanel>
+            <!-- Centered User Guide Card -->
+            <Border Name="UserGuideModal"
+                    Width="880" MaxHeight="660"
+                    Background="#181818" BorderBrush="#333333" BorderThickness="1.5"
+                    CornerRadius="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Padding="26,22,26,20"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="45" ShadowDepth="12" Opacity="0.8"/>
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform ScaleX="1.0" ScaleY="1.0"/>
+                        <TranslateTransform X="0" Y="0"/>
+                    </TransformGroup>
+                </Border.RenderTransform>
 
-            <StackPanel Grid.Column="3" Margin="0,0,16,0">
-                <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="TargetBox" FontSize="13.5" Height="38"/>
-            </StackPanel>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-            <StackPanel Grid.Column="4" Margin="0,0,16,0">
-                <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
-            </StackPanel>
+                    <!-- Header with Title, Subtitle, and Close X -->
+                    <Grid Grid.Row="0" Margin="0,0,0,18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-            <!-- Download Image To -->
-            <StackPanel Grid.Column="5" Margin="0,0,16,0">
-                <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder" />
-            </StackPanel>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Bing Wallpaper Guide" FontSize="20" FontWeight="Bold" Foreground="#FFFFFF"/>
+                            <TextBlock Text="Everything you need to know to get the most out of Bing Wallpaper." FontSize="13" Foreground="#9E9E9E" Margin="0,3,0,0"/>
+                        </StackPanel>
 
-            <!-- Spotlight / Auto Wallpaper pill -->
-            <StackPanel Grid.Column="6" Margin="0,0,16,0">
-                <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <Grid Height="38" VerticalAlignment="Center">
-                    <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
-                            Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
-                            Cursor="Hand" VerticalAlignment="Center">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
-                        </Border.Effect>
-                        <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
-                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
-                            <Ellipse.RenderTransform>
-                                <TranslateTransform X="0" Y="0"/>
-                            </Ellipse.RenderTransform>
-                        </Ellipse>
+                        <Button Name="GuideCloseBtn" Grid.Column="1" Style="{StaticResource ModernIconButton}" Width="32" Height="32" ToolTip="Close (Esc)" VerticalAlignment="Top">
+                            <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#CCCCCC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Body Content (Two Columns) -->
+                    <Grid Grid.Row="1" Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="280"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left Column: Hero preview card & Default Behavior -->
+                        <StackPanel Grid.Column="0">
+                            <!-- Hero Preview Card -->
+                            <Border Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="10" Padding="16,14" Margin="0,0,0,14">
+                                <StackPanel>
+                                    <Border Background="#141212ff" Width="44" Height="44" CornerRadius="12" Margin="0,0,0,10" HorizontalAlignment="Left">
+                                        <Viewbox Margin="7">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M11.97 7.569a.92.92 0 00-.805.863c-.013.195-.01.209.43 1.347 1 2.59 1.242 3.214 1.283 3.302.099.213.237.413.41.592.134.138.222.212.37.311.26.176.39.224 1.405.527.989.295 1.529.49 1.994.723.603.302 1.024.644 1.29 1.051.191.292.36.815.434 1.342.029.206.029.661 0 .847a2.491 2.491 0 01-.376 1.026c-.1.151-.065.126.081-.058.415-.52.838-1.408 1.054-2.213a6.728 6.728 0 00.102-3.012 6.626 6.626 0 00-3.291-4.53c-.34-.19-.879-.473-1.322-.698l-.254-.133a737.941 737.941 0 01-1.575-.827c-.548-.29-.78-.406-.846-.426a1.376 1.376 0 00-.29-.045l-.093.01z" Fill="#00CACC"/>
+                                                <Path Data="M13.164 17.24a4.385 4.385 0 00-.202.125 511.45 511.45 0 00-1.795 1.115 163.087 163.087 0 01-.989.614l-.463.288a99.198 99.198 0 01-1.502.941c-.326.2-.704.334-1.09.387-.18.024-.52.024-.7 0a2.807 2.807 0 01-1.318-.538 3.665 3.665 0 01-.543-.545 2.837 2.837 0 01-.506-1.141 2.161 2.161 0 00-.041-.182c-.008-.008.006.138.032.33.027.199.085.487.147.733.482 1.907 1.85 3.457 3.705 4.195a6.31 6.31 0 001.658.412c.22.025.844.035 1.074.017 1.054-.08 1.972-.393 2.913-.992a325.28 325.28 0 01.937-.596l.384-.244.684-.435.234-.149.009-.005.025-.017.013-.007.172-.11.597-.38c.76-.481.987-.65 1.34-.998.148-.146.37-.394.381-.425.002-.007.042-.068.088-.136a2.49 2.49 0 00.373-1.023 4.181 4.181 0 000-.847 4.336 4.336 0 00-.318-1.137c-.224-.472-.7-.9-1.383-1.245a2.972 2.972 0 00-.406-.181c-.01 0-.646.392-1.413.87a7089.171 7089.171 0 01-1.658 1.031l-.439.274z" Fill="#2756A9"/>
+                                                <Path Data="M4.003 14.946l.004 3.33.042.193c.134.604.366 1.04.77 1.445a2.701 2.701 0 001.955.814c.536 0 1-.135 1.479-.43l.703-.435.556-.346V8.003c0-2.306-.004-3.675-.012-3.782a2.734 2.734 0 00-.797-1.765c-.145-.144-.268-.24-.637-.496A1780.102 1780.102 0 015.762.362C5.406.115 5.38.098 5.271.059a.943.943 0 00-1.254.696C4.003.818 4 1.659 4 6.223v5.394H4l.003 3.329z" Fill="#00BBEC"/>
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
+                                    <TextBlock Text="Daily Inspiration" FontSize="14.5" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,3"/>
+                                    <TextBlock Text="Discover world-class photography refreshed daily from Bing's global archives." FontSize="12" Foreground="#AAAAAA" TextWrapping="Wrap" LineHeight="17"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Default Behavior Section -->
+                            <Border Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="10" Padding="16,14">
+                                <StackPanel>
+                                    <TextBlock Text="Default Behavior" FontSize="13.5" FontWeight="SemiBold" Foreground="#00CACC" Margin="0,0,0,8"/>
+                                    <TextBlock Text="â€¢ Auto 4K: Automatically fetches and sets UHD wallpapers directly." FontSize="12" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,6"/>
+                                    <TextBlock Text="â€¢ Dual Target: Changes both your Desktop and Lock Screen simultaneously." FontSize="12" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,6"/>
+                                    <TextBlock Text="â€¢ Background Sync: Keeps wallpapers fresh silently using Windows Task Scheduler." FontSize="12" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="18"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Right Column: Essential Features Grid -->
+                        <Border Grid.Column="2" Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="10" Padding="16,14">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
+                                <StackPanel>
+                                    <TextBlock Text="Essential Features" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,12"/>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#0078D4" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Download" FontSize="13" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                            <TextBlock Text="Save original 4K Ultra HD images directly to disk without any watermarks." FontSize="12" Foreground="#9E9E9E" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#00CACC" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Browse &amp; Preview" FontSize="13" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                            <TextBlock Text="Explore recent days of Bing imagery. Single click to inspect, double-click to apply." FontSize="12" Foreground="#9E9E9E" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#60CDFF" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Apply Wallpaper" FontSize="13" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                            <TextBlock Text="Set image for Desktop, Lock Screen, or Both with customized sizing (Fit, Fill, Stretch, Center, Span)." FontSize="12" Foreground="#9E9E9E" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#A78BFA" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Customize Region" FontSize="13" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                            <TextBlock Text="Switch between global regions (US, UK, Japan, Germany, etc.) for localized photography." FontSize="12" Foreground="#9E9E9E" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#34D399" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Automatic Changes" FontSize="13" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                            <TextBlock Text="Enable Auto switch to cycle wallpapers at custom intervals (1 min, Hourly, Daily, on Login)." FontSize="12" Foreground="#9E9E9E" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="34"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#FBBF24" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="Download Location" FontSize="13" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                            <TextBlock Text="Click the folder path at any time to choose where your saved wallpapers are stored." FontSize="12" Foreground="#9E9E9E" TextWrapping="Wrap" LineHeight="16" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+
+                    <!-- Footer: Updates & Close -->
+                    <Border Grid.Row="2" BorderBrush="#2C2C2C" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Keep Bing Wallpaper updated" FontSize="13" FontWeight="SemiBold" Foreground="#E0E0E0"/>
+                                <TextBlock Text="Check for new releases with enhanced features and latest fixes." FontSize="11.5" Foreground="#888888" Margin="0,2,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Name="GuideCheckUpdateBtn" Content="Check for updates" Width="150" Height="36" Margin="0,0,10,0" Background="#262626" Foreground="#E0E0E0" FontSize="13" FontWeight="SemiBold" Style="{StaticResource ModernIconButton}" ToolTip="Check for app updates"/>
+                                <Button Name="GuideDoneBtn" Content="Got it" Width="90" Height="36" Background="#0078D4" Foreground="White" FontSize="13" FontWeight="SemiBold" Style="{StaticResource ModernIconButton}"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </Grid>
-            </StackPanel>
-
-            <!-- Container for Every + Apply To options -->
-            <StackPanel Name="SpotlightOptionsContainer" Grid.Column="7" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
-                <StackPanel Margin="0,0,16,0">
-                    <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
-                </StackPanel>
-                <StackPanel Margin="0,0,0,0">
-                    <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
-                </StackPanel>
-            </StackPanel>
-        </Grid>
-
-        <!-- Smooth Modern Gallery Container -->
-        <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True">
-            <ScrollViewer Name="GalleryScrollViewer" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
-                <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
-            </ScrollViewer>
-        </Border>
-
-        <!-- Footer / Action Area -->
-        <Grid Grid.Row="3" Margin="0,28,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
-            
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
-                <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
-                <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
-            </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </Window>
@@ -1466,6 +1669,13 @@ $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
 $SpotlightOptionsContainer = $window.FindName('SpotlightOptionsContainer')
 $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
+$ModalOverlay = $window.FindName('ModalOverlay')
+$ModalBackdrop = $window.FindName('ModalBackdrop')
+$UserGuideModal = $window.FindName('UserGuideModal')
+$GuideBtn = $window.FindName('GuideBtn')
+$GuideCloseBtn = $window.FindName('GuideCloseBtn')
+$GuideDoneBtn = $window.FindName('GuideDoneBtn')
+$GuideCheckUpdateBtn = $window.FindName('GuideCheckUpdateBtn')
 
 # Helper to force UI redraw during blocking network calls
 function Update-UI {
@@ -1865,50 +2075,50 @@ function Apply-WallpaperAsync {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam)
-        try {
-            # 1. Download image in background thread (0ms UI freeze)
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            $wc.DownloadFile($Uri, $Temp)
-            $wc.Dispose()
-            if (Test-Path -LiteralPath $Temp) {
-                if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
-                Move-Item -LiteralPath $Temp -Destination $Dest -Force
-            }
-
-            # 2. Apply Desktop Wallpaper in background thread (0ms UI freeze)
-            if ($TargetParam -eq 'Desktop' -or $TargetParam -eq 'Both') {
-                $styleVal = '6'; $tileVal = '0'
-                switch ($StyleParam) {
-                    'Fit' { $styleVal = '6'; $tileVal = '0' }
-                    'Fill' { $styleVal = '10'; $tileVal = '0' }
-                    'Stretch' { $styleVal = '2'; $tileVal = '0' }
-                    'Center' { $styleVal = '0'; $tileVal = '0' }
-                    'Tile' { $styleVal = '0'; $tileVal = '1' }
-                    'Span' { $styleVal = '22'; $tileVal = '0' }
+            param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam)
+            try {
+                # 1. Download image in background thread (0ms UI freeze)
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                $wc.DownloadFile($Uri, $Temp)
+                $wc.Dispose()
+                if (Test-Path -LiteralPath $Temp) {
+                    if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+                    Move-Item -LiteralPath $Temp -Destination $Dest -Force
                 }
-                Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'WallpaperStyle' -Value $styleVal -Force -ErrorAction SilentlyContinue
-                Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'TileWallpaper' -Value $tileVal -Force -ErrorAction SilentlyContinue
 
-                if (![BingWallpaperNative]::SystemParametersInfo(20, 0, $Dest, 3)) {
-                    throw 'Windows could not apply the downloaded image as desktop wallpaper.'
+                # 2. Apply Desktop Wallpaper in background thread (0ms UI freeze)
+                if ($TargetParam -eq 'Desktop' -or $TargetParam -eq 'Both') {
+                    $styleVal = '6'; $tileVal = '0'
+                    switch ($StyleParam) {
+                        'Fit' { $styleVal = '6'; $tileVal = '0' }
+                        'Fill' { $styleVal = '10'; $tileVal = '0' }
+                        'Stretch' { $styleVal = '2'; $tileVal = '0' }
+                        'Center' { $styleVal = '0'; $tileVal = '0' }
+                        'Tile' { $styleVal = '0'; $tileVal = '1' }
+                        'Span' { $styleVal = '22'; $tileVal = '0' }
+                    }
+                    Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'WallpaperStyle' -Value $styleVal -Force -ErrorAction SilentlyContinue
+                    Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'TileWallpaper' -Value $tileVal -Force -ErrorAction SilentlyContinue
+
+                    if (![BingWallpaperNative]::SystemParametersInfo(20, 0, $Dest, 3)) {
+                        throw 'Windows could not apply the downloaded image as desktop wallpaper.'
+                    }
                 }
-            }
 
-            return @{ Success = $true; Error = $null; Dest = $Dest }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
-        }
-    }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style)
+                return @{ Success = $true; Error = $null; Dest = $Dest }
+            }
+            catch {
+                return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
+            }
+        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style)
 
     $asyncOp = $ps.BeginInvoke()
 
     $script:applyContext = @{
-        PS = $ps
+        PS      = $ps
         AsyncOp = $asyncOp
-        Target = $Target
+        Target  = $Target
     }
 
     if ($script:applyTimer) {
@@ -1919,57 +2129,57 @@ function Apply-WallpaperAsync {
     $script:applyTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:applyTimer.Interval = [TimeSpan]::FromMilliseconds(30)
     $script:applyTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:applyContext) {
-            $timerSender.Stop()
-            return
-        }
-        if ($script:applyContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:applyContext
-            $script:applyContext = $null
-            $script:applyTimer = $null
+            param($timerSender, $timerArgs)
+            if (-not $script:applyContext) {
+                $timerSender.Stop()
+                return
+            }
+            if ($script:applyContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:applyContext
+                $script:applyContext = $null
+                $script:applyTimer = $null
 
-            $isSuccess = $false
-            $errorMsg = $null
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                $errorMsg = if ($res) { $res.Error } else { $null }
+                $isSuccess = $false
+                $errorMsg = $null
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    $errorMsg = if ($res) { $res.Error } else { $null }
 
-                # Apply Lockscreen if needed
-                if ($isSuccess -and ($ctx.Target -eq 'Lock screen' -or $ctx.Target -eq 'Both')) {
-                    $cPath = $res.Dest
-                    $fullCachePath = (Resolve-Path -LiteralPath $cPath).Path
-                    $cacheDirectory = Split-Path -Parent $fullCachePath
-                    $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
-                    Copy-Item -LiteralPath $fullCachePath -Destination $lockScreenCachePath -Force
-                    $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
-                    if (-not $resLock) {
-                        throw 'Windows could not apply the lock screen image.'
+                    # Apply Lockscreen if needed
+                    if ($isSuccess -and ($ctx.Target -eq 'Lock screen' -or $ctx.Target -eq 'Both')) {
+                        $cPath = $res.Dest
+                        $fullCachePath = (Resolve-Path -LiteralPath $cPath).Path
+                        $cacheDirectory = Split-Path -Parent $fullCachePath
+                        $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
+                        Copy-Item -LiteralPath $fullCachePath -Destination $lockScreenCachePath -Force
+                        $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
+                        if (-not $resLock) {
+                            throw 'Windows could not apply the lock screen image.'
+                        }
                     }
                 }
-            }
-            catch {
-                $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-                $UpdateBtn.IsEnabled = $true
-                $DownloadBtn.IsEnabled = $true
-            }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                    $UpdateBtn.IsEnabled = $true
+                    $DownloadBtn.IsEnabled = $true
+                }
 
-            if ($isSuccess) {
-                Set-TransientStatus -Message (Get-AppliedSuccessMessage $ctx.Target)
+                if ($isSuccess) {
+                    Set-TransientStatus -Message (Get-AppliedSuccessMessage $ctx.Target)
+                }
+                else {
+                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "apply wallpaper"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                }
             }
-            else {
-                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "apply wallpaper"
-                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-            }
-        }
-    })
+        })
     $script:applyTimer.Start()
 }
 
@@ -2613,80 +2823,80 @@ function Start-VerifiedUpdate {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$Repository, [Version]$CurrentAppVersion)
-        try {
-            function Invoke-GhJson([string]$Uri) {
+            param([string]$Repository, [Version]$CurrentAppVersion)
+            try {
+                function Invoke-GhJson([string]$Uri) {
+                    try {
+                        return Invoke-RestMethod -Uri $Uri -Headers @{ 'User-Agent' = 'BingWallpaper-Updater' } -UseBasicParsing -ErrorAction Stop
+                    }
+                    catch {
+                        $wc = New-Object System.Net.WebClient
+                        $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+                        return $wc.DownloadString($Uri) | ConvertFrom-Json
+                    }
+                }
+
+                function Parse-RelVer([string]$TagName, [string]$ReleaseName, [string]$ReleaseBody) {
+                    $cleanTag = ($TagName -replace '^[vV]', '').Trim()
+                    if ($cleanTag -match '^\d+(\.\d+){1,3}$') { return [Version]$cleanTag }
+                    if ($ReleaseName -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                        $v = $Matches[1]
+                        if ($v -notmatch '\.') { $v = "$v.0" }
+                        if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                    }
+                    if ($ReleaseBody -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                        $v = $Matches[1]
+                        if ($v -notmatch '\.') { $v = "$v.0" }
+                        if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                    }
+                    return $null
+                }
+
+                $release = $null
+                $latestVersion = $null
+
                 try {
-                    return Invoke-RestMethod -Uri $Uri -Headers @{ 'User-Agent' = 'BingWallpaper-Updater' } -UseBasicParsing -ErrorAction Stop
+                    $releaseUri = "https://api.github.com/repos/$Repository/releases/latest"
+                    $latestRel = Invoke-GhJson -Uri $releaseUri
+                    $latestVersion = Parse-RelVer -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
+                    $release = $latestRel
                 }
                 catch {
-                    $wc = New-Object System.Net.WebClient
-                    $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-                    return $wc.DownloadString($Uri) | ConvertFrom-Json
+                    $allReleasesUri = "https://api.github.com/repos/$Repository/releases?per_page=10"
+                    $allReleases = Invoke-GhJson -Uri $allReleasesUri
+                    foreach ($rel in $allReleases) {
+                        try {
+                            $ver = Parse-RelVer -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
+                            if ($ver -and ($null -eq $latestVersion -or $ver -gt $latestVersion)) {
+                                $latestVersion = $ver
+                                $release = $rel
+                            }
+                        }
+                        catch {}
+                    }
                 }
-            }
 
-            function Parse-RelVer([string]$TagName, [string]$ReleaseName, [string]$ReleaseBody) {
-                $cleanTag = ($TagName -replace '^[vV]', '').Trim()
-                if ($cleanTag -match '^\d+(\.\d+){1,3}$') { return [Version]$cleanTag }
-                if ($ReleaseName -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                if (-not $release -or -not $latestVersion) {
+                    return @{ Success = $false; Error = "No releases with a valid version tag were found in repository '$Repository'." }
                 }
-                if ($ReleaseBody -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+
+                $hasUpdate = ($latestVersion -gt $CurrentAppVersion)
+                return @{
+                    Success       = $true
+                    HasUpdate     = $hasUpdate
+                    LatestVersion = $latestVersion.ToString()
+                    Release       = $release
+                    Error         = $null
                 }
-                return $null
-            }
-
-            $release = $null
-            $latestVersion = $null
-
-            try {
-                $releaseUri = "https://api.github.com/repos/$Repository/releases/latest"
-                $latestRel = Invoke-GhJson -Uri $releaseUri
-                $latestVersion = Parse-RelVer -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-                $release = $latestRel
             }
             catch {
-                $allReleasesUri = "https://api.github.com/repos/$Repository/releases?per_page=10"
-                $allReleases = Invoke-GhJson -Uri $allReleasesUri
-                foreach ($rel in $allReleases) {
-                    try {
-                        $ver = Parse-RelVer -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
-                        if ($ver -and ($null -eq $latestVersion -or $ver -gt $latestVersion)) {
-                            $latestVersion = $ver
-                            $release = $rel
-                        }
-                    }
-                    catch {}
-                }
+                return @{ Success = $false; Error = $_.Exception.Message }
             }
-
-            if (-not $release -or -not $latestVersion) {
-                return @{ Success = $false; Error = "No releases with a valid version tag were found in repository '$Repository'." }
-            }
-
-            $hasUpdate = ($latestVersion -gt $CurrentAppVersion)
-            return @{
-                Success = $true
-                HasUpdate = $hasUpdate
-                LatestVersion = $latestVersion.ToString()
-                Release = $release
-                Error = $null
-            }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message }
-        }
-    }).AddArgument($repo).AddArgument($currentVersion)
+        }).AddArgument($repo).AddArgument($currentVersion)
 
     $asyncOp = $ps.BeginInvoke()
     $script:updateContext = @{
-        PS = $ps
+        PS      = $ps
         AsyncOp = $asyncOp
     }
 
@@ -2698,69 +2908,70 @@ function Start-VerifiedUpdate {
     $script:updateTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:updateTimer.Interval = [TimeSpan]::FromMilliseconds(40)
     $script:updateTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:updateContext) {
-            $timerSender.Stop()
-            return
-        }
-
-        if ($script:updateContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:updateContext
-            $script:updateContext = $null
-            $script:updateTimer = $null
-
-            $isSuccess = $false
-            $errorMsg = $null
-            $hasUpdate = $false
-            $latestVersionStr = ''
-            $release = $null
-
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                if ($isSuccess) {
-                    $hasUpdate = [bool]$res.HasUpdate
-                    $latestVersionStr = [string]$res.LatestVersion
-                    $release = $res.Release
-                } else {
-                    $errorMsg = if ($res) { $res.Error } else { "Failed to check for updates." }
-                }
+            param($timerSender, $timerArgs)
+            if (-not $script:updateContext) {
+                $timerSender.Stop()
+                return
             }
-            catch {
+
+            if ($script:updateContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:updateContext
+                $script:updateContext = $null
+                $script:updateTimer = $null
+
                 $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-                $CheckUpdateBtn.IsEnabled = $true
-            }
+                $errorMsg = $null
+                $hasUpdate = $false
+                $latestVersionStr = ''
+                $release = $null
 
-            if (-not $isSuccess) {
-                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "check for updates"
-                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-                Show-ModernDialog -Title "Update Error" -Header "Connection Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
-                return
-            }
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    if ($isSuccess) {
+                        $hasUpdate = [bool]$res.HasUpdate
+                        $latestVersionStr = [string]$res.LatestVersion
+                        $release = $res.Release
+                    }
+                    else {
+                        $errorMsg = if ($res) { $res.Error } else { "Failed to check for updates." }
+                    }
+                }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                    $CheckUpdateBtn.IsEnabled = $true
+                }
 
-            if (-not $hasUpdate) {
-                Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
-                Set-TransientStatus -Message 'You are up to date.' -Brush $statusDefaultBrush
-                return
-            }
+                if (-not $isSuccess) {
+                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "check for updates"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                    Show-ModernDialog -Title "Update Error" -Header "Connection Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
+                    return
+                }
 
-            # New update is available
-            $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Icon "Update" -Buttons "YesNo"
-            if ($confirmation -ne 'Yes') {
-                Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush
-                return
-            }
+                if (-not $hasUpdate) {
+                    Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
+                    Set-TransientStatus -Message 'You are up to date.' -Brush $statusDefaultBrush
+                    return
+                }
 
-            # Start asynchronous download
-            Start-VerifiedUpdateDownloadAsync -Release $release -LatestVersionStr $latestVersionStr
-        }
-    })
+                # New update is available
+                $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new verified update has been published. Would you like to download, verify, and restart now?" -Icon "Update" -Buttons "YesNo"
+                if ($confirmation -ne 'Yes') {
+                    Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush
+                    return
+                }
+
+                # Start asynchronous download
+                Start-VerifiedUpdateDownloadAsync -Release $release -LatestVersionStr $latestVersionStr
+            }
+        })
     $script:updateTimer.Start()
 }
 
@@ -2804,53 +3015,53 @@ function Start-VerifiedUpdateDownloadAsync {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$AssetDigest, [string]$LatestVer, [string]$PublisherThumbprint)
-        try {
-            $downloadPath = Join-Path $env:TEMP "BingWallpaper-$LatestVer-$([Guid]::NewGuid().ToString('N')).exe"
-            $client = New-Object System.Net.WebClient
-            $client.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-            $client.DownloadFile($DownloadUrl, $downloadPath)
+            param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$AssetDigest, [string]$LatestVer, [string]$PublisherThumbprint)
+            try {
+                $downloadPath = Join-Path $env:TEMP "BingWallpaper-$LatestVer-$([Guid]::NewGuid().ToString('N')).exe"
+                $client = New-Object System.Net.WebClient
+                $client.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+                $client.DownloadFile($DownloadUrl, $downloadPath)
 
-            # Extract SHA-256 hash
-            $expectedHash = $null
-            if ($ChecksumUrl) {
-                $checksumText = $client.DownloadString($ChecksumUrl)
-                $expectedHash = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b').Value.ToUpperInvariant()
-            }
-            elseif ($AssetDigest -and $AssetDigest -match '(?i)sha256:([a-f0-9]{64})') {
-                $expectedHash = $Matches[1].ToUpperInvariant()
-            }
-
-            if ($expectedHash) {
-                $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
-                if ($actualHash -ne $expectedHash) {
-                    Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
-                    throw 'The downloaded update did not match the published SHA-256 checksum.'
+                # Extract SHA-256 hash
+                $expectedHash = $null
+                if ($ChecksumUrl) {
+                    $checksumText = $client.DownloadString($ChecksumUrl)
+                    $expectedHash = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b').Value.ToUpperInvariant()
                 }
-            }
-
-            if ($PublisherThumbprint) {
-                $signature = Get-AuthenticodeSignature -FilePath $downloadPath
-                if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $PublisherThumbprint) {
-                    Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
-                    throw 'The update does not have the expected valid Authenticode signature.'
+                elseif ($AssetDigest -and $AssetDigest -match '(?i)sha256:([a-f0-9]{64})') {
+                    $expectedHash = $Matches[1].ToUpperInvariant()
                 }
-            }
 
-            return @{ Success = $true; DownloadPath = $downloadPath; Error = $null }
-        }
-        catch {
-            return @{ Success = $false; DownloadPath = $null; Error = $_.Exception.Message }
-        }
-        finally {
-            if ($client) { $client.Dispose() }
-        }
-    }).AddArgument($downloadUrl).AddArgument($checksumUrl).AddArgument($assetDigest).AddArgument($LatestVersionStr).AddArgument($publisherThumbprint)
+                if ($expectedHash) {
+                    $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
+                    if ($actualHash -ne $expectedHash) {
+                        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+                        throw 'The downloaded update did not match the published SHA-256 checksum.'
+                    }
+                }
+
+                if ($PublisherThumbprint) {
+                    $signature = Get-AuthenticodeSignature -FilePath $downloadPath
+                    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $PublisherThumbprint) {
+                        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+                        throw 'The update does not have the expected valid Authenticode signature.'
+                    }
+                }
+
+                return @{ Success = $true; DownloadPath = $downloadPath; Error = $null }
+            }
+            catch {
+                return @{ Success = $false; DownloadPath = $null; Error = $_.Exception.Message }
+            }
+            finally {
+                if ($client) { $client.Dispose() }
+            }
+        }).AddArgument($downloadUrl).AddArgument($checksumUrl).AddArgument($assetDigest).AddArgument($LatestVersionStr).AddArgument($publisherThumbprint)
 
     $asyncOp = $ps.BeginInvoke()
     $script:updateDlContext = @{
-        PS = $ps
-        AsyncOp = $asyncOp
+        PS           = $ps
+        AsyncOp      = $asyncOp
         InstalledExe = $installedExe
     }
 
@@ -2862,52 +3073,53 @@ function Start-VerifiedUpdateDownloadAsync {
     $script:updateDlTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:updateDlTimer.Interval = [TimeSpan]::FromMilliseconds(40)
     $script:updateDlTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:updateDlContext) {
-            $timerSender.Stop()
-            return
-        }
-
-        if ($script:updateDlContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:updateDlContext
-            $script:updateDlContext = $null
-            $script:updateDlTimer = $null
-
-            $isSuccess = $false
-            $errorMsg = $null
-            $downloadPath = $null
-
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                if ($isSuccess) {
-                    $downloadPath = $res.DownloadPath
-                } else {
-                    $errorMsg = if ($res) { $res.Error } else { "Failed to download update." }
-                }
-            }
-            catch {
-                $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-                $CheckUpdateBtn.IsEnabled = $true
-            }
-
-            if (-not $isSuccess) {
-                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download update"
-                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-                Show-ModernDialog -Title "Update Error" -Header "Download Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
+            param($timerSender, $timerArgs)
+            if (-not $script:updateDlContext) {
+                $timerSender.Stop()
                 return
             }
 
-            # Launch updater script and restart
-            $installedExe = $ctx.InstalledExe
-            $updaterPath = Join-Path $env:TEMP "BingWallpaper-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
-            $updaterScript = @'
+            if ($script:updateDlContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:updateDlContext
+                $script:updateDlContext = $null
+                $script:updateDlTimer = $null
+
+                $isSuccess = $false
+                $errorMsg = $null
+                $downloadPath = $null
+
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    if ($isSuccess) {
+                        $downloadPath = $res.DownloadPath
+                    }
+                    else {
+                        $errorMsg = if ($res) { $res.Error } else { "Failed to download update." }
+                    }
+                }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                    $CheckUpdateBtn.IsEnabled = $true
+                }
+
+                if (-not $isSuccess) {
+                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download update"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                    Show-ModernDialog -Title "Update Error" -Header "Download Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
+                    return
+                }
+
+                # Launch updater script and restart
+                $installedExe = $ctx.InstalledExe
+                $updaterPath = Join-Path $env:TEMP "BingWallpaper-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
+                $updaterScript = @'
 param(
     [int]$ParentProcessId,
     [string]$DownloadedExe,
@@ -2928,14 +3140,14 @@ for ($attempt = 0; $attempt -lt 10; $attempt++) {
 }
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
 '@
-            Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8
-            $updaterArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterPath`" -ParentProcessId $PID -DownloadedExe `"$downloadPath`" -InstalledExe `"$installedExe`""
-            Start-Process -FilePath "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $updaterArgs -WindowStyle Hidden
+                Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8
+                $updaterArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterPath`" -ParentProcessId $PID -DownloadedExe `"$downloadPath`" -InstalledExe `"$installedExe`""
+                Start-Process -FilePath "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $updaterArgs -WindowStyle Hidden
 
-            $StatusText.Text = 'Verified update downloaded. Restarting...'
-            $window.Close()
-        }
-    })
+                $StatusText.Text = 'Verified update downloaded. Restarting...'
+                $window.Close()
+            }
+        })
     $script:updateDlTimer.Start()
 }
 
@@ -3017,372 +3229,373 @@ function Load-Gallery {
     # Execute Bing API fetch & multi-threaded thumbnail downloads in background runspace (0ms UI freeze!)
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$Region, [string]$CacheDir)
-        try {
-            $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
-            $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
-            $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
+            param([string]$Region, [string]$CacheDir)
+            try {
+                $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
+                $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
+                $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
             
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            $json1 = $wc.DownloadString($uri1)
-            $json2 = $wc.DownloadString($uri2)
-            $wc.Dispose()
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                $json1 = $wc.DownloadString($uri1)
+                $json2 = $wc.DownloadString($uri2)
+                $wc.Dispose()
 
-            $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
-            $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
+                $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
+                $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
 
-            $allImages = @()
-            if ($batch1) { $allImages += $batch1 }
-            if ($batch2) { $allImages += $batch2 }
+                $allImages = @()
+                if ($batch1) { $allImages += $batch1 }
+                if ($batch2) { $allImages += $batch2 }
 
-            $uniqueImages = $allImages | Group-Object -Property urlbase | ForEach-Object { $_.Group[0] } | Sort-Object -Property enddate -Descending
-            if (-not $uniqueImages -or $uniqueImages.Count -eq 0) {
-                return @{ Success = $false; Error = "Unable to connect to Bing."; Images = @() }
-            }
-
-            # Parallel download of missing thumbnails in background thread pool
-            $tasks = [System.Collections.Generic.List[System.Threading.Tasks.Task]]::new()
-            foreach ($img in $uniqueImages) {
-                $safeName = $img.urlbase -replace '[^a-zA-Z0-9]', ''
-                $thumbPath = Join-Path $CacheDir "${safeName}_thumb.jpg"
-                if (-not (Test-Path -LiteralPath $thumbPath)) {
-                    $imgUrl = "https://www.bing.com$($img.urlbase)_1920x1080.jpg"
-                    $task = [System.Threading.Tasks.Task]::Run([Action]{
-                        try {
-                            $dlClient = New-Object System.Net.WebClient
-                            $dlClient.Headers.Add("User-Agent", "Mozilla/5.0")
-                            $dlClient.DownloadFile($imgUrl, $thumbPath)
-                            $dlClient.Dispose()
-                        } catch {}
-                    })
-                    $tasks.Add($task)
+                $uniqueImages = $allImages | Group-Object -Property urlbase | ForEach-Object { $_.Group[0] } | Sort-Object -Property enddate -Descending
+                if (-not $uniqueImages -or $uniqueImages.Count -eq 0) {
+                    return @{ Success = $false; Error = "Unable to connect to Bing."; Images = @() }
                 }
-            }
-            if ($tasks.Count -gt 0) {
-                [System.Threading.Tasks.Task]::WaitAll($tasks.ToArray(), 10000) | Out-Null
-            }
 
-            # Return image objects array
-            $resultImages = @()
-            foreach ($img in $uniqueImages) {
-                $resultImages += [PSCustomObject]@{
-                    urlbase   = [string]$img.urlbase
-                    url       = [string]$img.url
-                    title     = [string]$img.title
-                    copyright = [string]$img.copyright
-                    enddate   = [string]$img.enddate
+                # Parallel download of missing thumbnails in background thread pool
+                $tasks = [System.Collections.Generic.List[System.Threading.Tasks.Task]]::new()
+                foreach ($img in $uniqueImages) {
+                    $safeName = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                    $thumbPath = Join-Path $CacheDir "${safeName}_thumb.jpg"
+                    if (-not (Test-Path -LiteralPath $thumbPath)) {
+                        $imgUrl = "https://www.bing.com$($img.urlbase)_1920x1080.jpg"
+                        $task = [System.Threading.Tasks.Task]::Run([Action] {
+                                try {
+                                    $dlClient = New-Object System.Net.WebClient
+                                    $dlClient.Headers.Add("User-Agent", "Mozilla/5.0")
+                                    $dlClient.DownloadFile($imgUrl, $thumbPath)
+                                    $dlClient.Dispose()
+                                }
+                                catch {}
+                            })
+                        $tasks.Add($task)
+                    }
                 }
-            }
+                if ($tasks.Count -gt 0) {
+                    [System.Threading.Tasks.Task]::WaitAll($tasks.ToArray(), 10000) | Out-Null
+                }
 
-            return @{ Success = $true; Error = $null; Images = $resultImages }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
-        }
-    }).AddArgument($selectedRegion).AddArgument($thumbCacheDir)
+                # Return image objects array
+                $resultImages = @()
+                foreach ($img in $uniqueImages) {
+                    $resultImages += [PSCustomObject]@{
+                        urlbase   = [string]$img.urlbase
+                        url       = [string]$img.url
+                        title     = [string]$img.title
+                        copyright = [string]$img.copyright
+                        enddate   = [string]$img.enddate
+                    }
+                }
+
+                return @{ Success = $true; Error = $null; Images = $resultImages }
+            }
+            catch {
+                return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
+            }
+        }).AddArgument($selectedRegion).AddArgument($thumbCacheDir)
 
     $asyncOp = $ps.BeginInvoke()
 
     $script:galleryRunspaceContext = @{
-        PS = $ps
-        AsyncOp = $asyncOp
+        PS            = $ps
+        AsyncOp       = $asyncOp
         ThumbCacheDir = $thumbCacheDir
     }
 
     $script:galleryTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:galleryTimer.Interval = [TimeSpan]::FromMilliseconds(30)
     $script:galleryTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:galleryRunspaceContext) {
-            $timerSender.Stop()
-            return
-        }
-        if ($script:galleryRunspaceContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:galleryRunspaceContext
-            $script:galleryRunspaceContext = $null
-            $script:galleryTimer = $null
-
-            $images = @()
-            $isSuccess = $false
-            $errorMsg = $null
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                $images = if ($res -and $res.Images) { @($res.Images) } else { @() }
-                $errorMsg = if ($res) { $res.Error } else { "Failed to load wallpapers." }
-            }
-            catch {
-                $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-            }
-
-            if (-not $isSuccess -or $images.Count -eq 0) {
-                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                $StatusText.Opacity = 1
-                $StatusText.Foreground = $statusErrorBrush
-                $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+            param($timerSender, $timerArgs)
+            if (-not $script:galleryRunspaceContext) {
+                $timerSender.Stop()
                 return
             }
+            if ($script:galleryRunspaceContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:galleryRunspaceContext
+                $script:galleryRunspaceContext = $null
+                $script:galleryTimer = $null
 
-            $script:loadedImages = $images
-            $total = $images.Count
-            $thumbCacheDir = $ctx.ThumbCacheDir
-
-            $current = 0
-            $firstCard = $null
-            foreach ($image in $images) {
-                $current++
-                $displayTitle = Get-CleanImageTitle $image
-
-                # Modern edge-to-edge flush Image Card
-                $card = New-Object System.Windows.Controls.Border
-                $card.Background = $cardUnselectedBg
-                $card.CornerRadius = New-Object System.Windows.CornerRadius(12)
-                $card.BorderThickness = New-Object System.Windows.Thickness(0)
-                $card.ClipToBounds = $true
-                $cardClip = New-Object System.Windows.Media.RectangleGeometry
-                $cardClip.RadiusX = 12
-                $cardClip.RadiusY = 12
-                $card.Clip = $cardClip
-                $card.Add_SizeChanged({
-                        param($evtSender, $e)
-                        $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
-                    })
-                $card.Padding = New-Object System.Windows.Thickness(0)
-                $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
-                $card.Cursor = [System.Windows.Input.Cursors]::Hand
-                $card.Tag = $image
-                if ($image.copyright) {
-                    $card.ToolTip = "$displayTitle`n$($image.copyright)"
-                }
-                
-                # Subtle default drop shadow
-                $shadow = New-Object System.Windows.Media.Effects.DropShadowEffect
-                $shadow.Color = [System.Windows.Media.Colors]::Black
-                $shadow.Direction = 270
-                $shadow.ShadowDepth = 2
-                $shadow.BlurRadius = 10
-                $shadow.Opacity = 0.3
-                $card.Effect = $shadow
-
-                # Reveal Highlight Effect Setup
-                $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
-                $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(28, 255, 255, 255), 0.0)))
-                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(14, 255, 255, 255), 0.4)))
-                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(4, 255, 255, 255), 0.75)))
-                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-                $revealBrush.RadiusX = 180
-                $revealBrush.RadiusY = 180
-                
-                $revealRect = New-Object System.Windows.Shapes.Rectangle
-                $revealRect.Fill = $revealBrush
-                $revealRect.Opacity = 0
-                $revealRect.IsHitTestVisible = $false
-                $revealRect.RadiusX = 12
-                $revealRect.RadiusY = 12
-                
-                $script:revealElements.Add(@{ Element = $revealRect; Brush = $revealBrush }) | Out-Null
-
-                $revealBorderBrush = New-Object System.Windows.Media.RadialGradientBrush
-                $revealBorderBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-                $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(90, 255, 255, 255), 0.0)))
-                $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-                $revealBorderBrush.RadiusX = 160
-                $revealBorderBrush.RadiusY = 160
-
-                $revealBorder = New-Object System.Windows.Controls.Border
-                $revealBorder.BorderBrush = $revealBorderBrush
-                $revealBorder.BorderThickness = New-Object System.Windows.Thickness(1.5)
-                $revealBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
-                $revealBorder.IsHitTestVisible = $false
-                
-                $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
-
-                # Hover Effects
-                $card.Add_MouseEnter({ 
-                        param($evtSender, $e)
-                        if ($evtSender -ne $script:selectedCard) {
-                            $evtSender.Background = $cardHoverBg
-                        }
-                    
-                        $evtSender.Effect.BlurRadius = 25
-                        $evtSender.Effect.ShadowDepth = 8
-
-                        $grid = $evtSender.Child
-                        if ($grid -and $grid.Children.Count -gt 1) {
-                            $grid.Children[1].Opacity = 1
-                        }
-                    })
-
-                $card.Add_MouseLeave({ 
-                        param($evtSender, $e)
-                        if ($evtSender -ne $script:selectedCard) {
-                            $evtSender.Background = $cardUnselectedBg
-                        }
-                        else {
-                            Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
-                        }
-
-                        $evtSender.Effect.BlurRadius = 10
-                        $evtSender.Effect.ShadowDepth = 2
-                        $evtSender.Effect.Opacity = 0.3
-
-                        $grid = $evtSender.Child
-                        if ($grid -and $grid.Children.Count -gt 1) {
-                            $grid.Children[1].Opacity = 0
-                        }
-                    })
-
-                $stack = New-Object System.Windows.Controls.StackPanel
-                $stack.IsHitTestVisible = $false
-
-                $cardGrid = New-Object System.Windows.Controls.Grid
-                $cardGrid.Children.Add($stack)
-                $cardGrid.Children.Add($revealRect)
-                $cardGrid.Children.Add($revealBorder)
-                
-                $card.Child = $cardGrid
-
-                # Image Container
-                $imgBorder = New-Object System.Windows.Controls.Border
-                $imgBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
-                $imgBorder.ClipToBounds = $true
-                $imgBorder.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20)))
-
-                $imageControl = New-Object System.Windows.Controls.Image
-                $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
-                $imgBorder.Child = $imageControl
-
-                $stack.Children.Add($imgBorder)
-
-                # Load thumbnail from pre-downloaded disk cache (0ms network delay!)
+                $images = @()
+                $isSuccess = $false
+                $errorMsg = $null
                 try {
-                    $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
-                    $thumbCachePath = Join-Path $thumbCacheDir "${safeName}_thumb.jpg"
-                    if (Test-Path -LiteralPath $thumbCachePath) {
-                        $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
-                        $bitmap.BeginInit()
-                        $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
-                        $bitmap.DecodePixelWidth = 360
-                        $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
-                        $bitmap.EndInit()
-                        $bitmap.Freeze()
-
-                        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
-                        $imageControl.Source = $bitmap
-                        $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
-                    }
-                }
-                catch {}
-
-                # Details Setup
-                $details = New-Object System.Windows.Controls.StackPanel
-                $details.Margin = New-Object System.Windows.Thickness(14, 10, 14, 12)
-
-                $title = New-Object System.Windows.Controls.TextBlock
-                $title.Text = $displayTitle
-                $title.Foreground = [System.Windows.Media.Brushes]::White
-                $title.FontSize = 15
-                $title.FontWeight = [System.Windows.FontWeights]::SemiBold
-                $title.TextTrimming = 'CharacterEllipsis'
-                $title.Margin = New-Object System.Windows.Thickness(0, 0, 0, 4)
-                $details.Children.Add($title)
-
-                $date = New-Object System.Windows.Controls.TextBlock
-                try {
-                    $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    $images = if ($res -and $res.Images) { @($res.Images) } else { @() }
+                    $errorMsg = if ($res) { $res.Error } else { "Failed to load wallpapers." }
                 }
                 catch {
-                    $date.Text = "Bing Wallpaper"
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
                 }
-                $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
-                $date.FontSize = 13.5
-                $details.Children.Add($date)
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                }
 
-                $card.Resources.Add('TitleText', $title)
-                $card.Resources.Add('DateText', $date)
+                if (-not $isSuccess -or $images.Count -eq 0) {
+                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                    $StatusText.Opacity = 1
+                    $StatusText.Foreground = $statusErrorBrush
+                    $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+                    return
+                }
 
-                # Details Container with layered shimmer overlay
-                $detailsContainer = New-Object System.Windows.Controls.Grid
-                $detailsContainer.ClipToBounds = $true
-                $detailsContainer.Children.Add($details)
+                $script:loadedImages = $images
+                $total = $images.Count
+                $thumbCacheDir = $ctx.ThumbCacheDir
 
-                $shimmerOverlay = New-Object System.Windows.Controls.Border
-                $shimmerOverlay.Width = 130
-                $shimmerOverlay.HorizontalAlignment = 'Left'
-                $shimmerOverlay.IsHitTestVisible = $false
-                $shimmerOverlay.Opacity = 0
+                $current = 0
+                $firstCard = $null
+                foreach ($image in $images) {
+                    $current++
+                    $displayTitle = Get-CleanImageTitle $image
 
-                $shimmerBrush = New-Object System.Windows.Media.LinearGradientBrush
-                $shimmerBrush.StartPoint = New-Object System.Windows.Point(0, 0.5)
-                $shimmerBrush.EndPoint = New-Object System.Windows.Point(1, 0.5)
-                $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 0.0)))
-                $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(75, 255, 255, 255), 0.5)))
-                $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 1.0)))
-                $shimmerOverlay.Background = $shimmerBrush
+                    # Modern edge-to-edge flush Image Card
+                    $card = New-Object System.Windows.Controls.Border
+                    $card.Background = $cardUnselectedBg
+                    $card.CornerRadius = New-Object System.Windows.CornerRadius(12)
+                    $card.BorderThickness = New-Object System.Windows.Thickness(0)
+                    $card.ClipToBounds = $true
+                    $cardClip = New-Object System.Windows.Media.RectangleGeometry
+                    $cardClip.RadiusX = 12
+                    $cardClip.RadiusY = 12
+                    $card.Clip = $cardClip
+                    $card.Add_SizeChanged({
+                            param($evtSender, $e)
+                            $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
+                        })
+                    $card.Padding = New-Object System.Windows.Thickness(0)
+                    $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
+                    $card.Cursor = [System.Windows.Input.Cursors]::Hand
+                    $card.Tag = $image
+                    if ($image.copyright) {
+                        $card.ToolTip = "$displayTitle`n$($image.copyright)"
+                    }
+                
+                    # Subtle default drop shadow
+                    $shadow = New-Object System.Windows.Media.Effects.DropShadowEffect
+                    $shadow.Color = [System.Windows.Media.Colors]::Black
+                    $shadow.Direction = 270
+                    $shadow.ShadowDepth = 2
+                    $shadow.BlurRadius = 10
+                    $shadow.Opacity = 0.3
+                    $card.Effect = $shadow
 
-                $shimmerTransform = New-Object System.Windows.Media.TranslateTransform
-                $shimmerOverlay.RenderTransform = $shimmerTransform
-                $detailsContainer.Children.Add($shimmerOverlay)
+                    # Reveal Highlight Effect Setup
+                    $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
+                    $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+                    $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(28, 255, 255, 255), 0.0)))
+                    $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(14, 255, 255, 255), 0.4)))
+                    $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(4, 255, 255, 255), 0.75)))
+                    $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+                    $revealBrush.RadiusX = 180
+                    $revealBrush.RadiusY = 180
+                
+                    $revealRect = New-Object System.Windows.Shapes.Rectangle
+                    $revealRect.Fill = $revealBrush
+                    $revealRect.Opacity = 0
+                    $revealRect.IsHitTestVisible = $false
+                    $revealRect.RadiusX = 12
+                    $revealRect.RadiusY = 12
+                
+                    $script:revealElements.Add(@{ Element = $revealRect; Brush = $revealBrush }) | Out-Null
 
-                $card.Resources.Add('ShimmerOverlay', $shimmerOverlay)
-                $card.Resources.Add('ShimmerTransform', $shimmerTransform)
+                    $revealBorderBrush = New-Object System.Windows.Media.RadialGradientBrush
+                    $revealBorderBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+                    $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(90, 255, 255, 255), 0.0)))
+                    $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+                    $revealBorderBrush.RadiusX = 160
+                    $revealBorderBrush.RadiusY = 160
 
-                $stack.Children.Add($detailsContainer)
+                    $revealBorder = New-Object System.Windows.Controls.Border
+                    $revealBorder.BorderBrush = $revealBorderBrush
+                    $revealBorder.BorderThickness = New-Object System.Windows.Thickness(1.5)
+                    $revealBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
+                    $revealBorder.IsHitTestVisible = $false
+                
+                    $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
 
-                # Card Click Action: Select card on single click, apply on double click
-                $card.Add_MouseLeftButtonDown({
-                        param($evtSender, $e)
-                        $clickedImage = $evtSender.Tag 
-                        Select-Card $evtSender $clickedImage
+                    # Hover Effects
+                    $card.Add_MouseEnter({ 
+                            param($evtSender, $e)
+                            if ($evtSender -ne $script:selectedCard) {
+                                $evtSender.Background = $cardHoverBg
+                            }
+                    
+                            $evtSender.Effect.BlurRadius = 25
+                            $evtSender.Effect.ShadowDepth = 8
+
+                            $grid = $evtSender.Child
+                            if ($grid -and $grid.Children.Count -gt 1) {
+                                $grid.Children[1].Opacity = 1
+                            }
+                        })
+
+                    $card.Add_MouseLeave({ 
+                            param($evtSender, $e)
+                            if ($evtSender -ne $script:selectedCard) {
+                                $evtSender.Background = $cardUnselectedBg
+                            }
+                            else {
+                                Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
+                            }
+
+                            $evtSender.Effect.BlurRadius = 10
+                            $evtSender.Effect.ShadowDepth = 2
+                            $evtSender.Effect.Opacity = 0.3
+
+                            $grid = $evtSender.Child
+                            if ($grid -and $grid.Children.Count -gt 1) {
+                                $grid.Children[1].Opacity = 0
+                            }
+                        })
+
+                    $stack = New-Object System.Windows.Controls.StackPanel
+                    $stack.IsHitTestVisible = $false
+
+                    $cardGrid = New-Object System.Windows.Controls.Grid
+                    $cardGrid.Children.Add($stack)
+                    $cardGrid.Children.Add($revealRect)
+                    $cardGrid.Children.Add($revealBorder)
+                
+                    $card.Child = $cardGrid
+
+                    # Image Container
+                    $imgBorder = New-Object System.Windows.Controls.Border
+                    $imgBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
+                    $imgBorder.ClipToBounds = $true
+                    $imgBorder.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20)))
+
+                    $imageControl = New-Object System.Windows.Controls.Image
+                    $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
+                    $imgBorder.Child = $imageControl
+
+                    $stack.Children.Add($imgBorder)
+
+                    # Load thumbnail from pre-downloaded disk cache (0ms network delay!)
+                    try {
+                        $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
+                        $thumbCachePath = Join-Path $thumbCacheDir "${safeName}_thumb.jpg"
+                        if (Test-Path -LiteralPath $thumbCachePath) {
+                            $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
+                            $bitmap.BeginInit()
+                            $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
+                            $bitmap.DecodePixelWidth = 360
+                            $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+                            $bitmap.EndInit()
+                            $bitmap.Freeze()
+
+                            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                            $imageControl.Source = $bitmap
+                            $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+                        }
+                    }
+                    catch {}
+
+                    # Details Setup
+                    $details = New-Object System.Windows.Controls.StackPanel
+                    $details.Margin = New-Object System.Windows.Thickness(14, 10, 14, 12)
+
+                    $title = New-Object System.Windows.Controls.TextBlock
+                    $title.Text = $displayTitle
+                    $title.Foreground = [System.Windows.Media.Brushes]::White
+                    $title.FontSize = 15
+                    $title.FontWeight = [System.Windows.FontWeights]::SemiBold
+                    $title.TextTrimming = 'CharacterEllipsis'
+                    $title.Margin = New-Object System.Windows.Thickness(0, 0, 0, 4)
+                    $details.Children.Add($title)
+
+                    $date = New-Object System.Windows.Controls.TextBlock
+                    try {
+                        $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
+                    }
+                    catch {
+                        $date.Text = "Bing Wallpaper"
+                    }
+                    $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
+                    $date.FontSize = 13.5
+                    $details.Children.Add($date)
+
+                    $card.Resources.Add('TitleText', $title)
+                    $card.Resources.Add('DateText', $date)
+
+                    # Details Container with layered shimmer overlay
+                    $detailsContainer = New-Object System.Windows.Controls.Grid
+                    $detailsContainer.ClipToBounds = $true
+                    $detailsContainer.Children.Add($details)
+
+                    $shimmerOverlay = New-Object System.Windows.Controls.Border
+                    $shimmerOverlay.Width = 130
+                    $shimmerOverlay.HorizontalAlignment = 'Left'
+                    $shimmerOverlay.IsHitTestVisible = $false
+                    $shimmerOverlay.Opacity = 0
+
+                    $shimmerBrush = New-Object System.Windows.Media.LinearGradientBrush
+                    $shimmerBrush.StartPoint = New-Object System.Windows.Point(0, 0.5)
+                    $shimmerBrush.EndPoint = New-Object System.Windows.Point(1, 0.5)
+                    $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 0.0)))
+                    $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(75, 255, 255, 255), 0.5)))
+                    $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 1.0)))
+                    $shimmerOverlay.Background = $shimmerBrush
+
+                    $shimmerTransform = New-Object System.Windows.Media.TranslateTransform
+                    $shimmerOverlay.RenderTransform = $shimmerTransform
+                    $detailsContainer.Children.Add($shimmerOverlay)
+
+                    $card.Resources.Add('ShimmerOverlay', $shimmerOverlay)
+                    $card.Resources.Add('ShimmerTransform', $shimmerTransform)
+
+                    $stack.Children.Add($detailsContainer)
+
+                    # Card Click Action: Select card on single click, apply on double click
+                    $card.Add_MouseLeftButtonDown({
+                            param($evtSender, $e)
+                            $clickedImage = $evtSender.Tag 
+                            Select-Card $evtSender $clickedImage
                         
-                        if ($e.ClickCount -eq 2) {
-                            Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
+                            if ($e.ClickCount -eq 2) {
+                                Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
+                            }
+                        })
+
+                    $GalleryPanel.Children.Add($card)
+                    if (-not $firstCard) { $firstCard = $card }
+                
+                    # Stagger the animation by 35ms per card for a cascading effect
+                    $staggerDelay = ($current - 1) * 35
+                    Show-GalleryCard -Card $card -DelayMs $staggerDelay
+                }
+
+                if ($firstCard -and $images.Count -gt 0) {
+                    Select-Card $firstCard $images[0]
+                }
+
+                if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
+                [BingWallpaperNative]::FlushMemory()
+            
+                # Animate the status text to count up synchronously with the card cascade animation
+                $script:loadingCounter = 0
+                $script:loadingTotal = $total
+            
+                if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+                $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
+                $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
+                $script:loadingStatusTimer.Add_Tick({
+                        $script:loadingCounter++
+                        if ($script:loadingCounter -le $script:loadingTotal) {
+                            $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
+                        }
+                        else {
+                            $script:loadingStatusTimer.Stop()
+                            Restore-StatusTextDefaultWithFade
                         }
                     })
-
-                $GalleryPanel.Children.Add($card)
-                if (-not $firstCard) { $firstCard = $card }
-                
-                # Stagger the animation by 35ms per card for a cascading effect
-                $staggerDelay = ($current - 1) * 35
-                Show-GalleryCard -Card $card -DelayMs $staggerDelay
+                $script:loadingStatusTimer.Start()
             }
-
-            if ($firstCard -and $images.Count -gt 0) {
-                Select-Card $firstCard $images[0]
-            }
-
-            if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
-            [BingWallpaperNative]::FlushMemory()
-            
-            # Animate the status text to count up synchronously with the card cascade animation
-            $script:loadingCounter = 0
-            $script:loadingTotal = $total
-            
-            if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
-            $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
-            $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
-            $script:loadingStatusTimer.Add_Tick({
-                    $script:loadingCounter++
-                    if ($script:loadingCounter -le $script:loadingTotal) {
-                        $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
-                    }
-                    else {
-                        $script:loadingStatusTimer.Stop()
-                        Restore-StatusTextDefaultWithFade
-                    }
-                })
-            $script:loadingStatusTimer.Start()
-        }
-    })
+        })
     $script:galleryTimer.Start()
 }
 
@@ -3473,28 +3686,28 @@ $DownloadBtn.Add_Click({
         # Execute network download asynchronously in background runspace so UI NEVER freezes
         $ps = [powershell]::Create()
         [void]$ps.AddScript({
-            param([string]$Uri, [string]$Temp, [string]$Dest)
-            try {
-                $wc = New-Object System.Net.WebClient
-                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                $wc.DownloadFile($Uri, $Temp)
-                $wc.Dispose()
-                if (Test-Path -LiteralPath $Temp) {
-                    if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
-                    Move-Item -LiteralPath $Temp -Destination $Dest -Force
+                param([string]$Uri, [string]$Temp, [string]$Dest)
+                try {
+                    $wc = New-Object System.Net.WebClient
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $wc.DownloadFile($Uri, $Temp)
+                    $wc.Dispose()
+                    if (Test-Path -LiteralPath $Temp) {
+                        if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+                        Move-Item -LiteralPath $Temp -Destination $Dest -Force
+                    }
+                    return @{ Success = $true; Error = $null }
                 }
-                return @{ Success = $true; Error = $null }
-            }
-            catch {
-                return @{ Success = $false; Error = $_.Exception.Message }
-            }
-        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath)
+                catch {
+                    return @{ Success = $false; Error = $_.Exception.Message }
+                }
+            }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath)
 
         $asyncOp = $ps.BeginInvoke()
 
         $script:dlContext = @{
-            PS = $ps
-            AsyncOp = $asyncOp
+            PS         = $ps
+            AsyncOp    = $asyncOp
             TargetCard = $targetCard
         }
 
@@ -3506,50 +3719,50 @@ $DownloadBtn.Add_Click({
         $script:downloadTimer = New-Object System.Windows.Threading.DispatcherTimer
         $script:downloadTimer.Interval = [TimeSpan]::FromMilliseconds(30)
         $script:downloadTimer.Add_Tick({
-            param($timerSender, $timerArgs)
-            if (-not $script:dlContext) {
-                $timerSender.Stop()
-                return
-            }
-            if ($script:dlContext.AsyncOp.IsCompleted) {
-                $timerSender.Stop()
-                $ctx = $script:dlContext
-                $script:dlContext = $null
-                $script:downloadTimer = $null
-
-                $isSuccess = $false
-                $errorMsg = $null
-                try {
-                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                    $isSuccess = ($res -and $res.Success -eq $true)
-                    $errorMsg = if ($res) { $res.Error } else { $null }
+                param($timerSender, $timerArgs)
+                if (-not $script:dlContext) {
+                    $timerSender.Stop()
+                    return
                 }
-                catch {
+                if ($script:dlContext.AsyncOp.IsCompleted) {
+                    $timerSender.Stop()
+                    $ctx = $script:dlContext
+                    $script:dlContext = $null
+                    $script:downloadTimer = $null
+
                     $isSuccess = $false
-                    $errorMsg = $_.Exception.Message
-                }
-                finally {
-                    try { $ctx.PS.Dispose() } catch {}
-                    $UpdateBtn.IsEnabled = $true
-                    $DownloadBtn.IsEnabled = $true
-                }
+                    $errorMsg = $null
+                    try {
+                        $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                        $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                        $isSuccess = ($res -and $res.Success -eq $true)
+                        $errorMsg = if ($res) { $res.Error } else { $null }
+                    }
+                    catch {
+                        $isSuccess = $false
+                        $errorMsg = $_.Exception.Message
+                    }
+                    finally {
+                        try { $ctx.PS.Dispose() } catch {}
+                        $UpdateBtn.IsEnabled = $true
+                        $DownloadBtn.IsEnabled = $true
+                    }
 
-                if ($isSuccess) {
-                    if ($ctx.TargetCard) {
-                        Stop-CardDownloadAnimation $ctx.TargetCard $true
+                    if ($isSuccess) {
+                        if ($ctx.TargetCard) {
+                            Stop-CardDownloadAnimation $ctx.TargetCard $true
+                        }
+                        Set-TransientStatus -Message "Wallpaper downloaded"
                     }
-                    Set-TransientStatus -Message "Wallpaper downloaded"
-                }
-                else {
-                    if ($ctx.TargetCard) {
-                        Stop-CardDownloadAnimation $ctx.TargetCard $false
+                    else {
+                        if ($ctx.TargetCard) {
+                            Stop-CardDownloadAnimation $ctx.TargetCard $false
+                        }
+                        $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download wallpaper"
+                        Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
                     }
-                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download wallpaper"
-                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
                 }
-            }
-        })
+            })
         $script:downloadTimer.Start()
     })
 
@@ -3641,7 +3854,177 @@ $window.Add_ContentRendered({
         Load-Gallery 
     })
 
+# =========================================================
+# User Guide Modal Overlay Functions & Events
+# =========================================================
+$script:isGuideAnimating = $false
+$script:guideRevealsInitialized = $false
+
+function Open-UserGuide {
+    if ($script:isGuideAnimating) { return }
+    if (-not $ModalOverlay -or -not $UserGuideModal -or -not $ModalBackdrop) { return }
+    if ($ModalOverlay.Visibility -eq [System.Windows.Visibility]::Visible) { return }
+
+    $script:isGuideAnimating = $true
+    $ModalOverlay.Visibility = [System.Windows.Visibility]::Visible
+
+    if (-not $script:guideRevealsInitialized) {
+        try {
+            Find-RevealBorders $UserGuideModal
+            $script:guideRevealsInitialized = $true
+        } catch {}
+    }
+
+    # Set initial visual state
+    $ModalBackdrop.Opacity = 0.0
+    $UserGuideModal.Opacity = 0.0
+
+    $transformGroup = [System.Windows.Media.TransformGroup]$UserGuideModal.RenderTransform
+    $scaleTransform = [System.Windows.Media.ScaleTransform]$transformGroup.Children[0]
+    $translateTransform = [System.Windows.Media.TranslateTransform]$transformGroup.Children[1]
+
+    $scaleTransform.ScaleX = 0.94
+    $scaleTransform.ScaleY = 0.94
+    $translateTransform.Y = 16
+
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(240))
+
+    $backdropFade = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
+    $backdropFade.EasingFunction = $ease
+
+    $modalFade = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
+    $modalFade.EasingFunction = $ease
+
+    $modalScaleX = New-Object System.Windows.Media.Animation.DoubleAnimation(0.94, 1.0, $duration)
+    $modalScaleX.EasingFunction = $ease
+    $modalScaleY = New-Object System.Windows.Media.Animation.DoubleAnimation(0.94, 1.0, $duration)
+    $modalScaleY.EasingFunction = $ease
+
+    $modalTranslateY = New-Object System.Windows.Media.Animation.DoubleAnimation(16, 0, $duration)
+    $modalTranslateY.EasingFunction = $ease
+
+    $modalFade.Add_Completed({
+        $script:isGuideAnimating = $false
+    })
+
+    $ModalBackdrop.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $backdropFade)
+    $UserGuideModal.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $modalFade)
+    $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $modalScaleX)
+    $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $modalScaleY)
+    $translateTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $modalTranslateY)
+}
+
+function Close-UserGuide {
+    if ($script:isGuideAnimating) { return }
+    if (-not $ModalOverlay -or -not $UserGuideModal -or -not $ModalBackdrop) { return }
+    if ($ModalOverlay.Visibility -ne [System.Windows.Visibility]::Visible) { return }
+
+    $script:isGuideAnimating = $true
+
+    $transformGroup = [System.Windows.Media.TransformGroup]$UserGuideModal.RenderTransform
+    $scaleTransform = [System.Windows.Media.ScaleTransform]$transformGroup.Children[0]
+    $translateTransform = [System.Windows.Media.TranslateTransform]$transformGroup.Children[1]
+
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseIn
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180))
+
+    $backdropFade = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, $duration)
+    $backdropFade.EasingFunction = $ease
+
+    $modalFade = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, $duration)
+    $modalFade.EasingFunction = $ease
+
+    $modalScaleX = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.94, $duration)
+    $modalScaleX.EasingFunction = $ease
+    $modalScaleY = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.94, $duration)
+    $modalScaleY.EasingFunction = $ease
+
+    $modalTranslateY = New-Object System.Windows.Media.Animation.DoubleAnimation(0, 16, $duration)
+    $modalTranslateY.EasingFunction = $ease
+
+    $backdropFade.Add_Completed({
+        $ModalOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+        $ModalBackdrop.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $UserGuideModal.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $null)
+        $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $null)
+        $translateTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $null)
+        $script:isGuideAnimating = $false
+    })
+
+    $ModalBackdrop.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $backdropFade)
+    $UserGuideModal.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $modalFade)
+    $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $modalScaleX)
+    $scaleTransform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $modalScaleY)
+    $translateTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $modalTranslateY)
+}
+
+# Backdrop click closes modal
+if ($ModalBackdrop) {
+    $ModalBackdrop.Add_MouseLeftButtonDown({
+        Close-UserGuide
+    })
+}
+
+# Modal card click does not close modal (swallow click)
+if ($UserGuideModal) {
+    $UserGuideModal.Add_MouseLeftButtonDown({
+        param($s, $e)
+        $e.Handled = $true
+    })
+}
+
+# Header Info / User Guide button opens modal
+if ($GuideBtn) {
+    $GuideBtn.Add_Click({
+        Open-UserGuide
+    })
+}
+
+# Modal X Close button
+if ($GuideCloseBtn) {
+    $GuideCloseBtn.Add_Click({
+        Close-UserGuide
+    })
+}
+
+# Modal Got It button
+if ($GuideDoneBtn) {
+    $GuideDoneBtn.Add_Click({
+        Close-UserGuide
+    })
+}
+
+# Modal Check for Updates button
+if ($GuideCheckUpdateBtn) {
+    $GuideCheckUpdateBtn.Add_Click({
+        Close-UserGuide
+        Start-VerifiedUpdate
+    })
+}
+
+# Escape key closes modal
+$window.Add_KeyDown({
+    param($s, $e)
+    if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
+        if ($ModalOverlay -and $ModalOverlay.Visibility -eq [System.Windows.Visibility]::Visible) {
+            Close-UserGuide
+            $e.Handled = $true
+        }
+    }
+})
+
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
+
+
 
 
