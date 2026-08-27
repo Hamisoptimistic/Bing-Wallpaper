@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.153'
+$script:appVersion = [Version]'1.0.154'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -2745,8 +2745,8 @@ function Show-ModernDialog {
             $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
             $fadeOut.EasingFunction = $ease
             $fadeOut.Add_Completed({
-                try { $dlg.Close() } catch {}
-            })
+                    try { $dlg.Close() } catch {}
+                })
             $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
         }
         else {
@@ -2816,7 +2816,7 @@ function Show-ModernDialog {
             Set-AppDimState $false -Force $true
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
                 [System.Windows.Threading.DispatcherPriority]::ApplicationIdle,
-                [Action]{ [BingWallpaperNative]::FlushMemory() }
+                [Action] { [BingWallpaperNative]::FlushMemory() }
             ) | Out-Null
         })
 
@@ -3874,9 +3874,9 @@ function Close-UserGuideDialog {
             $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
             $fadeOut.EasingFunction = $ease
             $fadeOut.Add_Completed({
-                try { $dlg.Close() } catch {}
-                $script:isClosingGuideDialog = $false
-            })
+                    try { $dlg.Close() } catch {}
+                    $script:isClosingGuideDialog = $false
+                })
             $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
         }
         else {
@@ -4369,7 +4369,7 @@ function Show-UserGuideDialog {
             }
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
                 [System.Windows.Threading.DispatcherPriority]::ApplicationIdle,
-                [Action]{ [BingWallpaperNative]::FlushMemory() }
+                [Action] { [BingWallpaperNative]::FlushMemory() }
             ) | Out-Null
         })
 
@@ -4482,6 +4482,7 @@ $script:memTrimTimer.Start()
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
 
 
