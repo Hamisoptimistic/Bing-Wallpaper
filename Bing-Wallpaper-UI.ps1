@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.120'
+$script:appVersion = [Version]'1.0.121'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1139,6 +1139,7 @@ if ($AutoApply) {
         <Grid Grid.Row="1" Margin="0,0,0,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="120"/>
                 <ColumnDefinition Width="120"/>
                 <ColumnDefinition Width="120"/>
@@ -1150,53 +1151,50 @@ if ($AutoApply) {
             
             <StackPanel Grid.Column="0" Margin="0,0,16,0">
                 <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <Grid Height="38">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <ComboBox Name="RegionBox" FontSize="13.5" Height="38"/>
-                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Grid.Column="1" Width="38" Height="38" Margin="8,0,0,0" ToolTip="Refresh Gallery">
-                        <Viewbox Width="19" Height="19" Margin="0,2,0,0">
-                            <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
-                                <Canvas.RenderTransform>
-                                <RotateTransform/>
-                                </Canvas.RenderTransform>
-                                <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                <Path Data="M18.5,5 V10 H13.5"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                            </Canvas>
-                        </Viewbox>
-                    </Button>
-                </Grid>
+                <ComboBox Name="RegionBox" FontSize="13.5" Height="38"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Margin="0,0,16,0" VerticalAlignment="Bottom">
+                <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
+                    <Viewbox Width="19" Height="19" Margin="0,2,0,0">
+                        <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+                            <Canvas.RenderTransform>
+                            <RotateTransform/>
+                            </Canvas.RenderTransform>
+                            <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            <Path Data="M18.5,5 V10 H13.5"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                        </Canvas>
+                    </Viewbox>
+                </Button>
             </StackPanel>
             
-            <StackPanel Grid.Column="1" Margin="0,0,16,0">
+            <StackPanel Grid.Column="2" Margin="0,0,16,0">
                 <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="2" Margin="0,0,16,0">
+            <StackPanel Grid.Column="3" Margin="0,0,16,0">
                 <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <ComboBox Name="TargetBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="3" Margin="0,0,16,0">
+            <StackPanel Grid.Column="4" Margin="0,0,16,0">
                 <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
             <!-- Save Image To -->
-            <StackPanel Grid.Column="4" Margin="0,0,16,0">
+            <StackPanel Grid.Column="5" Margin="0,0,16,0">
                 <TextBlock Text="Save Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change save folder" />
             </StackPanel>
 
             <!-- Spotlight / Auto Wallpaper pill -->
-            <StackPanel Grid.Column="5" Margin="0,0,16,0">
+            <StackPanel Grid.Column="6" Margin="0,0,16,0">
                 <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <Grid Height="38" VerticalAlignment="Center">
                     <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
@@ -1216,7 +1214,7 @@ if ($AutoApply) {
             </StackPanel>
 
             <!-- Container for Every + Apply To options -->
-            <StackPanel Name="SpotlightOptionsContainer" Grid.Column="6" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
+            <StackPanel Name="SpotlightOptionsContainer" Grid.Column="7" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
                 <StackPanel Margin="0,0,16,0">
                     <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
@@ -1849,7 +1847,7 @@ function Update-SpotlightScheduledTaskAsync {
     $bgScriptPath = $script:SpotlightScriptPath
     $bgAppDataRoot = $env:LOCALAPPDATA
 
-    # Fire-and-forget background runspace ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â never blocks the UI thread / WPF animations
+    # Fire-and-forget background runspace -- never blocks the UI thread / WPF animations
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
             param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
@@ -2987,6 +2985,8 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
 
 
 
