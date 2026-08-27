@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.148'
+$script:appVersion = [Version]'1.0.149'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1037,7 +1037,7 @@ if ($AutoApply) {
                                    AllowsTransparency="True"
                                    Focusable="False">
                                 <Border Background="#1E1E1E" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
-                                    <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
+                                    <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
                                 </Border>
@@ -4373,38 +4373,18 @@ $window.Add_Closed({
         catch {}
     })
 
+# Keyboard shortcuts (F5 = Refresh wallpapers / gallery)
+$window.Add_PreviewKeyDown({
+        param($s, $e)
+        if ($e.Key -eq [System.Windows.Input.Key]::F5) {
+            $e.Handled = $true
+            Load-Gallery
+        }
+    })
+
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
