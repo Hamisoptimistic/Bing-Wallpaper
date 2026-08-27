@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.139'
+$script:appVersion = [Version]'1.0.140'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1195,12 +1195,7 @@ if ($AutoApply) {
 
             <!-- Header -->
             <Grid Margin="0,0,0,32">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <Border Background="#141212ff" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0">
                         <Viewbox Margin="9">
                             <Canvas Width="24" Height="24">
@@ -1213,12 +1208,6 @@ if ($AutoApply) {
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Bing Wallpaper" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,4"/>
                     </StackPanel>
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="40" Height="40" ToolTip="User Guide" Margin="0,0,4,0">
-                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#E0E0E0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Button>
                 </StackPanel>
             </Grid>
 
@@ -1310,6 +1299,13 @@ if ($AutoApply) {
                         <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                         <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
                     </StackPanel>
+                </StackPanel>
+
+                <!-- Far Right: User Guide Button -->
+                <StackPanel Grid.Column="8" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                    <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="User Guide">
+                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#E0E0E0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
                 </StackPanel>
             </Grid>
 
@@ -4110,6 +4106,7 @@ $window.Add_PreviewMouseDown({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
