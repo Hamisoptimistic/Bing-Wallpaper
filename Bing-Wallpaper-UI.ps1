@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.117'
+$script:appVersion = [Version]'1.0.118'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1244,12 +1244,7 @@ if ($AutoApply) {
             <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
             
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Name="CheckUpdateBtn" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update">
-                    <Grid>
-                        <TextBlock Name="UpdateBtnText" Text="Check for updates" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <Ellipse Name="UpdateBadgeDot" Width="8" Height="8" Fill="#F87171" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-12,0" Visibility="Collapsed" />
-                    </Grid>
-                </Button>
+                <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
                 <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
                 <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
             </StackPanel>
@@ -1431,8 +1426,6 @@ $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
-$UpdateBtnText = $window.FindName('UpdateBtnText')
-$UpdateBadgeDot = $window.FindName('UpdateBadgeDot')
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
 $SpotlightPill = $window.FindName('SpotlightPill')
@@ -1856,7 +1849,7 @@ function Update-SpotlightScheduledTaskAsync {
     $bgScriptPath = $script:SpotlightScriptPath
     $bgAppDataRoot = $env:LOCALAPPDATA
 
-    # Fire-and-forget background runspace ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â never blocks the UI thread / WPF animations
+    # Fire-and-forget background runspace ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â never blocks the UI thread / WPF animations
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
             param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
@@ -2371,46 +2364,6 @@ function Show-ModernDialog {
     return $script:dialogChoice
 }
 
-function Check-ForUpdatesInBackground {
-    # Capture the dispatcher on the UI thread before handing off to the background worker
-    $dispatcher = $window.Dispatcher
-    $repo = $script:updateRepository
-    $appVer = $script:appVersion
-
-    $worker = New-Object System.ComponentModel.BackgroundWorker
-    $worker.Add_DoWork({
-            param($sender, $e)
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-            $releaseUri = "https://api.github.com/repos/$($e.Argument)/releases/latest"
-            try {
-                $e.Result = $wc.DownloadString($releaseUri)
-            }
-            catch {
-                $e.Result = $null
-            }
-            $wc.Dispose()
-        })
-    $worker.Add_RunWorkerCompleted({
-            param($sender, $e)
-            if ($e.Result) {
-                try {
-                    $latestRel = $e.Result | ConvertFrom-Json
-                    $latestVersion = Get-ReleaseVersion -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-                    if ($latestVersion -gt $appVer) {
-                        # Must update WPF elements from the UI thread
-                        $dispatcher.Invoke([Action] {
-                                if ($UpdateBadgeDot) { $UpdateBadgeDot.Visibility = [System.Windows.Visibility]::Visible }
-                                if ($UpdateBtnText) { $UpdateBtnText.Text = 'Update Now' }
-                            })
-                    }
-                }
-                catch {}
-            }
-            $sender.Dispose()
-        })
-    $worker.RunWorkerAsync($repo)
-}
 
 function Start-VerifiedUpdate {
     $CheckUpdateBtn.IsEnabled = $false
@@ -3030,11 +2983,12 @@ $RefreshBtn.Add_Click({
     })
 $window.Add_ContentRendered({ 
         Load-Gallery 
-        Check-ForUpdatesInBackground
     })
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
 
 
 
