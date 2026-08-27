@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.140'
+$script:appVersion = [Version]'1.0.141'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1331,12 +1331,25 @@ if ($AutoApply) {
                 </StackPanel>
             </Grid>
         </Grid>
+
+        <!-- Modal Backdrop Dim Layer -->
+        <Border Name="ModalDimOverlay" Background="#000000" Opacity="0" IsHitTestVisible="False"/>
     </Grid>
 </Window>
 "@
 
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
+
+# Ensure WPF application lifetime is controlled explicitly so closing child dialogs never closes the main app
+if (-not [System.Windows.Application]::Current) {
+    $script:wpfApp = New-Object System.Windows.Application
+    $script:wpfApp.ShutdownMode = [System.Windows.ShutdownMode]::OnExplicitShutdown
+} else {
+    $script:wpfApp = [System.Windows.Application]::Current
+    $script:wpfApp.ShutdownMode = [System.Windows.ShutdownMode]::OnExplicitShutdown
+}
+$script:wpfApp.MainWindow = $window
 
 #TEST
 
@@ -1527,6 +1540,24 @@ $SpotlightOptionsContainer = $window.FindName('SpotlightOptionsContainer')
 $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 $GuideBtn = $window.FindName('GuideBtn')
+$ModalDimOverlay = $window.FindName('ModalDimOverlay')
+
+function Set-AppDimState {
+    param([bool]$Dim)
+    if (-not $ModalDimOverlay) { return }
+    # If undimming is requested, retain dimming if the User Guide modal is still active/visible
+    if (-not $Dim) {
+        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+            return
+        }
+    }
+    $targetOpacity = if ($Dim) { 0.55 } else { 0.0 }
+    $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220))
+    $anim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetOpacity, $dur
+    $anim.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
+    $anim.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $anim)
+}
 
 # Helper to force UI redraw during blocking network calls
 function Update-UI {
@@ -2549,7 +2580,17 @@ function Show-ModernDialog {
 
     $r = New-Object System.Xml.XmlNodeReader ([xml]$dialogXaml)
     $dlg = [Windows.Markup.XamlReader]::Load($r)
-    if ($ParentWindow) { $dlg.Owner = $ParentWindow }
+    
+    $resolvedOwner = if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+        $script:activeGuideDialog
+    } elseif ($ParentWindow -and $ParentWindow.IsVisible) {
+        $ParentWindow
+    } else {
+        $window
+    }
+    if ($resolvedOwner -and $resolvedOwner.IsVisible) {
+        $dlg.Owner = $resolvedOwner
+    }
 
     # Set authentic Bing icon for dialog titlebar
     if ($window -and $window.Icon) {
@@ -2658,6 +2699,14 @@ function Show-ModernDialog {
                 $dlg.Close()
             })
         $buttonPanel.Children.Add($btnOk) | Out-Null
+    }
+
+    $dlg.Add_Closed({
+            Set-AppDimState $false
+        })
+
+    if ($ParentWindow -eq $window) {
+        Set-AppDimState $true
     }
 
     $dlg.ShowDialog() | Out-Null
@@ -3831,6 +3880,7 @@ function Show-UserGuideDialog {
                             <TextBlock Text="Default Behavior" FontSize="18" FontWeight="Bold" Foreground="#0078D4" Margin="0,0,0,16"/>
                             
                             <TextBlock Text="4K resolution is used by default" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
+                            <TextBlock Text="Everyday wallpaper changes automatically at 12am" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
                             <TextBlock Text="Fit is the default wallpaper style" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
                             <TextBlock Text="Your country is selected by default" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
                             <TextBlock Text="Wallpapers change hourly by default and use your location" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20"/>
@@ -4060,7 +4110,6 @@ function Show-UserGuideDialog {
     $btnUpdate = $dlg.FindName('GuideCheckUpdateBtn')
     if ($btnUpdate) {
         $btnUpdate.Add_Click({
-                $dlg.Close()
                 Start-VerifiedUpdate
             })
     }
@@ -4070,6 +4119,7 @@ function Show-UserGuideDialog {
 
     $dlg.Add_Closed({
             $script:activeGuideDialog = $null
+            Set-AppDimState $false
         })
 
     $dlg.Add_KeyDown({
@@ -4082,6 +4132,7 @@ function Show-UserGuideDialog {
             }
         })
 
+    Set-AppDimState $true
     $dlg.Show()
 }
 
@@ -4104,8 +4155,23 @@ $window.Add_PreviewMouseDown({
         }
     })
 
+$window.Add_Closed({
+        try {
+            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+                $script:activeGuideDialog.Close()
+            }
+            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
+        }
+        catch {}
+    })
+
 # Show the app
-$window.ShowDialog() | Out-Null
+$window.Show()
+[System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
 
 
 
