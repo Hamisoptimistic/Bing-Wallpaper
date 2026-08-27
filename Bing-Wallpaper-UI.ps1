@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.116'
+$script:appVersion = [Version]'1.0.117'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1138,10 +1138,12 @@ if ($AutoApply) {
         <!-- Settings Cards -->
         <Grid Grid.Row="1" Margin="0,0,0,24">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200"/>
                 <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
@@ -1187,43 +1189,42 @@ if ($AutoApply) {
                 <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
-            <!-- Spotlight / Auto Wallpaper pill + options (inline, next to Style) -->
-            <StackPanel Grid.Column="4" Orientation="Horizontal">
-                <StackPanel Margin="0,0,16,0">
-                    <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <Grid Height="38" VerticalAlignment="Center">
-                        <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
-                                Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
-                                Cursor="Hand" VerticalAlignment="Center">
-                            <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
-                            </Border.Effect>
-                            <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
-                                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
-                                <Ellipse.RenderTransform>
-                                    <TranslateTransform X="0" Y="0"/>
-                                </Ellipse.RenderTransform>
-                            </Ellipse>
-                        </Border>
-                    </Grid>
-                </StackPanel>
-
-                <!-- Container for Every + Apply To options -->
-                <StackPanel Name="SpotlightOptionsContainer" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
-                    <StackPanel Margin="0,0,16,0">
-                        <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,16,0">
-                        <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
-                    </StackPanel>
-                </StackPanel>
-            </StackPanel>
-
-            <StackPanel Grid.Column="5">
+            <!-- Save Image To -->
+            <StackPanel Grid.Column="4" Margin="0,0,16,0">
                 <TextBlock Text="Save Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                 <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change save folder" />
+            </StackPanel>
+
+            <!-- Spotlight / Auto Wallpaper pill -->
+            <StackPanel Grid.Column="5" Margin="0,0,16,0">
+                <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                <Grid Height="38" VerticalAlignment="Center">
+                    <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
+                            Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
+                            Cursor="Hand" VerticalAlignment="Center">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
+                        </Border.Effect>
+                        <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
+                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform X="0" Y="0"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Border>
+                </Grid>
+            </StackPanel>
+
+            <!-- Container for Every + Apply To options -->
+            <StackPanel Name="SpotlightOptionsContainer" Grid.Column="6" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
+                </StackPanel>
+                <StackPanel Margin="0,0,0,0">
+                    <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="120" Height="38"/>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
@@ -1849,75 +1850,75 @@ function Update-SpotlightScheduledTaskAsync {
     param([bool]$Enable)
 
     # Snapshot all UI-thread values NOW before handing off to background
-    $bgEnable      = $Enable
-    $bgMinutes     = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
-    $bgTarget      = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { [string]$SpotlightTargetBox.SelectedItem } else { 'Both' }
-    $bgScriptPath  = $script:SpotlightScriptPath
+    $bgEnable = $Enable
+    $bgMinutes = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
+    $bgTarget = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { [string]$SpotlightTargetBox.SelectedItem } else { 'Both' }
+    $bgScriptPath = $script:SpotlightScriptPath
     $bgAppDataRoot = $env:LOCALAPPDATA
 
-    # Fire-and-forget background runspace â€” never blocks the UI thread / WPF animations
+    # Fire-and-forget background runspace ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â never blocks the UI thread / WPF animations
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
-        try {
-            if ($Enable) {
-                $appDataDir = Join-Path $AppDataRoot 'BingWallpaper'
-                if (-not (Test-Path -LiteralPath $appDataDir)) {
-                    New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
-                }
+            param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
+            try {
+                if ($Enable) {
+                    $appDataDir = Join-Path $AppDataRoot 'BingWallpaper'
+                    if (-not (Test-Path -LiteralPath $appDataDir)) {
+                        New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
+                    }
 
-                # Copy the current running script to a persistent AppData location so background tasks always find it
-                $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
-                if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                    try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
-                }
+                    # Copy the current running script to a persistent AppData location so background tasks always find it
+                    $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
+                    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                        try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                    }
 
-                # Remove any legacy cmd wrappers that cause console popups
-                $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
-                if (Test-Path -LiteralPath $legacyCmd) {
-                    Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
-                }
+                    # Remove any legacy cmd wrappers that cause console popups
+                    $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
+                    if (Test-Path -LiteralPath $legacyCmd) {
+                        Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
+                    }
 
-                # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
-                $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
-                $vbsCode = @"
+                    # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
+                    $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
+                    $vbsCode = @"
 Set objShell = WScript.CreateObject("WScript.Shell")
 scriptPath = WScript.Arguments(0)
 target = WScript.Arguments(1)
 cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & scriptPath & """ -AutoApply -Target """ & target & """"
 objShell.Run cmd, 0, False
 "@
-                Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
+                    Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
 
-                $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
-                $action   = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
-                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+                    $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
+                    $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
+                    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
-                if ($Minutes -eq 0) {
-                    $trigger = New-ScheduledTaskTrigger -AtLogOn
-                }
-                elseif ($Minutes -le 1) {
-                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
-                }
-                elseif ($Minutes -lt 60) {
-                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
-                }
-                elseif ($Minutes -lt 1440) {
-                    $hours = [math]::Max(1, [int]($Minutes / 60))
-                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+                    if ($Minutes -eq 0) {
+                        $trigger = New-ScheduledTaskTrigger -AtLogOn
+                    }
+                    elseif ($Minutes -le 1) {
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
+                    }
+                    elseif ($Minutes -lt 60) {
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
+                    }
+                    elseif ($Minutes -lt 1440) {
+                        $hours = [math]::Max(1, [int]($Minutes / 60))
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+                    }
+                    else {
+                        $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
+                    }
+
+                    Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
                 }
                 else {
-                    $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
+                    Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
                 }
-
-                Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
             }
-            else {
-                Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
-            }
-        }
-        catch {}
-    }).AddArgument($bgEnable).AddArgument($bgMinutes).AddArgument($bgTarget).AddArgument($bgScriptPath).AddArgument($bgAppDataRoot)
+            catch {}
+        }).AddArgument($bgEnable).AddArgument($bgMinutes).AddArgument($bgTarget).AddArgument($bgScriptPath).AddArgument($bgAppDataRoot)
 
     $null = $ps.BeginInvoke()
 }
@@ -3034,6 +3035,10 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
+
 
 
 
