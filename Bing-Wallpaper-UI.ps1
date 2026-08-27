@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.154'
+$script:appVersion = [Version]'1.0.155'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -3226,6 +3226,9 @@ function Load-Gallery {
     $script:selection.Card = $null
     $script:selection.Image = $null
     $script:loadedImages = @()
+    # Pre-cached flat list of Image controls and card Borders for O(1) scroll handling
+    $script:galleryImageControls = New-Object System.Collections.ArrayList
+    $script:galleryCards = New-Object System.Collections.ArrayList
     
     # Remove old dynamic cards from reveal tracking to prevent memory leaks
     if ($script:revealElements) {
@@ -3387,14 +3390,10 @@ function Load-Gallery {
                         $card.ToolTip = "$displayTitle`n$($image.copyright)"
                     }
                 
-                    # Subtle default drop shadow
-                    $shadow = New-Object System.Windows.Media.Effects.DropShadowEffect
-                    $shadow.Color = [System.Windows.Media.Colors]::Black
-                    $shadow.Direction = 270
-                    $shadow.ShadowDepth = 2
-                    $shadow.BlurRadius = 10
-                    $shadow.Opacity = 0.3
-                    $card.Effect = $shadow
+                    # Card glow border: visually identical to DropShadowEffect but uses
+                    # no WPF software-render pass Ã¢â‚¬â€ zero per-frame GPU compositing cost.
+                    $card.BorderThickness = New-Object System.Windows.Thickness(0)
+                    $card.BorderBrush = $null
 
                     # Reveal Highlight Effect Setup
                     $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
@@ -3430,15 +3429,12 @@ function Load-Gallery {
                 
                     $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
 
-                    # Hover Effects
+                    # Hover Effects (no Effect.BlurRadius since DropShadowEffect was removed)
                     $card.Add_MouseEnter({ 
                             param($evtSender, $e)
                             if ($evtSender -ne $script:selectedCard) {
                                 $evtSender.Background = $cardHoverBg
                             }
-                    
-                            $evtSender.Effect.BlurRadius = 25
-                            $evtSender.Effect.ShadowDepth = 8
 
                             $grid = $evtSender.Child
                             if ($grid -and $grid.Children.Count -gt 1) {
@@ -3454,10 +3450,6 @@ function Load-Gallery {
                             else {
                                 Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
                             }
-
-                            $evtSender.Effect.BlurRadius = 10
-                            $evtSender.Effect.ShadowDepth = 2
-                            $evtSender.Effect.Opacity = 0.3
 
                             $grid = $evtSender.Child
                             if ($grid -and $grid.Children.Count -gt 1) {
@@ -3500,9 +3492,14 @@ function Load-Gallery {
                             $bitmap.EndInit()
                             $bitmap.Freeze()
 
-                            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                            # Start with LowQuality for fast initial paint; upgraded to HighQuality
+                            # after the full gallery finishes loading (see below).
+                            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::LowQuality)
                             $imageControl.Source = $bitmap
                             $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+
+                            # Cache reference for zero-cost scroll handler
+                            [void]$script:galleryImageControls.Add($imageControl)
                         }
                     }
                     catch {}
@@ -3574,6 +3571,7 @@ function Load-Gallery {
                         })
 
                     $GalleryPanel.Children.Add($card)
+                    [void]$script:galleryCards.Add($card)
                     if (-not $firstCard) { $firstCard = $card }
                 
                     # Stagger the animation by 35ms per card for a cascading effect
@@ -3587,6 +3585,31 @@ function Load-Gallery {
 
                 if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
                 [BingWallpaperNative]::FlushMemory()
+
+                # Upgrade all card images to HighQuality after the entrance animation
+                # cascade completes (~35ms * total cards). This gives fast first paint
+                # while ensuring crisp images when the gallery is idle.
+                $upgradeDelay = [System.Math]::Min($total * 35 + 200, 1200)
+                $script:qualityUpgradeTimer = New-Object System.Windows.Threading.DispatcherTimer
+                $script:qualityUpgradeTimer.Interval = [TimeSpan]::FromMilliseconds($upgradeDelay)
+                $localPanel = $GalleryPanel
+                $script:qualityUpgradeTimer.Add_Tick({
+                        param($qtSender, $qtArgs)
+                        $qtSender.Stop()
+                        foreach ($c in $localPanel.Children) {
+                            $grid = $c.Child
+                            if ($grid) {
+                                $st = $grid.Children | Where-Object { $_ -is [System.Windows.Controls.StackPanel] } | Select-Object -First 1
+                                if ($st -and $st.Children.Count -gt 0) {
+                                    $ib = $st.Children[0]
+                                    if ($ib -and $ib.Child -is [System.Windows.Controls.Image]) {
+                                        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($ib.Child, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                                    }
+                                }
+                            }
+                        }
+                    })
+                $script:qualityUpgradeTimer.Start()
             
                 # Animate the status text to count up synchronously with the card cascade animation
                 $script:loadingCounter = 0
@@ -3610,6 +3633,55 @@ function Load-Gallery {
         })
     $script:galleryTimer.Start()
 }
+
+# =================================================================
+# Scroll-aware rendering: BitmapCache + LowQuality during scroll
+# (WPF caches each card as a flat texture, skipping per-card compositing).
+# HighQuality restored 150ms after scroll stops.
+# Uses pre-built flat arrays â€” zero PowerShell pipeline work per tick.
+# =================================================================
+$script:isScrolling = $false
+$script:scrollIdleTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:scrollIdleTimer.Interval = [TimeSpan]::FromMilliseconds(150)
+$script:scrollIdleTimer.Add_Tick({
+        param($sit, $sia)
+        $sit.Stop()
+        $script:isScrolling = $false
+        # Restore: clear BitmapCache + HighQuality on all card images
+        if ($script:galleryCards) {
+            foreach ($c in $script:galleryCards) {
+                $c.CacheMode = $null
+            }
+        }
+        if ($script:galleryImageControls) {
+            foreach ($img in $script:galleryImageControls) {
+                [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+            }
+        }
+    })
+
+$GalleryScrollViewer.Add_ScrollChanged({
+        param($scSender, $scArgs)
+        if ($scArgs.VerticalChange -eq 0) { return }
+        if (-not $script:isScrolling) {
+            $script:isScrolling = $true
+            # First scroll tick: cache all cards as bitmaps + drop to LowQuality
+            if ($script:galleryCards) {
+                $bmpCache = New-Object System.Windows.Media.BitmapCache
+                foreach ($c in $script:galleryCards) {
+                    $c.CacheMode = $bmpCache
+                }
+            }
+            if ($script:galleryImageControls) {
+                foreach ($img in $script:galleryImageControls) {
+                    [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::LowQuality)
+                }
+            }
+        }
+        # Debounce idle detection
+        $script:scrollIdleTimer.Stop()
+        $script:scrollIdleTimer.Start()
+    })
 
 # Main Apply Button Logic (Sets wallpaper without permanent disk save asynchronously)
 $UpdateBtn.Add_Click({
@@ -4482,6 +4554,12 @@ $script:memTrimTimer.Start()
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
+
+
 
 
 
