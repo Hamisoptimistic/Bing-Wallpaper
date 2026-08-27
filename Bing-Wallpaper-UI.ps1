@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.156'
+$script:appVersion = [Version]'1.0.157'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1456,8 +1456,8 @@ if ($AutoApply) {
             </Grid>
 
             <!-- Smooth Modern Gallery Container -->
-            <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True">
-                <ScrollViewer Name="GalleryScrollViewer" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
+            <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
+                <ScrollViewer Name="GalleryScrollViewer" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Top" FocusVisualStyle="{x:Null}">
                     <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
                 </ScrollViewer>
             </Border>
@@ -3195,6 +3195,19 @@ function Show-GalleryCard {
     $translate.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $slide)
 }
 
+function Update-GalleryViewportHeight {
+    if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0 -and $GalleryScrollViewer) {
+        $card = $GalleryPanel.Children[0]
+        if ($card.ActualHeight -gt 50) {
+            $rowHeight = $card.ActualHeight + 16
+            $twoRowsHeight = ($rowHeight * 2) - 16
+            if ($GalleryScrollViewer.MaxHeight -ne $twoRowsHeight) {
+                $GalleryScrollViewer.MaxHeight = $twoRowsHeight
+            }
+        }
+    }
+}
+
 # Load Gallery Function (100% Asynchronous with zero UI freeze)
 function Load-Gallery {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -3376,6 +3389,7 @@ function Load-Gallery {
                     $card.Add_SizeChanged({
                             param($evtSender, $e)
                             $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
+                            Update-GalleryViewportHeight
                         })
                     $card.Padding = New-Object System.Windows.Thickness(0)
                     $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
@@ -3386,7 +3400,7 @@ function Load-Gallery {
                     }
                 
                     # Card glow border: visually identical to DropShadowEffect but uses
-                    # no WPF software-render pass ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â zero per-frame GPU compositing cost.
+                    # no WPF software-render pass ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â zero per-frame GPU compositing cost.
                     $card.BorderThickness = New-Object System.Windows.Thickness(0)
                     $card.BorderBrush = $null
 
@@ -3578,6 +3592,7 @@ function Load-Gallery {
                     Select-Card $firstCard $images[0]
                 }
 
+                Update-GalleryViewportHeight
                 if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
                 [BingWallpaperNative]::FlushMemory()
 
@@ -3633,7 +3648,7 @@ function Load-Gallery {
 # Scroll-aware rendering: BitmapCache + LowQuality during scroll
 # (WPF caches each card as a flat texture, skipping per-card compositing).
 # HighQuality restored 150ms after scroll stops.
-# Uses pre-built flat arrays ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â zero PowerShell pipeline work per tick.
+# Uses pre-built flat arrays ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â zero PowerShell pipeline work per tick.
 # =================================================================
 $script:isScrolling = $false
 $script:scrollIdleTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -3920,6 +3935,8 @@ $RefreshBtn.Add_Click({
 $window.Add_ContentRendered({ 
         Load-Gallery 
     })
+$window.Add_SizeChanged({ Update-GalleryViewportHeight })
+$GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
 
 # =========================================================
 # User Guide Dialog (Native Win32/WPF modal matching Show-ModernDialog)
@@ -4540,6 +4557,9 @@ $script:memTrimTimer.Start()
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
 
 
 
