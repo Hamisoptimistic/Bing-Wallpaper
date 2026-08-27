@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.135'
+$script:appVersion = [Version]'1.0.136'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -883,7 +883,7 @@ if ($AutoApply) {
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Bing Wallpaper" Height="780" Width="1100"
-        Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
+        Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
     <Window.Resources>
         <!-- Custom Button Style -->
@@ -3724,10 +3724,20 @@ function Show-UserGuideDialog {
         }
     } catch {}
 
+    # Calculate 70% of screen / window space
+    $screenWidth = [System.Windows.SystemParameters]::PrimaryScreenWidth
+    $screenHeight = [System.Windows.SystemParameters]::PrimaryScreenHeight
+    if ($window -and $window.ActualWidth -gt 600) {
+        $screenWidth = $window.ActualWidth
+        $screenHeight = $window.ActualHeight
+    }
+    $modalWidth = [Math]::Max(1050, [int]($screenWidth * 0.70))
+    $modalHeight = [Math]::Max(680, [int]($screenHeight * 0.70))
+
     $dialogXaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Bing Wallpaper Guide" Width="920" Height="610"
+        Title="Bing Wallpaper Guide" Width="$modalWidth" Height="$modalHeight"
         Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         ResizeMode="NoResize" WindowStyle="SingleBorderWindow">
@@ -3765,16 +3775,16 @@ function Show-UserGuideDialog {
         </Style>
 
         <Style x:Key="DialogBtn" TargetType="Button">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="MinWidth" Value="100"/>
-            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="150"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Name="BtnBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,6,16,6"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="18,6,18,6"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -3790,7 +3800,7 @@ function Show-UserGuideDialog {
         </Style>
     </Window.Resources>
 
-    <Border Padding="26,22,26,20" Background="#181818">
+    <Border Padding="28,24,28,22" Background="#181818">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -3798,11 +3808,11 @@ function Show-UserGuideDialog {
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Header with Bing Logo -->
-            <Grid Grid.Row="0" Margin="0,0,0,18">
+            <!-- Header with Authentic Bing Logo -->
+            <Grid Grid.Row="0" Margin="0,0,0,20">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="#141212ff" Width="44" Height="44" CornerRadius="12" Margin="0,0,14,0" VerticalAlignment="Center">
-                        <Viewbox Margin="7">
+                    <Border Background="#141212ff" Width="48" Height="48" CornerRadius="13" Margin="0,0,16,0" VerticalAlignment="Center">
+                        <Viewbox Margin="8">
                             <Canvas Width="24" Height="24">
                                 <Path Data="M11.97 7.569a.92.92 0 00-.805.863c-.013.195-.01.209.43 1.347 1 2.59 1.242 3.214 1.283 3.302.099.213.237.413.41.592.134.138.222.212.37.311.26.176.39.224 1.405.527.989.295 1.529.49 1.994.723.603.302 1.024.644 1.29 1.051.191.292.36.815.434 1.342.029.206.029.661 0 .847a2.491 2.491 0 01-.376 1.026c-.1.151-.065.126.081-.058.415-.52.838-1.408 1.054-2.213a6.728 6.728 0 00.102-3.012 6.626 6.626 0 00-3.291-4.53c-.34-.19-.879-.473-1.322-.698l-.254-.133a737.941 737.941 0 01-1.575-.827c-.548-.29-.78-.406-.846-.426a1.376 1.376 0 00-.29-.045l-.093.01z" Fill="#00CACC"/>
                                 <Path Data="M13.164 17.24a4.385 4.385 0 00-.202.125 511.45 511.45 0 00-1.795 1.115 163.087 163.087 0 01-.989.614l-.463.288a99.198 99.198 0 01-1.502.941c-.326.2-.704.334-1.09.387-.18.024-.52.024-.7 0a2.807 2.807 0 01-1.318-.538 3.665 3.665 0 01-.543-.545 2.837 2.837 0 01-.506-1.141 2.161 2.161 0 00-.041-.182c-.008-.008.006.138.032.33.027.199.085.487.147.733.482 1.907 1.85 3.457 3.705 4.195a6.31 6.31 0 001.658.412c.22.025.844.035 1.074.017 1.054-.08 1.972-.393 2.913-.992a325.28 325.28 0 01.937-.596l.384-.244.684-.435.234-.149.009-.005.025-.017.013-.007.172-.11.597-.38c.76-.481.987-.65 1.34-.998.148-.146.37-.394.381-.425.002-.007.042-.068.088-.136a2.49 2.49 0 00.373-1.023 4.181 4.181 0 000-.847 4.336 4.336 0 00-.318-1.137c-.224-.472-.7-.9-1.383-1.245a2.972 2.972 0 00-.406-.181c-.01 0-.646.392-1.413.87a7089.171 7089.171 0 01-1.658 1.031l-.439.274z" Fill="#2756A9"/>
@@ -3811,130 +3821,152 @@ function Show-UserGuideDialog {
                         </Viewbox>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Bing Wallpaper Guide" FontSize="20" FontWeight="Bold" Foreground="#FFFFFF"/>
-                        <TextBlock Text="Everything you need to know to get the most out of Bing Wallpaper." FontSize="13" Foreground="#9E9E9E" Margin="0,2,0,0"/>
+                        <TextBlock Text="Bing Wallpaper Guide" FontSize="22" FontWeight="Bold" Foreground="#FFFFFF"/>
+                        <TextBlock Text="Everything you need to know to get the most out of Bing Wallpaper." FontSize="14" Foreground="#A0A0A0" Margin="0,3,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
 
             <!-- Two-Column Body -->
-            <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid Grid.Row="1" Margin="0,0,0,18">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="310"/>
-                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="380"/>
+                    <ColumnDefinition Width="24"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Column -->
+                <!-- Left Column: Wallpaper Card & Default Behavior -->
                 <StackPanel Grid.Column="0">
-                    <!-- Preview Card -->
-                    <Border Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,0,0,14">
-                        <StackPanel>
-                            <Border Height="155" Background="#141414" ClipToBounds="True">
-                                <Image Name="GuideLatestImage" Stretch="UniformToFill"/>
-                            </Border>
-                            <StackPanel Margin="12,10,12,12">
-                                <TextBlock Name="GuideLatestTitle" Text="$cleanTitle" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" Margin="0,0,0,3"/>
-                                <TextBlock Name="GuideLatestDate" Text="$cleanDate" FontSize="12.5" Foreground="#A0A0A0" TextTrimming="CharacterEllipsis"/>
+                    <!-- Preview Card matching Gallery Item style & rounded corners -->
+                    <Border Name="GuidePreviewCard" Background="#212121" CornerRadius="12" BorderThickness="0" ClipToBounds="True" Margin="0,0,0,16" Cursor="Hand">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.3" Direction="270"/>
+                        </Border.Effect>
+                        <Grid>
+                            <StackPanel IsHitTestVisible="False">
+                                <!-- Image with perfect top-rounded corners -->
+                                <Border Height="185" CornerRadius="12,12,0,0" ClipToBounds="True" Background="#141414">
+                                    <Image Name="GuideLatestImage" Stretch="UniformToFill"/>
+                                </Border>
+                                <StackPanel Margin="14,12,14,14">
+                                    <TextBlock Name="GuideLatestTitle" Text="$cleanTitle" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                                    <TextBlock Name="GuideLatestDate" Text="$cleanDate" FontSize="13" Foreground="#A0A0A0" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
+                            <!-- Reveal Highlight Layer -->
+                            <Rectangle Name="GuideRevealRect" RadiusX="12" RadiusY="12" Opacity="0" IsHitTestVisible="False"/>
+                            <Border Name="GuideRevealBorder" CornerRadius="12" BorderThickness="1.5" IsHitTestVisible="False"/>
+                        </Grid>
                     </Border>
 
-                    <!-- Default Behavior -->
-                    <Border Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                    <!-- Default Behavior Card -->
+                    <Border Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="16,14">
                         <StackPanel>
-                            <TextBlock Text="Default Behavior" FontSize="14" FontWeight="SemiBold" Foreground="#00CACC" Margin="0,0,0,8"/>
-                            <TextBlock Text="Ã¢â‚¬Â¢ Auto 4K: Automatically fetches and sets UHD wallpapers directly." FontSize="12.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,5"/>
-                            <TextBlock Text="Ã¢â‚¬Â¢ Dual Target: Changes both your Desktop and Lock Screen simultaneously." FontSize="12.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,5"/>
-                            <TextBlock Text="Ã¢â‚¬Â¢ Background Sync: Keeps wallpapers fresh silently using Windows Task Scheduler." FontSize="12.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="18"/>
+                            <TextBlock Text="Default Behavior" FontSize="15" FontWeight="SemiBold" Foreground="#00CACC" Margin="0,0,0,10"/>
+                            <TextBlock Text="â€¢ 4K resolution is used by default." FontSize="13.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
+                            <TextBlock Text="â€¢ Fit is the default wallpaper style." FontSize="13.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
+                            <TextBlock Text="â€¢ Your country is selected by default." FontSize="13.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
+                            <TextBlock Text="â€¢ Wallpapers change hourly by default and use your location." FontSize="13.5" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
-                <!-- Right Column: Features -->
-                <Border Grid.Column="2" Background="#202020" BorderBrush="#2F2F2F" BorderThickness="1" CornerRadius="10" Padding="16,14">
+                <!-- Right Column: Essential Features -->
+                <Border Grid.Column="2" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="18,16">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
                         <StackPanel>
-                            <TextBlock Text="Essential Features" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,12"/>
+                            <TextBlock Text="Essential Features" FontSize="16" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,14"/>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#0078D4" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Download" FontSize="13.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Save original 4K Ultra HD images directly to disk without any watermarks." FontSize="12.5" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="17" Margin="0,1,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="#1A1A1A" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="17" Foreground="#0078D4" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Download" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="Save original 4K Ultra HD images directly to disk without any watermarks." FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#00CACC" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Browse &amp; Preview" FontSize="13.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Explore recent days of Bing imagery. Single click to inspect, double-click to apply." FontSize="12.5" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="17" Margin="0,1,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="#1A1A1A" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="17" Foreground="#00CACC" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Browse &amp; Preview" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="Explore recent days of Bing imagery. Single click to inspect, double-click to apply." FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#60CDFF" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Apply Wallpaper" FontSize="13.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Set image for Desktop, Lock Screen, or Both with customized sizing (Fit, Fill, Stretch, Center, Span)." FontSize="12.5" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="17" Margin="0,1,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="#1A1A1A" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE771;" FontFamily="Segoe MDL2 Assets" FontSize="17" Foreground="#60CDFF" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Apply Wallpaper" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="Set image for Desktop, Lock Screen, or Both with customized sizing (Fit, Fill, Stretch, Center, Span)." FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#A78BFA" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Customize Region" FontSize="13.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Switch between global regions (US, UK, Japan, Germany, etc.) for localized photography." FontSize="12.5" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="17" Margin="0,1,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="#1A1A1A" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="17" Foreground="#A78BFA" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Customize Region" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="Switch between global regions (US, UK, Japan, Germany, etc.) for localized photography." FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#34D399" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Automatic Changes" FontSize="13.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Enable Auto switch to cycle wallpapers at custom intervals (1 min, Hourly, Daily, on Login)." FontSize="12.5" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="17" Margin="0,1,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="#1A1A1A" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="17" Foreground="#34D399" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Automatic Changes" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="Enable Auto switch to cycle wallpapers at custom intervals (1 min, Hourly, Daily, on Login)." FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="34"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#FBBF24" VerticalAlignment="Top" Margin="0,2,0,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="Download Location" FontSize="13.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Click the folder path at any time to choose where your saved wallpapers are stored." FontSize="12.5" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="17" Margin="0,1,0,0"/>
-                                </StackPanel>
-                            </Grid>
+                            <Border Background="#1A1A1A" CornerRadius="8" Padding="12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="17" Foreground="#FBBF24" VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Download Location" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                        <TextBlock Text="Click the folder path at any time to choose where your saved wallpapers are stored." FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </Border>
             </Grid>
 
-            <!-- Footer: Updates & Close Buttons -->
-            <Border Grid.Row="2" BorderBrush="#2C2C2C" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+            <!-- Footer: Updates Area (Clean, single action) -->
+            <Border Grid.Row="2" BorderBrush="#2C2C2C" BorderThickness="0,1,0,0" Padding="0,16,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -3942,13 +3974,12 @@ function Show-UserGuideDialog {
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Keep Bing Wallpaper updated" FontSize="13.5" FontWeight="SemiBold" Foreground="#E0E0E0"/>
-                        <TextBlock Text="Check for new releases with enhanced features and latest fixes." FontSize="12" Foreground="#888888" Margin="0,2,0,0"/>
+                        <TextBlock Text="Keep Bing Wallpaper updated" FontSize="14" FontWeight="SemiBold" Foreground="#E0E0E0"/>
+                        <TextBlock Text="Check for new releases with enhanced features and latest fixes." FontSize="12.5" Foreground="#888888" Margin="0,2,0,0"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button Name="GuideCheckUpdateBtn" Content="Check for updates" Style="{StaticResource DialogBtn}" Background="#0078D4" Foreground="#FFFFFF" BorderThickness="0" Margin="0,0,10,0"/>
-                        <Button Name="GuideCloseBtn" Content="Close" Style="{StaticResource DialogBtn}" Background="#2A2A2A" Foreground="#E0E0E0" BorderBrush="#3A3A3A" BorderThickness="1"/>
+                        <Button Name="GuideCheckUpdateBtn" Content="Check for updates" Style="{StaticResource DialogBtn}" Background="#0078D4" Foreground="#FFFFFF" BorderThickness="0"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -3983,7 +4014,7 @@ function Show-UserGuideDialog {
             $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
             $bmp.BeginInit()
             $bmp.UriSource = New-Object System.Uri($thumbPath)
-            $bmp.DecodePixelWidth = 320
+            $bmp.DecodePixelWidth = 380
             $bmp.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
             $bmp.EndInit()
             $bmp.Freeze()
@@ -3991,20 +4022,78 @@ function Show-UserGuideDialog {
         } catch {}
     }
 
+    # Setup Gallery-Matching Hover & Reveal Effects on the Preview Card
+    $card = $dlg.FindName('GuidePreviewCard')
+    $revealRect = $dlg.FindName('GuideRevealRect')
+    $revealBorder = $dlg.FindName('GuideRevealBorder')
+
+    if ($card) {
+        $cardClip = New-Object System.Windows.Media.RectangleGeometry
+        $cardClip.RadiusX = 12
+        $cardClip.RadiusY = 12
+        $card.Clip = $cardClip
+        $card.Add_SizeChanged({
+            param($s, $e)
+            $s.Clip.Rect = [System.Windows.Rect]::new(0, 0, $s.ActualWidth, $s.ActualHeight)
+        })
+
+        $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
+        $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+        $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(28, 255, 255, 255), 0.0)))
+        $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(14, 255, 255, 255), 0.4)))
+        $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(4, 255, 255, 255), 0.75)))
+        $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+        $revealBrush.RadiusX = 180
+        $revealBrush.RadiusY = 180
+        if ($revealRect) { $revealRect.Fill = $revealBrush }
+
+        $revealBorderBrush = New-Object System.Windows.Media.RadialGradientBrush
+        $revealBorderBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+        $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(90, 255, 255, 255), 0.0)))
+        $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+        $revealBorderBrush.RadiusX = 160
+        $revealBorderBrush.RadiusY = 160
+        if ($revealBorder) { $revealBorder.BorderBrush = $revealBorderBrush }
+
+        $cardUnselected = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 33, 33, 33))
+        $cardHover = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 45, 45, 45))
+
+        $card.Add_MouseEnter({
+            $card.Background = $cardHover
+            if ($card.Effect) {
+                $card.Effect.BlurRadius = 25
+                $card.Effect.ShadowDepth = 8
+            }
+            if ($revealRect) { $revealRect.Opacity = 1 }
+        })
+
+        $card.Add_MouseLeave({
+            $card.Background = $cardUnselected
+            if ($card.Effect) {
+                $card.Effect.BlurRadius = 10
+                $card.Effect.ShadowDepth = 2
+            }
+            if ($revealRect) { $revealRect.Opacity = 0 }
+        })
+
+        $card.Add_MouseMove({
+            param($s, $e)
+            try {
+                $pos = $e.GetPosition($card)
+                $revealBrush.Center = $pos
+                $revealBrush.GradientOrigin = $pos
+                $revealBorderBrush.Center = $pos
+                $revealBorderBrush.GradientOrigin = $pos
+            } catch {}
+        })
+    }
+
     # Event handlers
     $btnUpdate = $dlg.FindName('GuideCheckUpdateBtn')
-    $btnClose = $dlg.FindName('GuideCloseBtn')
-
     if ($btnUpdate) {
         $btnUpdate.Add_Click({
             $dlg.Close()
             Start-VerifiedUpdate
-        })
-    }
-
-    if ($btnClose) {
-        $btnClose.Add_Click({
-            $dlg.Close()
         })
     }
 
@@ -4020,6 +4109,7 @@ if ($GuideBtn) {
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
