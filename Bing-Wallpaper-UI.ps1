@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.151'
+$script:appVersion = [Version]'1.0.152'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -602,14 +602,18 @@ public static class BingWallpaperNative {
     [ComImport, Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
     private class FileOpenDialog { }
 
+    [DllImport("kernel32.dll")]
+    public static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr min, IntPtr max);
+
     [DllImport("psapi.dll")]
     public static extern int EmptyWorkingSet(IntPtr hwProc);
 
     public static void FlushMemory() {
         try {
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
+            GC.Collect(2, GCCollectionMode.Forced, true, true);
             GC.WaitForPendingFinalizers();
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
+            GC.Collect(2, GCCollectionMode.Forced, true, true);
+            SetProcessWorkingSetSize(System.Diagnostics.Process.GetCurrentProcess().Handle, (IntPtr)(-1), (IntPtr)(-1));
             EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle);
         } catch { }
     }
@@ -858,6 +862,89 @@ function Load-Settings {
         SpotlightInterval = 60
         SpotlightTarget   = "Desktop"
     }
+}
+
+# Supported Regions
+$countries = @(
+    @{ Name = "Auto (Global)"; Code = "auto" },
+    @{ Name = "Arab Region"; Code = "ar-XA" },
+    @{ Name = "Argentina"; Code = "es-AR" },
+    @{ Name = "Australia"; Code = "en-AU" },
+    @{ Name = "Austria"; Code = "de-AT" },
+    @{ Name = "Belgium (Dutch)"; Code = "nl-BE" },
+    @{ Name = "Belgium (French)"; Code = "fr-BE" },
+    @{ Name = "Brazil"; Code = "pt-BR" },
+    @{ Name = "Bulgaria"; Code = "bg-BG" },
+    @{ Name = "Canada (English)"; Code = "en-CA" },
+    @{ Name = "Canada (French)"; Code = "fr-CA" },
+    @{ Name = "Chile"; Code = "es-CL" },
+    @{ Name = "China"; Code = "zh-CN" },
+    @{ Name = "Croatia"; Code = "hr-HR" },
+    @{ Name = "Czech Republic"; Code = "cs-CZ" },
+    @{ Name = "Denmark"; Code = "da-DK" },
+    @{ Name = "Estonia"; Code = "et-EE" },
+    @{ Name = "Finland"; Code = "fi-FI" },
+    @{ Name = "France"; Code = "fr-FR" },
+    @{ Name = "Germany"; Code = "de-DE" },
+    @{ Name = "Greece"; Code = "el-GR" },
+    @{ Name = "Hong Kong"; Code = "zh-HK" },
+    @{ Name = "Hungary"; Code = "hu-HU" },
+    @{ Name = "India"; Code = "en-IN" },
+    @{ Name = "Indonesia"; Code = "en-ID" },
+    @{ Name = "Israel"; Code = "he-IL" },
+    @{ Name = "Italy"; Code = "it-IT" },
+    @{ Name = "Japan"; Code = "ja-JP" },
+    @{ Name = "Latvia"; Code = "lv-LV" },
+    @{ Name = "Lithuania"; Code = "lt-LT" },
+    @{ Name = "Malaysia"; Code = "en-MY" },
+    @{ Name = "Mexico"; Code = "es-MX" },
+    @{ Name = "Netherlands"; Code = "nl-NL" },
+    @{ Name = "New Zealand"; Code = "en-NZ" },
+    @{ Name = "Norway"; Code = "nb-NO" },
+    @{ Name = "Philippines"; Code = "en-PH" },
+    @{ Name = "Poland"; Code = "pl-PL" },
+    @{ Name = "Portugal"; Code = "pt-PT" },
+    @{ Name = "Romania"; Code = "ro-RO" },
+    @{ Name = "Russia"; Code = "ru-RU" },
+    @{ Name = "Singapore"; Code = "en-SG" },
+    @{ Name = "Slovakia"; Code = "sk-SK" },
+    @{ Name = "Slovenia"; Code = "sl-SI" },
+    @{ Name = "South Korea"; Code = "ko-KR" },
+    @{ Name = "Spain"; Code = "es-ES" },
+    @{ Name = "Sweden"; Code = "sv-SE" },
+    @{ Name = "Switzerland (French)"; Code = "fr-CH" },
+    @{ Name = "Switzerland (German)"; Code = "de-CH" },
+    @{ Name = "Taiwan"; Code = "zh-TW" },
+    @{ Name = "Thailand"; Code = "th-TH" },
+    @{ Name = "Turkey"; Code = "tr-TR" },
+    @{ Name = "Ukraine"; Code = "uk-UA" },
+    @{ Name = "United Kingdom"; Code = "en-GB" },
+    @{ Name = "United States"; Code = "en-US" },
+    @{ Name = "Vietnam"; Code = "vi-VN" }
+)
+$countries = @($countries[0]) + @($countries | Select-Object -Skip 1 | Sort-Object -Property { $_.Name })
+
+# Auto-detect the user's region from Windows locale
+function Get-DetectedRegionCode {
+    try {
+        # Check geographical region first (e.g. IN for India)
+        $region = [System.Globalization.RegionInfo]::CurrentRegion.TwoLetterISORegionName
+        $match = $countries | Where-Object { $_.Code -match "-$region`$" } | Select-Object -First 1
+        if ($match) { return $match.Code }
+        
+        # Fallback to UI Language (e.g. en-GB)
+        $culture = [System.Globalization.CultureInfo]::CurrentUICulture
+        $tag = $culture.Name
+        $match = $countries | Where-Object { $_.Code -eq $tag } | Select-Object -First 1
+        if ($match) { return $match.Code }
+
+        # Language-only fallback (e.g. "fr" -> picks fr-FR, "en" -> picks en-US)
+        $lang = $culture.TwoLetterISOLanguageName
+        $match = $countries | Where-Object { $_.Code -like "$lang-*" } | Select-Object -First 1
+        if ($match) { return $match.Code }
+    }
+    catch {}
+    return 'auto'   # safe worldwide fallback
 }
 
 if ($AutoApply) {
@@ -1663,67 +1750,7 @@ function Start-RefreshAnimation {
     $script:refreshDelayTimer.Start()
 }
 
-# Populate Settings (Alphabetically sorted, Auto pinned at top)
-$countries = @(
-    @{ Name = "Auto (Global)"; Code = "auto" },
-    @{ Name = "Arab Region"; Code = "ar-XA" },
-    @{ Name = "Argentina"; Code = "es-AR" },
-    @{ Name = "Australia"; Code = "en-AU" },
-    @{ Name = "Austria"; Code = "de-AT" },
-    @{ Name = "Belgium (Dutch)"; Code = "nl-BE" },
-    @{ Name = "Belgium (French)"; Code = "fr-BE" },
-    @{ Name = "Brazil"; Code = "pt-BR" },
-    @{ Name = "Bulgaria"; Code = "bg-BG" },
-    @{ Name = "Canada (English)"; Code = "en-CA" },
-    @{ Name = "Canada (French)"; Code = "fr-CA" },
-    @{ Name = "Chile"; Code = "es-CL" },
-    @{ Name = "China"; Code = "zh-CN" },
-    @{ Name = "Croatia"; Code = "hr-HR" },
-    @{ Name = "Czech Republic"; Code = "cs-CZ" },
-    @{ Name = "Denmark"; Code = "da-DK" },
-    @{ Name = "Estonia"; Code = "et-EE" },
-    @{ Name = "Finland"; Code = "fi-FI" },
-    @{ Name = "France"; Code = "fr-FR" },
-    @{ Name = "Germany"; Code = "de-DE" },
-    @{ Name = "Greece"; Code = "el-GR" },
-    @{ Name = "Hong Kong"; Code = "zh-HK" },
-    @{ Name = "Hungary"; Code = "hu-HU" },
-    @{ Name = "India"; Code = "en-IN" },
-    @{ Name = "Indonesia"; Code = "en-ID" },
-    @{ Name = "Israel"; Code = "he-IL" },
-    @{ Name = "Italy"; Code = "it-IT" },
-    @{ Name = "Japan"; Code = "ja-JP" },
-    @{ Name = "Latvia"; Code = "lv-LV" },
-    @{ Name = "Lithuania"; Code = "lt-LT" },
-    @{ Name = "Malaysia"; Code = "en-MY" },
-    @{ Name = "Mexico"; Code = "es-MX" },
-    @{ Name = "Netherlands"; Code = "nl-NL" },
-    @{ Name = "New Zealand"; Code = "en-NZ" },
-    @{ Name = "Norway"; Code = "nb-NO" },
-    @{ Name = "Philippines"; Code = "en-PH" },
-    @{ Name = "Poland"; Code = "pl-PL" },
-    @{ Name = "Portugal"; Code = "pt-PT" },
-    @{ Name = "Romania"; Code = "ro-RO" },
-    @{ Name = "Russia"; Code = "ru-RU" },
-    @{ Name = "Singapore"; Code = "en-SG" },
-    @{ Name = "Slovakia"; Code = "sk-SK" },
-    @{ Name = "Slovenia"; Code = "sl-SI" },
-    @{ Name = "South Korea"; Code = "ko-KR" },
-    @{ Name = "Spain"; Code = "es-ES" },
-    @{ Name = "Sweden"; Code = "sv-SE" },
-    @{ Name = "Switzerland (French)"; Code = "fr-CH" },
-    @{ Name = "Switzerland (German)"; Code = "de-CH" },
-    @{ Name = "Taiwan"; Code = "zh-TW" },
-    @{ Name = "Thailand"; Code = "th-TH" },
-    @{ Name = "Turkey"; Code = "tr-TR" },
-    @{ Name = "Ukraine"; Code = "uk-UA" },
-    @{ Name = "United Kingdom"; Code = "en-GB" },
-    @{ Name = "United States"; Code = "en-US" },
-    @{ Name = "Vietnam"; Code = "vi-VN" }
-)
-
-$countries = @($countries[0]) + @($countries | Select-Object -Skip 1 | Sort-Object -Property { $_.Name })
-
+# Populate Region Settings
 $RegionBox.SelectedIndex = 0
 foreach ($c in $countries) {
     $item = New-Object System.Windows.Controls.ComboBoxItem
@@ -1740,29 +1767,6 @@ function Get-SelectedRegionCode {
         return $RegionBox.SelectedItem.Tag
     }
     return 'auto'
-}
-
-# Auto-detect the user's region from Windows locale (used only on first launch)
-function Get-DetectedRegionCode {
-    try {
-        # Check geographical region first (e.g. IN for India)
-        $region = [System.Globalization.RegionInfo]::CurrentRegion.TwoLetterISORegionName
-        $match = $countries | Where-Object { $_.Code -match "-$region`$" } | Select-Object -First 1
-        if ($match) { return $match.Code }
-        
-        # Fallback to UI Language (e.g. en-GB)
-        $culture = [System.Globalization.CultureInfo]::CurrentUICulture
-        $tag = $culture.Name
-        $match = $countries | Where-Object { $_.Code -eq $tag } | Select-Object -First 1
-        if ($match) { return $match.Code }
-
-        # Language-only fallback (e.g. "fr" -> picks fr-FR, "en" -> picks en-US)
-        $lang = $culture.TwoLetterISOLanguageName
-        $match = $countries | Where-Object { $_.Code -like "$lang-*" } | Select-Object -First 1
-        if ($match) { return $match.Code }
-    }
-    catch {}
-    return 'auto'   # safe worldwide fallback
 }
 
 @('4K', '2K', '1080p', '720p') | ForEach-Object { 
@@ -2159,6 +2163,7 @@ function Restore-StatusTextDefaultWithFade {
             $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
             $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $dur)
             $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+            [BingWallpaperNative]::FlushMemory()
         })
     $script:fadeTimer.Start()
 }
@@ -4283,6 +4288,7 @@ function Show-UserGuideDialog {
             if ($window -and $window.IsVisible) {
                 try { $window.Activate() | Out-Null } catch {}
             }
+            [BingWallpaperNative]::FlushMemory()
         })
 
     $dlg.Add_KeyDown({
@@ -4370,9 +4376,30 @@ $window.Add_PreviewKeyDown({
         }
     })
 
+# Lifecycle & Memory Trimming
+$window.Add_ContentRendered({
+        [BingWallpaperNative]::FlushMemory()
+    })
+
+$window.Add_StateChanged({
+        if ($window.WindowState -eq [System.Windows.WindowState]::Minimized) {
+            [BingWallpaperNative]::FlushMemory()
+        }
+    })
+
+# Periodic idle memory flush
+$script:memTrimTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(45)
+$script:memTrimTimer.Add_Tick({
+        [BingWallpaperNative]::FlushMemory()
+    })
+$script:memTrimTimer.Start()
+
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
 
 
 
