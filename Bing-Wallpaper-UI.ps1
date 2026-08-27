@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.152'
+$script:appVersion = [Version]'1.0.153'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1694,19 +1694,24 @@ $GuideBtn = $window.FindName('GuideBtn')
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 
 function Set-AppDimState {
-    param([bool]$Dim)
+    param([bool]$Dim, [bool]$Force = $false)
     if (-not $ModalDimOverlay) { return }
-    # If undimming is requested, retain dimming if the User Guide modal is still active/visible
-    if (-not $Dim) {
-        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+    if (-not $Dim -and -not $Force) {
+        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible -and -not $script:isClosingGuideDialog) {
             return
         }
     }
     $targetOpacity = if ($Dim) { 0.55 } else { 0.0 }
-    $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220))
-    $anim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetOpacity, $dur
-    $anim.EasingFunction = New-Object System.Windows.Media.Animation.CubicEase
-    $anim.EasingFunction.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $currentOpacity = [double]$ModalDimOverlay.Opacity
+    if ([Math]::Abs($currentOpacity - $targetOpacity) -lt 0.005) { return }
+
+    # Slower, cinematic transition duration: 500ms on open, 440ms on close
+    $durationMs = if ($Dim) { 500 } else { 440 }
+    $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($durationMs))
+    $anim = New-Object System.Windows.Media.Animation.DoubleAnimation($currentOpacity, $targetOpacity, $dur)
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $anim.EasingFunction = $ease
     $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $anim)
 }
 
@@ -2608,7 +2613,7 @@ function Show-ModernDialog {
         </Style>
     </Window.Resources>
 
-    <Border Padding="24" Background="#181818">
+    <Border Name="DialogRoot" Padding="24" Background="#181818" Opacity="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -2729,6 +2734,26 @@ function Show-ModernDialog {
     $script:dialogChoice = 'Cancel'
     $btnStyle = $dlg.FindResource('DialogBtn')
 
+    $closeWithFade = {
+        param([string]$choice)
+        $script:dialogChoice = $choice
+        Set-AppDimState $false -Force $true
+        $root = $dlg.FindName('DialogRoot')
+        if ($root) {
+            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, [TimeSpan]::FromMilliseconds(380))
+            $ease = New-Object System.Windows.Media.Animation.CubicEase
+            $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+            $fadeOut.EasingFunction = $ease
+            $fadeOut.Add_Completed({
+                try { $dlg.Close() } catch {}
+            })
+            $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+        }
+        else {
+            try { $dlg.Close() } catch {}
+        }
+    }
+
     if ($Buttons -eq 'YesNo') {
         $btnNo = New-Object System.Windows.Controls.Button
         $btnNo.Style = $btnStyle
@@ -2739,8 +2764,7 @@ function Show-ModernDialog {
         $btnNo.BorderThickness = New-Object System.Windows.Thickness(1)
         $btnNo.Margin = New-Object System.Windows.Thickness(0, 0, 10, 0)
         $btnNo.Add_Click({
-                $script:dialogChoice = 'No'
-                $dlg.Close()
+                & $closeWithFade 'No'
             })
         $buttonPanel.Children.Add($btnNo) | Out-Null
 
@@ -2752,8 +2776,7 @@ function Show-ModernDialog {
         $btnYes.BorderThickness = New-Object System.Windows.Thickness(0)
         $btnYes.IsDefault = $true
         $btnYes.Add_Click({
-                $script:dialogChoice = 'Yes'
-                $dlg.Close()
+                & $closeWithFade 'Yes'
             })
         $buttonPanel.Children.Add($btnYes) | Out-Null
     }
@@ -2766,14 +2789,35 @@ function Show-ModernDialog {
         $btnOk.BorderThickness = New-Object System.Windows.Thickness(0)
         $btnOk.IsDefault = $true
         $btnOk.Add_Click({
-                $script:dialogChoice = 'OK'
-                $dlg.Close()
+                & $closeWithFade 'OK'
             })
         $buttonPanel.Children.Add($btnOk) | Out-Null
     }
 
+    $dlg.Add_KeyDown({
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
+                $e.Handled = $true
+                & $closeWithFade 'Cancel'
+            }
+        })
+
+    # Smooth entrance animation (slower, cinematic)
+    $root = $dlg.FindName('DialogRoot')
+    if ($root) {
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(450))
+        $ease = New-Object System.Windows.Media.Animation.CubicEase
+        $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+        $fadeIn.EasingFunction = $ease
+        $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+    }
+
     $dlg.Add_Closed({
-            Set-AppDimState $false
+            Set-AppDimState $false -Force $true
+            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
+                [System.Windows.Threading.DispatcherPriority]::ApplicationIdle,
+                [Action]{ [BingWallpaperNative]::FlushMemory() }
+            ) | Out-Null
         })
 
     if ($ParentWindow -eq $window) {
@@ -3814,13 +3858,37 @@ $window.Add_ContentRendered({
 # User Guide Dialog (Native Win32/WPF modal matching Show-ModernDialog)
 # =========================================================
 $script:activeGuideDialog = $null
+$script:isClosingGuideDialog = $false
+
+function Close-UserGuideDialog {
+    if ($script:isClosingGuideDialog) { return }
+    if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+        $script:isClosingGuideDialog = $true
+        $dlg = $script:activeGuideDialog
+        Set-AppDimState $false -Force $true
+        
+        $root = $dlg.FindName('DialogRoot')
+        if ($root) {
+            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, [TimeSpan]::FromMilliseconds(380))
+            $ease = New-Object System.Windows.Media.Animation.CubicEase
+            $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+            $fadeOut.EasingFunction = $ease
+            $fadeOut.Add_Completed({
+                try { $dlg.Close() } catch {}
+                $script:isClosingGuideDialog = $false
+            })
+            $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+        }
+        else {
+            try { $dlg.Close() } catch {}
+            $script:isClosingGuideDialog = $false
+        }
+    }
+}
 
 function Show-UserGuideDialog {
     if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
-        try {
-            $script:activeGuideDialog.Close()
-        }
-        catch {}
+        Close-UserGuideDialog
         return
     }
     $cleanTitle = "AutoScape"
@@ -3893,7 +3961,7 @@ function Show-UserGuideDialog {
         </Style>
     </Window.Resources>
 
-    <Border Padding="28,24,28,22" Background="#181818">
+    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" Opacity="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -4282,22 +4350,35 @@ function Show-UserGuideDialog {
     # Track active dialog instance
     $script:activeGuideDialog = $dlg
 
+    # Smooth entrance animation (slower, cinematic)
+    $root = $dlg.FindName('DialogRoot')
+    if ($root) {
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(450))
+        $ease = New-Object System.Windows.Media.Animation.CubicEase
+        $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+        $fadeIn.EasingFunction = $ease
+        $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+    }
+
     $dlg.Add_Closed({
             $script:activeGuideDialog = $null
-            Set-AppDimState $false
+            $script:isClosingGuideDialog = $false
+            Set-AppDimState $false -Force $true
             if ($window -and $window.IsVisible) {
                 try { $window.Activate() | Out-Null } catch {}
             }
-            [BingWallpaperNative]::FlushMemory()
+            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
+                [System.Windows.Threading.DispatcherPriority]::ApplicationIdle,
+                [Action]{ [BingWallpaperNative]::FlushMemory() }
+            ) | Out-Null
         })
 
-    $dlg.Add_KeyDown({
+    # PreviewKeyDown captures Escape reliably regardless of focused child control
+    $dlg.Add_PreviewKeyDown({
             param($s, $e)
             if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
-                try {
-                    $dlg.Close()
-                }
-                catch {}
+                $e.Handled = $true
+                Close-UserGuideDialog
             }
         })
 
@@ -4349,11 +4430,8 @@ if ($GuideBtn) {
 $window.Add_PreviewMouseDown({
         param($s, $e)
         if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
-            try {
-                $script:activeGuideDialog.Close()
-                $e.Handled = $true
-            }
-            catch {}
+            Close-UserGuideDialog
+            $e.Handled = $true
         }
     })
 
@@ -4367,10 +4445,16 @@ $window.Add_Closed({
         catch {}
     })
 
-# Keyboard shortcuts (F5 = Refresh wallpapers / gallery)
+# Keyboard shortcuts (F5 = Refresh wallpapers / gallery, Escape = Close active dialog)
 $window.Add_PreviewKeyDown({
         param($s, $e)
-        if ($e.Key -eq [System.Windows.Input.Key]::F5) {
+        if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
+            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+                $e.Handled = $true
+                Close-UserGuideDialog
+            }
+        }
+        elseif ($e.Key -eq [System.Windows.Input.Key]::F5) {
             $e.Handled = $true
             Load-Gallery
         }
@@ -4398,6 +4482,11 @@ $script:memTrimTimer.Start()
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
+
 
 
 
