@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -835,11 +835,12 @@ function Load-Settings {
         catch {}
     }
     return @{
-        Region     = "auto"
-        Resolution = "1920x1080"
-        Target     = "Both"
-        Style      = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        Region           = "auto"
+        Resolution       = "1920x1080"
+        Target           = "Both"
+        Style            = (Get-CurrentDesktopWallpaperStyle)
+        SaveFolder       = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        SpotlightEnabled = $false
     }
 }
 
@@ -1381,11 +1382,12 @@ function Load-Settings {
         catch {}
     }
     return @{
-        Region     = "auto"
-        Resolution = "1920x1080"
-        Target     = "Both"
-        Style      = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        Region           = "auto"
+        Resolution       = "1920x1080"
+        Target           = "Both"
+        Style            = (Get-CurrentDesktopWallpaperStyle)
+        SaveFolder       = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        SpotlightEnabled = $false
     }
 }
 
