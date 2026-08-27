@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.125'
+$script:appVersion = [Version]'1.0.126'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -839,7 +839,7 @@ function Load-Settings {
         Resolution        = "4K"
         Target            = "Both"
         Style             = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder        = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        SaveFolder        = (Get-DownloadFolder)
         SpotlightEnabled  = $false
         SpotlightInterval = 60
         SpotlightTarget   = "Desktop"
@@ -1146,7 +1146,7 @@ if ($AutoApply) {
                 <ColumnDefinition Width="120"/>
                 <ColumnDefinition Width="120"/>
                 <ColumnDefinition Width="120"/>
-                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="310"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -1190,10 +1190,10 @@ if ($AutoApply) {
                 <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
             </StackPanel>
 
-            <!-- Save Image To -->
+            <!-- Download Image To -->
             <StackPanel Grid.Column="5" Margin="0,0,16,0">
-                <TextBlock Text="Save Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change save folder" />
+                <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder" />
             </StackPanel>
 
             <!-- Spotlight / Auto Wallpaper pill -->
@@ -1388,7 +1388,7 @@ function Load-Settings {
         Resolution        = "4K"
         Target            = "Both"
         Style             = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder        = (Join-Path $env:USERPROFILE 'Pictures\BingWallpapers')
+        SaveFolder        = (Get-DownloadFolder)
         SpotlightEnabled  = $false
         SpotlightInterval = 60
         SpotlightTarget   = "Desktop"
@@ -1637,7 +1637,7 @@ $FolderBox.Add_PreviewMouseLeftButtonDown({
         try {
             # Modern common folder dialog (IFileOpenDialog under the hood)
             $dialog = New-Object Microsoft.Win32.OpenFolderDialog
-            $dialog.Title = 'Select Save Folder'
+            $dialog.Title = 'Select Download Folder'
             if (Test-Path -LiteralPath $FolderBox.Text) {
                 $dialog.InitialDirectory = $FolderBox.Text
             }
@@ -1674,7 +1674,7 @@ $FolderBox.Add_PreviewMouseLeftButtonDown({
 
         if ($modernFailed) {
             $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
-            $legacyRes = [BingWallpaperNative]::PickFolder($helper.Handle, 'Select Save Folder')
+            $legacyRes = [BingWallpaperNative]::PickFolder($helper.Handle, 'Select Download Folder')
             if (-not [string]::IsNullOrEmpty($legacyRes)) {
                 $picked = $legacyRes
             }
@@ -3031,6 +3031,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
