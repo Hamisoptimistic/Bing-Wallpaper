@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.126'
+$script:appVersion = [Version]'1.0.127'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1752,6 +1752,43 @@ function Select-Card($card, $image) {
     }
 }
 
+function Start-CardDownloadAnimation($card) {
+    if (-not $card) { return }
+    $shimmer = $card.Resources['ShimmerOverlay']
+    $transform = $card.Resources['ShimmerTransform']
+    if (-not $shimmer -or -not $transform) { return }
+
+    # Reset any previous animations cleanly
+    $transform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
+    $shimmer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+    $shimmer.Opacity = 0
+
+    # 1. Silky smooth, calm frosted-white shimmer wave
+    $sweepAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
+    $sweepAnim.From = -150
+    $sweepAnim.To = 450
+    $sweepAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1550))
+    $sweepAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
+    $sine = New-Object System.Windows.Media.Animation.SineEase
+    $sine.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $sweepAnim.EasingFunction = $sine
+
+    # Fade shimmer in and out smoothly across the full calm sweep
+    $shimmerOpacityAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
+    $shimmerOpacityAnim.From = 1.0
+    $shimmerOpacityAnim.To = 0.0
+    $shimmerOpacityAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1550))
+    $shimmerOpacityAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
+
+    # Launch native WPF animations
+    $transform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $sweepAnim)
+    $shimmer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $shimmerOpacityAnim)
+}
+
+function Stop-CardDownloadAnimation($card, [bool]$Success) {
+    # The animation runs smoothly to completion on its own natural timing curve
+}
+
 # Transient Status Message System (Auto-resets after N seconds)
 $statusDefaultBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(52, 211, 153)))
@@ -1759,6 +1796,8 @@ $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Win
 $script:statusResetTimer = $null
 $script:fadeTimer = $null
 $script:loadingStatusTimer = $null
+$script:downloadTimer = $null
+$script:dlContext = $null
 
 function Restore-StatusTextDefaultWithFade {
     # If no wallpapers are loaded, never prompt to double-click
@@ -2795,7 +2834,36 @@ function Load-Gallery {
             $card.Resources.Add('TitleText', $title)
             $card.Resources.Add('DateText', $date)
 
-            $stack.Children.Add($details)
+            # Details Container with layered shimmer & success glow overlays
+            $detailsContainer = New-Object System.Windows.Controls.Grid
+            $detailsContainer.ClipToBounds = $true
+
+            # 1. Text Content
+            $detailsContainer.Children.Add($details)
+
+            # 2. Shimmer Light Wave Overlay
+            $shimmerOverlay = New-Object System.Windows.Controls.Border
+            $shimmerOverlay.Width = 130
+            $shimmerOverlay.HorizontalAlignment = 'Left'
+            $shimmerOverlay.IsHitTestVisible = $false
+            $shimmerOverlay.Opacity = 0
+
+            $shimmerBrush = New-Object System.Windows.Media.LinearGradientBrush
+            $shimmerBrush.StartPoint = New-Object System.Windows.Point(0, 0.5)
+            $shimmerBrush.EndPoint = New-Object System.Windows.Point(1, 0.5)
+            $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 0.0)))
+            $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(75, 255, 255, 255), 0.5)))
+            $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 1.0)))
+            $shimmerOverlay.Background = $shimmerBrush
+
+            $shimmerTransform = New-Object System.Windows.Media.TranslateTransform
+            $shimmerOverlay.RenderTransform = $shimmerTransform
+            $detailsContainer.Children.Add($shimmerOverlay)
+
+            $card.Resources.Add('ShimmerOverlay', $shimmerOverlay)
+            $card.Resources.Add('ShimmerTransform', $shimmerTransform)
+
+            $stack.Children.Add($detailsContainer)
 
             # Card Click Action: Select card on single click, apply on double click
             $card.Add_MouseLeftButtonDown({
@@ -2904,41 +2972,141 @@ $UpdateBtn.Add_Click({
         }
     })
 
-# Dedicated Download Button Logic (Saves image to configured folder)
+# Dedicated Download Button Logic (Saves image to configured folder asynchronously)
 $DownloadBtn.Add_Click({
-        $targetImage = if ($script:selectedImage) { 
-            $script:selectedImage 
+        $targetImage = $null
+        $targetCard = $null
+
+        if ($script:selectedCard -and $script:selectedImage) {
+            $targetImage = $script:selectedImage
+            $targetCard = $script:selectedCard
         }
-        elseif ($script:selection.Image) { 
-            $script:selection.Image 
+        elseif ($script:selection.Card -and $script:selection.Image) {
+            $targetImage = $script:selection.Image
+            $targetCard = $script:selection.Card
         }
-        elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) { 
-            $script:loadedImages[0] 
+        elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) {
+            $targetImage = $script:loadedImages[0]
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
         }
-        else { 
-            (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+        else {
+            $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
         }
+
         if (-not $targetImage) { return }
         $actionTitle = Get-CleanImageTitle $targetImage
 
+        # Start animation & status update IMMEDIATELY in 1ms on UI thread
         $UpdateBtn.IsEnabled = $false
         $DownloadBtn.IsEnabled = $false
         $StatusText.Foreground = $statusDefaultBrush
         $StatusText.Text = "Downloading $actionTitle..."
-        Update-UI
 
-        try {
-            $null = Save-BingImage -Image $targetImage -Resolution $ResolutionBox.SelectedItem -DownloadFolder $FolderBox.Text
-            Set-TransientStatus -Message "Wallpaper downloaded"
+        if ($targetCard) {
+            Start-CardDownloadAnimation $targetCard
         }
-        catch {
-            $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "download wallpaper"
-            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+
+        # Prepare target directories and paths
+        $downloadFolder = $FolderBox.Text
+        if (-not (Test-Path -LiteralPath $downloadFolder)) {
+            try { New-Item -ItemType Directory -Path $downloadFolder -Force | Out-Null } catch {}
         }
-        finally {
-            $UpdateBtn.IsEnabled = $true
-            $DownloadBtn.IsEnabled = $true
+
+        $imageUri = Get-BingImageUri -Image $targetImage -Resolution $ResolutionBox.SelectedItem
+        $imageDate = if ($targetImage.enddate -and ($targetImage.enddate -match '^\d{8}$')) { $targetImage.enddate } else { (Get-Date).ToString('yyyyMMdd') }
+        $cleanTitle = ($actionTitle -replace '[\\/:*?"<>|\x00-\x1F]', '').Trim()
+        $cleanTitle = ($cleanTitle -replace '\s+', ' ').Trim()
+        if ($cleanTitle.Length -gt 60) { $cleanTitle = $cleanTitle.Substring(0, 60).Trim() }
+        $fileName = if ($cleanTitle) { "Bing-$imageDate-$cleanTitle.jpg" } else { "Bing-$imageDate.jpg" }
+        $downloadPath = Join-Path $downloadFolder $fileName
+        $tempPath = "$downloadPath.tmp"
+
+        # Execute network download asynchronously in background runspace so UI NEVER freezes
+        $ps = [powershell]::Create()
+        [void]$ps.AddScript({
+            param([string]$Uri, [string]$Temp, [string]$Dest)
+            try {
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                $wc.DownloadFile($Uri, $Temp)
+                $wc.Dispose()
+                if (Test-Path -LiteralPath $Temp) {
+                    if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+                    Move-Item -LiteralPath $Temp -Destination $Dest -Force
+                }
+                return @{ Success = $true; Error = $null }
+            }
+            catch {
+                return @{ Success = $false; Error = $_.Exception.Message }
+            }
+        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath)
+
+        $asyncOp = $ps.BeginInvoke()
+
+        $script:dlContext = @{
+            PS = $ps
+            AsyncOp = $asyncOp
+            TargetCard = $targetCard
         }
+
+        if ($script:downloadTimer) {
+            $script:downloadTimer.Stop()
+            $script:downloadTimer = $null
+        }
+
+        $script:downloadTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:downloadTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+        $script:downloadTimer.Add_Tick({
+            param($timerSender, $timerArgs)
+            if (-not $script:dlContext) {
+                $timerSender.Stop()
+                return
+            }
+            if ($script:dlContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:dlContext
+                $script:dlContext = $null
+                $script:downloadTimer = $null
+
+                $isSuccess = $false
+                $errorMsg = $null
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    $errorMsg = if ($res) { $res.Error } else { $null }
+                }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                    $UpdateBtn.IsEnabled = $true
+                    $DownloadBtn.IsEnabled = $true
+                }
+
+                if ($isSuccess) {
+                    if ($ctx.TargetCard) {
+                        Stop-CardDownloadAnimation $ctx.TargetCard $true
+                    }
+                    Set-TransientStatus -Message "Wallpaper downloaded"
+                }
+                else {
+                    if ($ctx.TargetCard) {
+                        Stop-CardDownloadAnimation $ctx.TargetCard $false
+                    }
+                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download wallpaper"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                }
+            }
+        })
+        $script:downloadTimer.Start()
     })
 
 $CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
@@ -3031,6 +3199,14 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
+
+
+
+
+
 
 
 
