@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.72'
+$script:appVersion = [Version]'1.0.115'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1847,78 +1847,79 @@ else {
 
 function Update-SpotlightScheduledTaskAsync {
     param([bool]$Enable)
-    
-    $minutes = 1440
-    if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) {
-        $minutes = [int]$SpotlightIntervalBox.SelectedItem.Tag
-    }
-    $target = 'Both'
-    if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) {
-        $target = [string]$SpotlightTargetBox.SelectedItem
-    }
 
-    if ($Enable) {
-        $appDataDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper'
-        if (-not (Test-Path $appDataDir)) { New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null }
+    # Snapshot all UI-thread values NOW before handing off to background
+    $bgEnable      = $Enable
+    $bgMinutes     = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 1440 }
+    $bgTarget      = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { [string]$SpotlightTargetBox.SelectedItem } else { 'Both' }
+    $bgScriptPath  = $script:SpotlightScriptPath
+    $bgAppDataRoot = $env:LOCALAPPDATA
 
-        # Copy the current running script to a persistent AppData location so background tasks always find it
-        $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
-        $currentScript = if ($script:SpotlightScriptPath -and (Test-Path -LiteralPath $script:SpotlightScriptPath)) {
-            $script:SpotlightScriptPath
-        }
-        elseif ($PSCommandPath -and (Test-Path -LiteralPath $PSCommandPath)) {
-            $PSCommandPath
-        }
-        else {
-            (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1') -ErrorAction SilentlyContinue).Path
-        }
+    # Fire-and-forget background runspace â€” never blocks the UI thread / WPF animations
+    $ps = [powershell]::Create()
+    [void]$ps.AddScript({
+        param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
+        try {
+            if ($Enable) {
+                $appDataDir = Join-Path $AppDataRoot 'BingWallpaper'
+                if (-not (Test-Path -LiteralPath $appDataDir)) {
+                    New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
+                }
 
-        if ($currentScript -and (Test-Path -LiteralPath $currentScript)) {
-            try { Copy-Item -LiteralPath $currentScript -Destination $persistentScriptPath -Force } catch {}
-        }
+                # Copy the current running script to a persistent AppData location so background tasks always find it
+                $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
+                if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                    try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                }
 
-        # Remove any legacy cmd wrappers that cause console popups
-        $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
-        if (Test-Path -LiteralPath $legacyCmd) { Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue }
+                # Remove any legacy cmd wrappers that cause console popups
+                $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
+                if (Test-Path -LiteralPath $legacyCmd) {
+                    Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
+                }
 
-        # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
-        $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
-        $vbsCode = @"
+                # Native VBScript wrapper that uses WScript.Shell.Run with SW_HIDE (0) to guarantee zero console flashes
+                $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
+                $vbsCode = @"
 Set objShell = WScript.CreateObject("WScript.Shell")
 scriptPath = WScript.Arguments(0)
 target = WScript.Arguments(1)
 cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & scriptPath & """ -AutoApply -Target """ & target & """"
 objShell.Run cmd, 0, False
 "@
-        Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
+                Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
 
-        $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$target`""
-        $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
-        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
-        
-        if ($minutes -eq 0) {
-            $trigger = New-ScheduledTaskTrigger -AtLogOn
+                $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
+                $action   = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
+                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+
+                if ($Minutes -eq 0) {
+                    $trigger = New-ScheduledTaskTrigger -AtLogOn
+                }
+                elseif ($Minutes -le 1) {
+                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
+                }
+                elseif ($Minutes -lt 60) {
+                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
+                }
+                elseif ($Minutes -lt 1440) {
+                    $hours = [math]::Max(1, [int]($Minutes / 60))
+                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+                }
+                else {
+                    $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
+                }
+
+                Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+            }
+            else {
+                Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
+            }
         }
-        elseif ($minutes -le 1) {
-            # 1 minute interval
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
-        }
-        elseif ($minutes -lt 60) {
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $minutes)
-        }
-        elseif ($minutes -lt 1440) {
-            $hours = [math]::Max(1, [int]($minutes / 60))
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
-        }
-        else {
-            $trigger = New-ScheduledTaskTrigger -Daily -At "06:00"
-        }
-        
-        Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
-    }
-    else {
-        Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
-    }
+        catch {}
+    }).AddArgument($bgEnable).AddArgument($bgMinutes).AddArgument($bgTarget).AddArgument($bgScriptPath).AddArgument($bgAppDataRoot)
+
+    $null = $ps.BeginInvoke()
 }
 
 function Set-SpotlightState {
@@ -3033,6 +3034,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
