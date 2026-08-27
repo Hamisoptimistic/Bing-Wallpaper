@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.127'
+$script:appVersion = [Version]'1.0.128'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1798,6 +1798,146 @@ $script:fadeTimer = $null
 $script:loadingStatusTimer = $null
 $script:downloadTimer = $null
 $script:dlContext = $null
+$script:applyTimer = $null
+$script:applyContext = $null
+
+function Apply-WallpaperAsync {
+    param(
+        $Image,
+        $Card,
+        [string]$Resolution,
+        [string]$Target,
+        [string]$Style
+    )
+    if (-not $Image) { return }
+    $actionTitle = Get-CleanImageTitle $Image
+
+    $UpdateBtn.IsEnabled = $false
+    $DownloadBtn.IsEnabled = $false
+    $StatusText.Foreground = $statusDefaultBrush
+    $StatusText.Text = "Applying $actionTitle..."
+
+    if ($Card) {
+        Start-CardDownloadAnimation $Card
+    }
+
+    $imageUri = Get-BingImageUri -Image $Image -Resolution $Resolution
+    $cacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
+    if (-not (Test-Path -LiteralPath $cacheDir)) {
+        try { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null } catch {}
+    }
+    $cachePath = Join-Path $cacheDir "current_wallpaper.jpg"
+    $tempPath = "$cachePath.tmp"
+
+    $ps = [powershell]::Create()
+    [void]$ps.AddScript({
+        param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam)
+        try {
+            # 1. Download image in background thread (0ms UI freeze)
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            $wc.DownloadFile($Uri, $Temp)
+            $wc.Dispose()
+            if (Test-Path -LiteralPath $Temp) {
+                if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+                Move-Item -LiteralPath $Temp -Destination $Dest -Force
+            }
+
+            # 2. Apply Desktop Wallpaper in background thread (0ms UI freeze)
+            if ($TargetParam -eq 'Desktop' -or $TargetParam -eq 'Both') {
+                $styleVal = '6'; $tileVal = '0'
+                switch ($StyleParam) {
+                    'Fit' { $styleVal = '6'; $tileVal = '0' }
+                    'Fill' { $styleVal = '10'; $tileVal = '0' }
+                    'Stretch' { $styleVal = '2'; $tileVal = '0' }
+                    'Center' { $styleVal = '0'; $tileVal = '0' }
+                    'Tile' { $styleVal = '0'; $tileVal = '1' }
+                    'Span' { $styleVal = '22'; $tileVal = '0' }
+                }
+                Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'WallpaperStyle' -Value $styleVal -Force -ErrorAction SilentlyContinue
+                Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'TileWallpaper' -Value $tileVal -Force -ErrorAction SilentlyContinue
+
+                if (![BingWallpaperNative]::SystemParametersInfo(20, 0, $Dest, 3)) {
+                    throw 'Windows could not apply the downloaded image as desktop wallpaper.'
+                }
+            }
+
+            return @{ Success = $true; Error = $null; Dest = $Dest }
+        }
+        catch {
+            return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
+        }
+    }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style)
+
+    $asyncOp = $ps.BeginInvoke()
+
+    $script:applyContext = @{
+        PS = $ps
+        AsyncOp = $asyncOp
+        Target = $Target
+    }
+
+    if ($script:applyTimer) {
+        $script:applyTimer.Stop()
+        $script:applyTimer = $null
+    }
+
+    $script:applyTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:applyTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+    $script:applyTimer.Add_Tick({
+        param($timerSender, $timerArgs)
+        if (-not $script:applyContext) {
+            $timerSender.Stop()
+            return
+        }
+        if ($script:applyContext.AsyncOp.IsCompleted) {
+            $timerSender.Stop()
+            $ctx = $script:applyContext
+            $script:applyContext = $null
+            $script:applyTimer = $null
+
+            $isSuccess = $false
+            $errorMsg = $null
+            try {
+                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                $isSuccess = ($res -and $res.Success -eq $true)
+                $errorMsg = if ($res) { $res.Error } else { $null }
+
+                # Apply Lockscreen if needed
+                if ($isSuccess -and ($ctx.Target -eq 'Lock screen' -or $ctx.Target -eq 'Both')) {
+                    $cPath = $res.Dest
+                    $fullCachePath = (Resolve-Path -LiteralPath $cPath).Path
+                    $cacheDirectory = Split-Path -Parent $fullCachePath
+                    $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
+                    Copy-Item -LiteralPath $fullCachePath -Destination $lockScreenCachePath -Force
+                    $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
+                    if (-not $resLock) {
+                        throw 'Windows could not apply the lock screen image.'
+                    }
+                }
+            }
+            catch {
+                $isSuccess = $false
+                $errorMsg = $_.Exception.Message
+            }
+            finally {
+                try { $ctx.PS.Dispose() } catch {}
+                $UpdateBtn.IsEnabled = $true
+                $DownloadBtn.IsEnabled = $true
+            }
+
+            if ($isSuccess) {
+                Set-TransientStatus -Message (Get-AppliedSuccessMessage $ctx.Target)
+            }
+            else {
+                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "apply wallpaper"
+                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+            }
+        }
+    })
+    $script:applyTimer.Start()
+}
 
 function Restore-StatusTextDefaultWithFade {
     # If no wallpapers are loaded, never prompt to double-click
@@ -2872,25 +3012,7 @@ function Load-Gallery {
                     Select-Card $evtSender $clickedImage
                     
                     if ($e.ClickCount -eq 2) {
-                        $actionTitle = Get-CleanImageTitle $clickedImage
-                        $UpdateBtn.IsEnabled = $false
-                        $DownloadBtn.IsEnabled = $false
-                        $StatusText.Foreground = $statusDefaultBrush
-                        $StatusText.Text = "Applying $actionTitle..."
-                        Update-UI
-
-                        try {
-                            $null = Set-BingImage -Image $clickedImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
-                            Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
-                        }
-                        catch {
-                            $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "apply wallpaper"
-                            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-                        }
-                        finally {
-                            $UpdateBtn.IsEnabled = $true
-                            $DownloadBtn.IsEnabled = $true
-                        }
+                        Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
                     }
                 })
 
@@ -2935,41 +3057,34 @@ function Load-Gallery {
     }
 }
 
-# Main Apply Button Logic (Sets wallpaper without permanent disk save)
+# Main Apply Button Logic (Sets wallpaper without permanent disk save asynchronously)
 $UpdateBtn.Add_Click({
-        $targetImage = if ($script:selectedImage) { 
-            $script:selectedImage 
+        $targetImage = $null
+        $targetCard = $null
+
+        if ($script:selectedCard -and $script:selectedImage) { 
+            $targetImage = $script:selectedImage 
+            $targetCard = $script:selectedCard
         }
-        elseif ($script:selection.Image) { 
-            $script:selection.Image 
+        elseif ($script:selection.Card -and $script:selection.Image) { 
+            $targetImage = $script:selection.Image 
+            $targetCard = $script:selection.Card
         }
         elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) { 
-            $script:loadedImages[0] 
+            $targetImage = $script:loadedImages[0] 
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
         }
         else { 
-            (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+            $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
         }
         if (-not $targetImage) { return }
-        $actionTitle = Get-CleanImageTitle $targetImage
 
-        $UpdateBtn.IsEnabled = $false
-        $DownloadBtn.IsEnabled = $false
-        $StatusText.Foreground = $statusDefaultBrush
-        $StatusText.Text = "Applying $actionTitle..."
-        Update-UI
-
-        try {
-            $null = Set-BingImage -Image $targetImage -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
-            Set-TransientStatus -Message (Get-AppliedSuccessMessage $TargetBox.SelectedItem)
-        }
-        catch {
-            $errMsg = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "apply wallpaper"
-            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-        }
-        finally {
-            $UpdateBtn.IsEnabled = $true
-            $DownloadBtn.IsEnabled = $true
-        }
+        Apply-WallpaperAsync -Image $targetImage -Card $targetCard -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
     })
 
 # Dedicated Download Button Logic (Saves image to configured folder asynchronously)
@@ -3199,6 +3314,10 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
+
+
+
 
 
 
