@@ -38,12 +38,12 @@ jobs:
 
           # Compile executable
           powershell -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
-          if (-not (Test-Path .\BingWallpaper.exe)) {
-            throw "BingWallpaper.exe failed to compile"
+          if (-not (Test-Path .\AutoScape.exe)) {
+            throw "AutoScape.exe failed to compile"
           }
-          if (-not (Test-Path .\BingWallpaper.exe.sha256)) {
-            $hash = (Get-FileHash -LiteralPath .\BingWallpaper.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-            Set-Content -LiteralPath .\BingWallpaper.exe.sha256 -Value "$hash  BingWallpaper.exe" -Encoding ASCII
+          if (-not (Test-Path .\AutoScape.exe.sha256)) {
+            $hash = (Get-FileHash -LiteralPath .\AutoScape.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+            Set-Content -LiteralPath .\AutoScape.exe.sha256 -Value "$hash  AutoScape.exe" -Encoding ASCII
           }
 
           "version=$ver" >> $env:GITHUB_OUTPUT
@@ -53,20 +53,20 @@ jobs:
         with:
           tag_name: latest
           target_commitish: ${{ github.sha }}
-          name: "Bing Wallpaper v${{ steps.build_step.outputs.version }} (Latest)"
+          name: "AutoScape v${{ steps.build_step.outputs.version }} (Latest)"
           body: |
-            ### 🚀 Bing Wallpaper Latest Build (v${{ steps.build_step.outputs.version }})
+            ### 🚀 AutoScape Latest Build (v${{ steps.build_step.outputs.version }})
             Automatically built from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
 
             #### 📦 Downloads
-            - **[BingWallpaper.exe](https://github.com/${{ github.repository }}/releases/download/latest/BingWallpaper.exe)** (Zero-console standalone launcher)
-            - **[BingWallpaper.exe.sha256](https://github.com/${{ github.repository }}/releases/download/latest/BingWallpaper.exe.sha256)** (SHA-256 Checksum)
+            - **[AutoScape.exe](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.exe)** (Zero-console standalone launcher)
+            - **[AutoScape.exe.sha256](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.exe.sha256)** (SHA-256 Checksum)
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            BingWallpaper.exe
-            BingWallpaper.exe.sha256
+            AutoScape.exe
+            AutoScape.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -75,21 +75,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "Bing Wallpaper ${{ github.ref_name }}"
+          name: "AutoScape ${{ github.ref_name }}"
           body: |
-            ### 🚀 Bing Wallpaper Release (${{ github.ref_name }})
+            ### 🚀 AutoScape Release (${{ github.ref_name }})
             Built from commit `${{ github.sha }}` on tag `${{ github.ref_name }}`.
 
             #### 📦 Downloads
-            - **[BingWallpaper.exe](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/BingWallpaper.exe)**
-            - **[BingWallpaper.exe.sha256](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/BingWallpaper.exe.sha256)**
+            - **[AutoScape.exe](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.exe)**
+            - **[AutoScape.exe.sha256](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.exe.sha256)**
           draft: false
           prerelease: false
           files: |
-            BingWallpaper.exe
-            BingWallpaper.exe.sha256
+            AutoScape.exe
+            AutoScape.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-

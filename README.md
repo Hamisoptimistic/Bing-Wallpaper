@@ -1,15 +1,15 @@
 <div align="center">
 
 <h1>
-  <img src="assets/bing-color.svg" width="36" height="36" alt="Bing Logo" style="vertical-align: middle; margin-right: 8px;" />
-  Bing Wallpaper for Windows
+  <img src="assets/PeakView_logo_vector.svg" width="36" height="36" alt="AutoScape Logo" style="vertical-align: middle; margin-right: 8px;" />
+  AutoScape for Windows
 </h1>
 
 <p><b>Daily 4K Bing photography delivered to your Desktop & Lock Screen with near-zero resource consumption.</b></p>
 
 <p align="center">
-  <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1">
-    <img src="https://img.shields.io/badge/Download%20for%20Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download Bing Wallpaper" />
+  <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/AutoScape.exe?download=1">
+    <img src="https://img.shields.io/badge/Download%20for%20Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Download AutoScape" />
   </a>
 </p>
 
@@ -24,21 +24,21 @@
 
 <br />
 
-<img src="assets/Preview.jpg" width="100%" alt="Bing Wallpaper Application Preview" />
+<img src="assets/Preview.jpg" width="100%" alt="AutoScape Application Preview" />
 
 </div>
 
 ---
 
-## Why Bing Wallpaper?
+## Why AutoScape?
 
 Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanently hogging **150 MB to 400 MB of RAM** just to change a wallpaper once a day.
 
-**Bing Wallpaper for Windows is built natively:**
+**AutoScape for Windows is built natively:**
 - **~50–60 MB Active RAM**: The lightweight WPF interface uses minimal memory while open.
 - **0 MB Idle RAM**: The application exits completely when you close it. Automated background rotations are scheduled directly through Windows Task Scheduler—no background tray process or resident daemon needed.
 - **100% Silent Execution**: Uses an invisible native runner to apply wallpapers in the background without terminal flashes or command prompt windows.
-- **Zero-Console Standalone App**: Launches instantly via `BingWallpaper.exe` with no terminal pop-up.
+- **Zero-Console Standalone App**: Launches instantly via `AutoScape.exe` with no terminal pop-up.
 
 ---
 
@@ -64,32 +64,32 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
   <tr>
     <td width="50%" align="center">
       <br />
-      <b>🤫 1-Click Silent Background Automation</b>
+      <b>🔄 Auto-Change via Windows Task Scheduler</b>
       <br /><br />
-      Toggle <b>Auto</b> on to update wallpapers automatically. Choose from <i>On Login</i>, <i>1 minute (test)</i>, <i>Hourly</i>, <i>Every 6 hours</i>, or <i>Daily</i> with zero console pop-ups.
+      Runs purely natively in the background. Choose between <i>On Login</i>, <i>1 min</i>, <i>Hourly</i>, <i>Every 6h</i>, or <i>Daily at 12:00 AM</i>.
       <br /><br />
     </td>
     <td width="50%" align="center">
       <br />
-      <b>🎯 Desktop & Lock Screen Support</b>
+      <b>🖼️ Ultra HD / 4K & Multi-Monitor Fit</b>
       <br /><br />
-      Personalize your <b>Desktop</b>, <b>Lock Screen</b>, or <b>Both</b> simultaneously. Select wallpaper styles: <i>Fit</i>, <i>Fill</i>, <i>Stretch</i>, <i>Center</i>, or <i>Tile</i>.
+      Pulls authentic 4K UHD imagery from Microsoft Bing. Choose your target (<i>Desktop</i>, <i>Lock screen</i>, or <i>Both</i>) and layout (<i>Fit</i>, <i>Fill</i>, <i>Stretch</i>, <i>Center</i>, <i>Span</i>).
       <br /><br />
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
       <br />
-      <b>📐 4K UHD & Crisp Resolutions</b>
+      <b>🌍 Global Region Support & Auto-Detect</b>
       <br /><br />
-      Select your preferred resolution directly from the toolbar: <b>4K / UHD</b>, <b>1080p Full HD</b>, or standard widescreen formats.
+      Switch between 40+ countries and regions or let the app automatically match your current Windows locale.
       <br /><br />
     </td>
     <td width="50%" align="center">
       <br />
-      <b>🌍 50+ Global Country Feeds</b>
+      <b>🚀 1-Click Cryptographically Verified Updates</b>
       <br /><br />
-      Explore and apply daily wallpapers curated from 50+ international regions (India, United States, United Kingdom, Japan, Germany, France, Australia, and more).
+      Built-in update checker checks GitHub Releases, verifies SHA-256 integrity, and hot-swaps the application executable safely.
       <br /><br />
     </td>
   </tr>
@@ -113,10 +113,10 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 ---
 
-## Quick Comparison
+## Comparison: AutoScape vs. Official Bing Wallpaper
 
 <p align="center">
-  <img src="assets/comparison-table.svg" width="100%" alt="Bing Wallpaper Comparison Table" />
+  <img src="assets/comparison-table.svg" width="100%" alt="AutoScape Comparison Table" />
 </p>
 
 
@@ -126,7 +126,7 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 ## Getting Started
 
 ### 1. Download & Launch
-Download **[`BingWallpaper.exe`](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/BingWallpaper.exe?download=1)** and double-click to run. No setup wizard or administrative permissions required.
+Download **[`AutoScape.exe`](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/AutoScape.exe?download=1)** and double-click to run. No setup wizard or administrative permissions required.
 
 ### 2. Automatic Updates
 Inside the application, turn the **Auto** toggle to **ON**:
@@ -150,7 +150,7 @@ powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "Bing-Wallpaper
 
 ## Building from Source
 
-To compile the standalone `BingWallpaper.exe` launcher and create a desktop shortcut:
+To compile the standalone `AutoScape.exe` launcher and create a desktop shortcut:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File "scripts\Create-Bing-App-Shortcut.ps1"

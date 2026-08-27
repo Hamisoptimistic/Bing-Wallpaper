@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.149'
+$script:appVersion = [Version]'1.0.150'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -3772,23 +3772,11 @@ $SpotlightPill.Add_PreviewMouseLeftButtonDown({
         Update-SpotlightScheduledTaskAsync -Enable $newState
         Save-Settings
         
-        $whiteBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Colors]::White)
-        $runPrefix = New-Object System.Windows.Documents.Run("Automatic wallpaper changing ")
-        $runPrefix.Foreground = $whiteBrush
-
-        Set-TransientStatus -Message ""
-        $StatusText.Inlines.Clear()
-        $StatusText.Inlines.Add($runPrefix)
-
         if ($newState) {
-            $runState = New-Object System.Windows.Documents.Run("enabled.")
-            $runState.Foreground = $statusSuccessBrush
-            $StatusText.Inlines.Add($runState)
+            Set-TransientStatus -Message "Automatic wallpaper changing enabled." -Brush $statusSuccessBrush
         }
         else {
-            $runState = New-Object System.Windows.Documents.Run("disabled.")
-            $runState.Foreground = $statusErrorBrush
-            $StatusText.Inlines.Add($runState)
+            Set-TransientStatus -Message "Automatic wallpaper changing disabled." -Brush $statusErrorBrush
         }
     })
 
@@ -4385,6 +4373,9 @@ $window.Add_PreviewKeyDown({
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
 
 
 
