@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.129'
+$script:appVersion = [Version]'1.0.130'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -939,6 +939,30 @@ if ($AutoApply) {
         </Style>
 
 
+        <!-- ComboBox Toggle Button Template -->
+        <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
+            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="34"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Name="ArrowIcon" Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" Foreground="#777" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" IsHitTestVisible="False"/>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
+                    <Setter TargetName="ArrowIcon" Property="Foreground" Value="#DDD"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                    <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
+                    <Setter TargetName="ArrowIcon" Property="Foreground" Value="#0078D4"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
         <!-- Modern Windows 11 ComboBox Style (Borderless Matte) -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#2A2A2A"/>
@@ -950,34 +974,38 @@ if ($AutoApply) {
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="34"/>
-                                    </Grid.ColumnDefinitions>
-                                    <ContentPresenter Grid.Column="0" Content="{TemplateBinding SelectionBoxItem}" TextElement.Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" Margin="14,0,0,0"/>
-                                    <TextBlock Name="ArrowIcon" Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" Foreground="#777" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" IsHitTestVisible="False"/>
-                                </Grid>
-                            </Border>
-                            <ToggleButton Opacity="0" IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Cursor="Hand" />
-                            <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
+                            <ToggleButton Name="ToggleButton"
+                                          Template="{StaticResource ComboBoxToggleButtonTemplate}"
+                                          Background="{TemplateBinding Background}"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <ContentPresenter Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              VerticalAlignment="Center"
+                                              Margin="14,0,34,0"/>
+                            <Popup Name="PART_Popup"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   Focusable="False">
                                 <Border Background="#1E1E1E" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
                                     <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
-                                        <ItemsPresenter/>
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
                                 </Border>
                             </Popup>
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
-                                <Setter TargetName="ArrowIcon" Property="Foreground" Value="#DDD"/>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="PART_Popup" Property="MinHeight" Value="95"/>
                             </Trigger>
-                            <Trigger Property="IsDropDownOpen" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
-                                <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
-                                <Setter TargetName="ArrowIcon" Property="Foreground" Value="#0078D4"/>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#888888"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1448,31 +1476,35 @@ function Update-UI {
 # Run the visual feedback before the synchronous gallery work starts. WPF owns
 # the animation clock, so this needs no timer, polling loop, or background worker.
 function Start-RefreshAnimation {
-    if (-not $RefreshIcon) { 
-        Load-Gallery
-        return 
-    }
+    if (-not $RefreshIcon) { return }
 
     $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
     $spin = New-Object System.Windows.Media.Animation.DoubleAnimation
     $spin.From = 0
     $spin.To = 360
-    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(700))
-    $spin.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
+    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(560))
+    $spin.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
     [System.Windows.Media.Animation.Timeline]::SetDesiredFrameRate($spin, 60)
-    $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin)
+    $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin, [System.Windows.Media.Animation.HandoffBehavior]::SnapshotAndReplace)
 
-    Load-Gallery
-}
-
-function Stop-RefreshAnimation {
-    if ($RefreshIcon) {
-        $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
-        $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $null)
-        $rotation.Angle = 0
-    }
-    $script:isRefreshAnimating = $false
-    if ($RefreshBtn) { $RefreshBtn.IsEnabled = $true }
+    # PowerShell does not consistently deliver WPF animation Completed callbacks.
+    # Use one dispatcher tick to start the reload after the visual feedback ends.
+    $script:refreshDelayTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(560)
+    $script:refreshDelayTimer.Add_Tick({
+            $script:refreshDelayTimer.Stop()
+            $script:refreshDelayTimer = $null
+            $finishedRotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
+            $finishedRotation.Angle = 0
+            try {
+                Load-Gallery
+            }
+            finally {
+                $script:isRefreshAnimating = $false
+                $RefreshBtn.IsEnabled = $true
+            }
+        })
+    $script:refreshDelayTimer.Start()
 }
 
 # Populate Settings (Alphabetically sorted, Auto pinned at top)
@@ -2872,8 +2904,6 @@ function Load-Gallery {
             $script:galleryRunspaceContext = $null
             $script:galleryTimer = $null
 
-            Stop-RefreshAnimation
-
             $images = @()
             $isSuccess = $false
             $errorMsg = $null
@@ -3413,62 +3443,4 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
