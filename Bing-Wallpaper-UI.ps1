@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.128'
+$script:appVersion = [Version]'1.0.129'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1448,35 +1448,31 @@ function Update-UI {
 # Run the visual feedback before the synchronous gallery work starts. WPF owns
 # the animation clock, so this needs no timer, polling loop, or background worker.
 function Start-RefreshAnimation {
-    if (-not $RefreshIcon) { return }
+    if (-not $RefreshIcon) { 
+        Load-Gallery
+        return 
+    }
 
     $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
     $spin = New-Object System.Windows.Media.Animation.DoubleAnimation
     $spin.From = 0
     $spin.To = 360
-    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(560))
-    $spin.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
+    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(700))
+    $spin.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
     [System.Windows.Media.Animation.Timeline]::SetDesiredFrameRate($spin, 60)
-    $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin, [System.Windows.Media.Animation.HandoffBehavior]::SnapshotAndReplace)
+    $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin)
 
-    # PowerShell does not consistently deliver WPF animation Completed callbacks.
-    # Use one dispatcher tick to start the reload after the visual feedback ends.
-    $script:refreshDelayTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(560)
-    $script:refreshDelayTimer.Add_Tick({
-            $script:refreshDelayTimer.Stop()
-            $script:refreshDelayTimer = $null
-            $finishedRotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
-            $finishedRotation.Angle = 0
-            try {
-                Load-Gallery
-            }
-            finally {
-                $script:isRefreshAnimating = $false
-                $RefreshBtn.IsEnabled = $true
-            }
-        })
-    $script:refreshDelayTimer.Start()
+    Load-Gallery
+}
+
+function Stop-RefreshAnimation {
+    if ($RefreshIcon) {
+        $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
+        $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $null)
+        $rotation.Angle = 0
+    }
+    $script:isRefreshAnimating = $false
+    if ($RefreshBtn) { $RefreshBtn.IsEnabled = $true }
 }
 
 # Populate Settings (Alphabetically sorted, Auto pinned at top)
@@ -1800,6 +1796,8 @@ $script:downloadTimer = $null
 $script:dlContext = $null
 $script:applyTimer = $null
 $script:applyContext = $null
+$script:galleryTimer = $null
+$script:galleryRunspaceContext = $null
 
 function Apply-WallpaperAsync {
     param(
@@ -2738,7 +2736,7 @@ function Show-GalleryCard {
     $translate.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $slide)
 }
 
-# Load Gallery Function
+# Load Gallery Function (100% Asynchronous with zero UI freeze)
 function Load-Gallery {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     [CmdletBinding()]
@@ -2747,6 +2745,16 @@ function Load-Gallery {
     if ($script:fadeTimer) { $script:fadeTimer.Stop() }
     if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
     if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+
+    # Stop and dispose previous gallery runspace if one is currently in progress
+    if ($script:galleryTimer) {
+        $script:galleryTimer.Stop()
+        $script:galleryTimer = $null
+    }
+    if ($script:galleryRunspaceContext) {
+        try { $script:galleryRunspaceContext.PS.Dispose() } catch {}
+        $script:galleryRunspaceContext = $null
+    }
 
     $GalleryPanel.Children.Clear()
     $script:selectedCard = $null
@@ -2767,294 +2775,385 @@ function Load-Gallery {
     $StatusText.Opacity = 1
     $StatusText.Text = 'Connecting to Bing...'
     $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
-    Update-UI
 
-    try {
-        $selectedRegion = Get-SelectedRegionCode
-        $images = Get-BingImages -Region $selectedRegion
-        if (-not $images -or $images.Count -eq 0) {
-            throw [System.Net.WebException]::new("Unable to connect to Bing.")
-        }
-        $script:loadedImages = $images
-        $total = $images.Count
+    $selectedRegion = Get-SelectedRegionCode
+    $thumbCacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\Thumbnails'
+    if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
+        try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
+    }
 
-        $thumbCacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache\Thumbnails'
-        if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
-            New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null
-        }
+    # Execute Bing API fetch & multi-threaded thumbnail downloads in background runspace (0ms UI freeze!)
+    $ps = [powershell]::Create()
+    [void]$ps.AddScript({
+        param([string]$Region, [string]$CacheDir)
+        try {
+            $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
+            $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
+            $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
+            
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            $json1 = $wc.DownloadString($uri1)
+            $json2 = $wc.DownloadString($uri2)
+            $wc.Dispose()
 
-        # Multi-threaded parallel background download of all thumbnails (fast!)
-        $urlBases = [string[]]($images | ForEach-Object { $_.urlbase })
-        [BingWallpaper.FastDownloader]::DownloadThumbnailsParallel($urlBases, $thumbCacheDir)
+            $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
+            $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
 
-        $current = 0
-        foreach ($image in $images) {
-            $current++
-            $displayTitle = Get-CleanImageTitle $image
+            $allImages = @()
+            if ($batch1) { $allImages += $batch1 }
+            if ($batch2) { $allImages += $batch2 }
 
-            # Modern edge-to-edge flush Image Card
-            $card = New-Object System.Windows.Controls.Border
-            $card.Background = $cardUnselectedBg
-            $card.CornerRadius = New-Object System.Windows.CornerRadius(12)
-            $card.BorderThickness = New-Object System.Windows.Thickness(0)
-            $card.ClipToBounds = $true
-            $cardClip = New-Object System.Windows.Media.RectangleGeometry
-            $cardClip.RadiusX = 12
-            $cardClip.RadiusY = 12
-            $card.Clip = $cardClip
-            $card.Add_SizeChanged({
-                    param($evtSender, $e)
-                    $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
-                })
-            $card.Padding = New-Object System.Windows.Thickness(0)
-            $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
-            $card.Cursor = [System.Windows.Input.Cursors]::Hand
-            $card.Tag = $image
-            if ($image.copyright) {
-                $card.ToolTip = "$displayTitle`n$($image.copyright)"
+            $uniqueImages = $allImages | Group-Object -Property urlbase | ForEach-Object { $_.Group[0] } | Sort-Object -Property enddate -Descending
+            if (-not $uniqueImages -or $uniqueImages.Count -eq 0) {
+                return @{ Success = $false; Error = "Unable to connect to Bing."; Images = @() }
             }
-            
-            # Subtle default drop shadow
-            $shadow = New-Object System.Windows.Media.Effects.DropShadowEffect
-            $shadow.Color = [System.Windows.Media.Colors]::Black
-            $shadow.Direction = 270
-            $shadow.ShadowDepth = 2
-            $shadow.BlurRadius = 10
-            $shadow.Opacity = 0.3
-            $card.Effect = $shadow
 
-            # Reveal Highlight Effect Setup (Background - Smooth Diffused Falloff)
-            $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
-            $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-
-            # Smooth multi-stop gradient falloff (no harsh circular edges)
-            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(28, 255, 255, 255), 0.0)))
-            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(14, 255, 255, 255), 0.4)))
-            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(4, 255, 255, 255), 0.75)))
-            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-
-            # Keep the radius around 160-200 for a soft ambient wash
-            $revealBrush.RadiusX = 180
-            $revealBrush.RadiusY = 180
-            
-            $revealRect = New-Object System.Windows.Shapes.Rectangle
-            $revealRect.Fill = $revealBrush
-            $revealRect.Opacity = 0
-            $revealRect.IsHitTestVisible = $false
-            $revealRect.RadiusX = 12
-            $revealRect.RadiusY = 12
-            
-            $script:revealElements.Add(@{ Element = $revealRect; Brush = $revealBrush }) | Out-Null
-
-            # Reveal Border Effect Setup (Always visible border glow)
-            $revealBorderBrush = New-Object System.Windows.Media.RadialGradientBrush
-            $revealBorderBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-            $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(90, 255, 255, 255), 0.0)))
-            $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-            $revealBorderBrush.RadiusX = 160
-            $revealBorderBrush.RadiusY = 160
-
-            $revealBorder = New-Object System.Windows.Controls.Border
-            $revealBorder.BorderBrush = $revealBorderBrush
-            $revealBorder.BorderThickness = New-Object System.Windows.Thickness(1.5)
-            $revealBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
-            $revealBorder.IsHitTestVisible = $false
-            
-            $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
-
-            # Hover Effects
-            $card.Add_MouseEnter({ 
-                    param($evtSender, $e)
-                    if ($evtSender -ne $script:selectedCard) {
-                        $evtSender.Background = $cardHoverBg
-                    }
-                
-                    # Dynamic hover shadow & reveal light lookup
-                    $evtSender.Effect.BlurRadius = 25
-                    $evtSender.Effect.ShadowDepth = 8
-
-                    $grid = $evtSender.Child
-                    if ($grid -and $grid.Children.Count -gt 1) {
-                        $grid.Children[1].Opacity = 1
-                    }
-                })
-
-            $card.Add_MouseLeave({ 
-                    param($evtSender, $e)
-                    if ($evtSender -ne $script:selectedCard) {
-                        $evtSender.Background = $cardUnselectedBg
-                    }
-                    else {
-                        Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
-                    }
-
-                    # Reset shadow & reveal light
-                    $evtSender.Effect.BlurRadius = 10
-                    $evtSender.Effect.ShadowDepth = 2
-                    $evtSender.Effect.Opacity = 0.3
-
-                    $grid = $evtSender.Child
-                    if ($grid -and $grid.Children.Count -gt 1) {
-                        $grid.Children[1].Opacity = 0
-                    }
-                })
-
-            $stack = New-Object System.Windows.Controls.StackPanel
-            $stack.IsHitTestVisible = $false
-
-            $cardGrid = New-Object System.Windows.Controls.Grid
-            $cardGrid.Children.Add($stack)
-            $cardGrid.Children.Add($revealRect)
-            $cardGrid.Children.Add($revealBorder)
-            
-            $card.Child = $cardGrid
-
-            # Image Container (Using Image control for native aspect ratio scaling)
-            $imgBorder = New-Object System.Windows.Controls.Border
-            $imgBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
-            $imgBorder.ClipToBounds = $true
-            $imgBorder.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20)))
-
-            $imageControl = New-Object System.Windows.Controls.Image
-            $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
-            $imgBorder.Child = $imageControl
-
-            $stack.Children.Add($imgBorder)
-
-            # Load thumbnail from disk cache with fast LockBits accent extraction
-            try {
-                $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
-                $thumbCachePath = Join-Path $thumbCacheDir "${safeName}_thumb.jpg"
-                if (-not (Test-Path -LiteralPath $thumbCachePath)) {
-                    $wc = New-Object System.Net.WebClient
-                    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-                    $wc.DownloadFile("https://www.bing.com$($image.urlbase)_1920x1080.jpg", $thumbCachePath)
-                    $wc.Dispose()
-                }
-                if (Test-Path -LiteralPath $thumbCachePath) {
-                    $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
-                    $bitmap.BeginInit()
-                    $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
-                    $bitmap.DecodePixelWidth = 360
-                    $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
-                    $bitmap.EndInit()
-                    $bitmap.Freeze()
-
-                    [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
-                    $imageControl.Source = $bitmap
-                    $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+            # Parallel download of missing thumbnails in background thread pool
+            $tasks = [System.Collections.Generic.List[System.Threading.Tasks.Task]]::new()
+            foreach ($img in $uniqueImages) {
+                $safeName = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                $thumbPath = Join-Path $CacheDir "${safeName}_thumb.jpg"
+                if (-not (Test-Path -LiteralPath $thumbPath)) {
+                    $imgUrl = "https://www.bing.com$($img.urlbase)_1920x1080.jpg"
+                    $task = [System.Threading.Tasks.Task]::Run([Action]{
+                        try {
+                            $dlClient = New-Object System.Net.WebClient
+                            $dlClient.Headers.Add("User-Agent", "Mozilla/5.0")
+                            $dlClient.DownloadFile($imgUrl, $thumbPath)
+                            $dlClient.Dispose()
+                        } catch {}
+                    })
+                    $tasks.Add($task)
                 }
             }
-            catch {}
+            if ($tasks.Count -gt 0) {
+                [System.Threading.Tasks.Task]::WaitAll($tasks.ToArray(), 10000) | Out-Null
+            }
 
-            # Details Setup
-            $details = New-Object System.Windows.Controls.StackPanel
-            $details.Margin = New-Object System.Windows.Thickness(14, 10, 14, 12)
+            # Return image objects array
+            $resultImages = @()
+            foreach ($img in $uniqueImages) {
+                $resultImages += [PSCustomObject]@{
+                    urlbase   = [string]$img.urlbase
+                    url       = [string]$img.url
+                    title     = [string]$img.title
+                    copyright = [string]$img.copyright
+                    enddate   = [string]$img.enddate
+                }
+            }
 
-            $title = New-Object System.Windows.Controls.TextBlock
-            $title.Text = $displayTitle
-            $title.Foreground = [System.Windows.Media.Brushes]::White
-            $title.FontSize = 15
-            $title.FontWeight = [System.Windows.FontWeights]::SemiBold
-            $title.TextTrimming = 'CharacterEllipsis'
-            $title.Margin = New-Object System.Windows.Thickness(0, 0, 0, 4)
-            $details.Children.Add($title)
+            return @{ Success = $true; Error = $null; Images = $resultImages }
+        }
+        catch {
+            return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
+        }
+    }).AddArgument($selectedRegion).AddArgument($thumbCacheDir)
 
-            $date = New-Object System.Windows.Controls.TextBlock
+    $asyncOp = $ps.BeginInvoke()
+
+    $script:galleryRunspaceContext = @{
+        PS = $ps
+        AsyncOp = $asyncOp
+        ThumbCacheDir = $thumbCacheDir
+    }
+
+    $script:galleryTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:galleryTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+    $script:galleryTimer.Add_Tick({
+        param($timerSender, $timerArgs)
+        if (-not $script:galleryRunspaceContext) {
+            $timerSender.Stop()
+            return
+        }
+        if ($script:galleryRunspaceContext.AsyncOp.IsCompleted) {
+            $timerSender.Stop()
+            $ctx = $script:galleryRunspaceContext
+            $script:galleryRunspaceContext = $null
+            $script:galleryTimer = $null
+
+            Stop-RefreshAnimation
+
+            $images = @()
+            $isSuccess = $false
+            $errorMsg = $null
             try {
-                $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
+                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                $isSuccess = ($res -and $res.Success -eq $true)
+                $images = if ($res -and $res.Images) { @($res.Images) } else { @() }
+                $errorMsg = if ($res) { $res.Error } else { "Failed to load wallpapers." }
             }
             catch {
-                $date.Text = "Bing Wallpaper"
+                $isSuccess = $false
+                $errorMsg = $_.Exception.Message
             }
-            $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
-            $date.FontSize = 13.5
-            $details.Children.Add($date)
+            finally {
+                try { $ctx.PS.Dispose() } catch {}
+            }
 
-            $card.Resources.Add('TitleText', $title)
-            $card.Resources.Add('DateText', $date)
+            if (-not $isSuccess -or $images.Count -eq 0) {
+                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                $StatusText.Opacity = 1
+                $StatusText.Foreground = $statusErrorBrush
+                $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+                return
+            }
 
-            # Details Container with layered shimmer & success glow overlays
-            $detailsContainer = New-Object System.Windows.Controls.Grid
-            $detailsContainer.ClipToBounds = $true
+            $script:loadedImages = $images
+            $total = $images.Count
+            $thumbCacheDir = $ctx.ThumbCacheDir
 
-            # 1. Text Content
-            $detailsContainer.Children.Add($details)
+            $current = 0
+            $firstCard = $null
+            foreach ($image in $images) {
+                $current++
+                $displayTitle = Get-CleanImageTitle $image
 
-            # 2. Shimmer Light Wave Overlay
-            $shimmerOverlay = New-Object System.Windows.Controls.Border
-            $shimmerOverlay.Width = 130
-            $shimmerOverlay.HorizontalAlignment = 'Left'
-            $shimmerOverlay.IsHitTestVisible = $false
-            $shimmerOverlay.Opacity = 0
+                # Modern edge-to-edge flush Image Card
+                $card = New-Object System.Windows.Controls.Border
+                $card.Background = $cardUnselectedBg
+                $card.CornerRadius = New-Object System.Windows.CornerRadius(12)
+                $card.BorderThickness = New-Object System.Windows.Thickness(0)
+                $card.ClipToBounds = $true
+                $cardClip = New-Object System.Windows.Media.RectangleGeometry
+                $cardClip.RadiusX = 12
+                $cardClip.RadiusY = 12
+                $card.Clip = $cardClip
+                $card.Add_SizeChanged({
+                        param($evtSender, $e)
+                        $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
+                    })
+                $card.Padding = New-Object System.Windows.Thickness(0)
+                $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
+                $card.Cursor = [System.Windows.Input.Cursors]::Hand
+                $card.Tag = $image
+                if ($image.copyright) {
+                    $card.ToolTip = "$displayTitle`n$($image.copyright)"
+                }
+                
+                # Subtle default drop shadow
+                $shadow = New-Object System.Windows.Media.Effects.DropShadowEffect
+                $shadow.Color = [System.Windows.Media.Colors]::Black
+                $shadow.Direction = 270
+                $shadow.ShadowDepth = 2
+                $shadow.BlurRadius = 10
+                $shadow.Opacity = 0.3
+                $card.Effect = $shadow
 
-            $shimmerBrush = New-Object System.Windows.Media.LinearGradientBrush
-            $shimmerBrush.StartPoint = New-Object System.Windows.Point(0, 0.5)
-            $shimmerBrush.EndPoint = New-Object System.Windows.Point(1, 0.5)
-            $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 0.0)))
-            $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(75, 255, 255, 255), 0.5)))
-            $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 1.0)))
-            $shimmerOverlay.Background = $shimmerBrush
+                # Reveal Highlight Effect Setup
+                $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
+                $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(28, 255, 255, 255), 0.0)))
+                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(14, 255, 255, 255), 0.4)))
+                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(4, 255, 255, 255), 0.75)))
+                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+                $revealBrush.RadiusX = 180
+                $revealBrush.RadiusY = 180
+                
+                $revealRect = New-Object System.Windows.Shapes.Rectangle
+                $revealRect.Fill = $revealBrush
+                $revealRect.Opacity = 0
+                $revealRect.IsHitTestVisible = $false
+                $revealRect.RadiusX = 12
+                $revealRect.RadiusY = 12
+                
+                $script:revealElements.Add(@{ Element = $revealRect; Brush = $revealBrush }) | Out-Null
 
-            $shimmerTransform = New-Object System.Windows.Media.TranslateTransform
-            $shimmerOverlay.RenderTransform = $shimmerTransform
-            $detailsContainer.Children.Add($shimmerOverlay)
+                $revealBorderBrush = New-Object System.Windows.Media.RadialGradientBrush
+                $revealBorderBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+                $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(90, 255, 255, 255), 0.0)))
+                $revealBorderBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+                $revealBorderBrush.RadiusX = 160
+                $revealBorderBrush.RadiusY = 160
 
-            $card.Resources.Add('ShimmerOverlay', $shimmerOverlay)
-            $card.Resources.Add('ShimmerTransform', $shimmerTransform)
+                $revealBorder = New-Object System.Windows.Controls.Border
+                $revealBorder.BorderBrush = $revealBorderBrush
+                $revealBorder.BorderThickness = New-Object System.Windows.Thickness(1.5)
+                $revealBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
+                $revealBorder.IsHitTestVisible = $false
+                
+                $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
 
-            $stack.Children.Add($detailsContainer)
-
-            # Card Click Action: Select card on single click, apply on double click
-            $card.Add_MouseLeftButtonDown({
-                    param($evtSender, $e)
-                    $clickedImage = $evtSender.Tag 
-                    Select-Card $evtSender $clickedImage
+                # Hover Effects
+                $card.Add_MouseEnter({ 
+                        param($evtSender, $e)
+                        if ($evtSender -ne $script:selectedCard) {
+                            $evtSender.Background = $cardHoverBg
+                        }
                     
-                    if ($e.ClickCount -eq 2) {
-                        Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
+                        $evtSender.Effect.BlurRadius = 25
+                        $evtSender.Effect.ShadowDepth = 8
+
+                        $grid = $evtSender.Child
+                        if ($grid -and $grid.Children.Count -gt 1) {
+                            $grid.Children[1].Opacity = 1
+                        }
+                    })
+
+                $card.Add_MouseLeave({ 
+                        param($evtSender, $e)
+                        if ($evtSender -ne $script:selectedCard) {
+                            $evtSender.Background = $cardUnselectedBg
+                        }
+                        else {
+                            Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
+                        }
+
+                        $evtSender.Effect.BlurRadius = 10
+                        $evtSender.Effect.ShadowDepth = 2
+                        $evtSender.Effect.Opacity = 0.3
+
+                        $grid = $evtSender.Child
+                        if ($grid -and $grid.Children.Count -gt 1) {
+                            $grid.Children[1].Opacity = 0
+                        }
+                    })
+
+                $stack = New-Object System.Windows.Controls.StackPanel
+                $stack.IsHitTestVisible = $false
+
+                $cardGrid = New-Object System.Windows.Controls.Grid
+                $cardGrid.Children.Add($stack)
+                $cardGrid.Children.Add($revealRect)
+                $cardGrid.Children.Add($revealBorder)
+                
+                $card.Child = $cardGrid
+
+                # Image Container
+                $imgBorder = New-Object System.Windows.Controls.Border
+                $imgBorder.CornerRadius = New-Object System.Windows.CornerRadius(12)
+                $imgBorder.ClipToBounds = $true
+                $imgBorder.Background = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20)))
+
+                $imageControl = New-Object System.Windows.Controls.Image
+                $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
+                $imgBorder.Child = $imageControl
+
+                $stack.Children.Add($imgBorder)
+
+                # Load thumbnail from pre-downloaded disk cache (0ms network delay!)
+                try {
+                    $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
+                    $thumbCachePath = Join-Path $thumbCacheDir "${safeName}_thumb.jpg"
+                    if (Test-Path -LiteralPath $thumbCachePath) {
+                        $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
+                        $bitmap.BeginInit()
+                        $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
+                        $bitmap.DecodePixelWidth = 360
+                        $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+                        $bitmap.EndInit()
+                        $bitmap.Freeze()
+
+                        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                        $imageControl.Source = $bitmap
+                        $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+                    }
+                }
+                catch {}
+
+                # Details Setup
+                $details = New-Object System.Windows.Controls.StackPanel
+                $details.Margin = New-Object System.Windows.Thickness(14, 10, 14, 12)
+
+                $title = New-Object System.Windows.Controls.TextBlock
+                $title.Text = $displayTitle
+                $title.Foreground = [System.Windows.Media.Brushes]::White
+                $title.FontSize = 15
+                $title.FontWeight = [System.Windows.FontWeights]::SemiBold
+                $title.TextTrimming = 'CharacterEllipsis'
+                $title.Margin = New-Object System.Windows.Thickness(0, 0, 0, 4)
+                $details.Children.Add($title)
+
+                $date = New-Object System.Windows.Controls.TextBlock
+                try {
+                    $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
+                }
+                catch {
+                    $date.Text = "Bing Wallpaper"
+                }
+                $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
+                $date.FontSize = 13.5
+                $details.Children.Add($date)
+
+                $card.Resources.Add('TitleText', $title)
+                $card.Resources.Add('DateText', $date)
+
+                # Details Container with layered shimmer overlay
+                $detailsContainer = New-Object System.Windows.Controls.Grid
+                $detailsContainer.ClipToBounds = $true
+                $detailsContainer.Children.Add($details)
+
+                $shimmerOverlay = New-Object System.Windows.Controls.Border
+                $shimmerOverlay.Width = 130
+                $shimmerOverlay.HorizontalAlignment = 'Left'
+                $shimmerOverlay.IsHitTestVisible = $false
+                $shimmerOverlay.Opacity = 0
+
+                $shimmerBrush = New-Object System.Windows.Media.LinearGradientBrush
+                $shimmerBrush.StartPoint = New-Object System.Windows.Point(0, 0.5)
+                $shimmerBrush.EndPoint = New-Object System.Windows.Point(1, 0.5)
+                $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 0.0)))
+                $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(75, 255, 255, 255), 0.5)))
+                $shimmerBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Colors]::Transparent, 1.0)))
+                $shimmerOverlay.Background = $shimmerBrush
+
+                $shimmerTransform = New-Object System.Windows.Media.TranslateTransform
+                $shimmerOverlay.RenderTransform = $shimmerTransform
+                $detailsContainer.Children.Add($shimmerOverlay)
+
+                $card.Resources.Add('ShimmerOverlay', $shimmerOverlay)
+                $card.Resources.Add('ShimmerTransform', $shimmerTransform)
+
+                $stack.Children.Add($detailsContainer)
+
+                # Card Click Action: Select card on single click, apply on double click
+                $card.Add_MouseLeftButtonDown({
+                        param($evtSender, $e)
+                        $clickedImage = $evtSender.Tag 
+                        Select-Card $evtSender $clickedImage
+                        
+                        if ($e.ClickCount -eq 2) {
+                            Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
+                        }
+                    })
+
+                $GalleryPanel.Children.Add($card)
+                if (-not $firstCard) { $firstCard = $card }
+                
+                # Stagger the animation by 35ms per card for a cascading effect
+                $staggerDelay = ($current - 1) * 35
+                Show-GalleryCard -Card $card -DelayMs $staggerDelay
+            }
+
+            if ($firstCard -and $images.Count -gt 0) {
+                Select-Card $firstCard $images[0]
+            }
+
+            if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
+            [BingWallpaperNative]::FlushMemory()
+            
+            # Animate the status text to count up synchronously with the card cascade animation
+            $script:loadingCounter = 0
+            $script:loadingTotal = $total
+            
+            if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+            $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
+            $script:loadingStatusTimer.Add_Tick({
+                    $script:loadingCounter++
+                    if ($script:loadingCounter -le $script:loadingTotal) {
+                        $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
+                    }
+                    else {
+                        $script:loadingStatusTimer.Stop()
+                        Restore-StatusTextDefaultWithFade
                     }
                 })
-
-            $GalleryPanel.Children.Add($card)
-            
-            # Stagger the animation by 35ms per card for a cascading effect
-            $staggerDelay = ($current - 1) * 35
-            Show-GalleryCard -Card $card -DelayMs $staggerDelay
+            $script:loadingStatusTimer.Start()
         }
-
-        if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
-        [BingWallpaperNative]::FlushMemory()
-        
-        # Animate the status text to count up synchronously with the card cascade animation
-        $script:loadingCounter = 0
-        $script:loadingTotal = $total
-        
-        if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
-        $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
-        $script:loadingStatusTimer.Add_Tick({
-                $script:loadingCounter++
-                if ($script:loadingCounter -le $script:loadingTotal) {
-                    $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
-                }
-                else {
-                    $script:loadingStatusTimer.Stop()
-                    Restore-StatusTextDefaultWithFade
-                }
-            })
-        $script:loadingStatusTimer.Start()
-    }
-    catch {
-        if ($script:fadeTimer) { $script:fadeTimer.Stop() }
-        if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
-        if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
-
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        $StatusText.Opacity = 1
-        $StatusText.Foreground = $statusErrorBrush
-        $StatusText.Text = Get-UserFriendlyNetworkError -Exception $_.Exception -DefaultAction "load wallpapers"
-    }
+    })
+    $script:galleryTimer.Start()
 }
 
 # Main Apply Button Logic (Sets wallpaper without permanent disk save asynchronously)
@@ -3314,6 +3413,7 @@ $window.Add_ContentRendered({
 
 # Show the app
 $window.ShowDialog() | Out-Null
+
 
 
 
