@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.147'
+$script:appVersion = [Version]'1.0.148'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -801,7 +801,7 @@ function Get-CleanImageTitle {
             $clean = $matches[1] -creplace '([a-z])([A-Z])', '$1 $2'
             return $clean
         }
-        return 'Bing Wallpaper'
+        return 'AutoScape'
     }
     return $t.Trim()
 }
@@ -880,11 +880,11 @@ if ($AutoApply) {
         $targetImage = $images[0]
         $title = Get-CleanImageTitle $targetImage
         $appliedPath = Set-BingImage -Image $targetImage -Resolution $Resolution -Target $Target -Style $Style
-        Write-Output "Successfully applied Bing Wallpaper: $title ($appliedPath)"
+        Write-Output "Successfully applied AutoScape wallpaper: $title ($appliedPath)"
         exit 0
     }
     catch {
-        Write-Error "Failed to apply Bing Wallpaper: $($_.Exception.Message)"
+        Write-Error "Failed to apply AutoScape wallpaper: $($_.Exception.Message)"
         exit 1
     }
 }
@@ -896,7 +896,7 @@ if ($AutoApply) {
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Bing Wallpaper" Height="780" Width="1100"
+        Title="AutoScape" Height="780" Width="1100"
         Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
     <Window.Resources>
@@ -1264,7 +1264,8 @@ if ($AutoApply) {
                         </Viewbox>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Bing Wallpaper" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,4"/>
+                        <TextBlock Text="AutoScape" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,2"/>
+                        <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
@@ -1468,7 +1469,7 @@ try {
     }
 '@
     Add-Type -TypeDefinition $code -IgnoreWarnings
-    [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("BingWallpaper.App")
+    [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App")
 }
 catch {}
 
@@ -2518,8 +2519,8 @@ function Format-MarkdownForDialog {
 
 function Show-ModernDialog {
     param(
-        [string]$Title = 'Bing Wallpaper',
-        [string]$Header = 'Bing Wallpaper',
+        [string]$Title = 'AutoScape',
+        [string]$Header = 'AutoScape',
         [string]$Message = '',
         [string]$Details = '',
         [ValidateSet('Info', 'Update', 'Error', 'Success')]
@@ -2922,7 +2923,7 @@ function Start-VerifiedUpdate {
                 }
 
                 if (-not $hasUpdate) {
-                    Show-ModernDialog -Title "Bing Wallpaper" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
+                    Show-ModernDialog -Title "AutoScape" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
                     Set-TransientStatus -Message 'You are up to date.' -Brush $statusDefaultBrush
                     return
                 }
@@ -2947,17 +2948,21 @@ function Start-VerifiedUpdateDownloadAsync {
         [string]$LatestVersionStr
     )
 
-    $exeAsset = $Release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe' } | Select-Object -First 1
-    $checksumAsset = $Release.assets | Where-Object { $_.name -eq 'BingWallpaper.exe.sha256' } | Select-Object -First 1
+    $exeAsset = $Release.assets | Where-Object { $_.name -match '^(AutoScape|BingWallpaper)\.exe$' } | Select-Object -First 1
+    $checksumAsset = $Release.assets | Where-Object { $_.name -match '^(AutoScape|BingWallpaper)\.exe\.sha256$' } | Select-Object -First 1
 
     if (-not $exeAsset) {
-        $errMsg = 'This release does not include BingWallpaper.exe.'
+        $errMsg = 'This release does not include AutoScape.exe.'
         Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
         Show-ModernDialog -Title "Update Error" -Header "Update Failed" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
         return
     }
 
     $exeCandidates = @(
+        (Join-Path ([Environment]::CurrentDirectory) 'AutoScape.exe'),
+        (Join-Path (Get-Location).Path 'AutoScape.exe'),
+        (Join-Path $PSScriptRoot 'AutoScape.exe'),
+        (Join-Path (Split-Path -Parent $PSScriptRoot) 'AutoScape.exe'),
         (Join-Path ([Environment]::CurrentDirectory) 'BingWallpaper.exe'),
         (Join-Path (Get-Location).Path 'BingWallpaper.exe'),
         (Join-Path $PSScriptRoot 'BingWallpaper.exe'),
@@ -2965,7 +2970,7 @@ function Start-VerifiedUpdateDownloadAsync {
     )
     $installedExe = $exeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
     if (-not $installedExe) {
-        $errMsg = 'The installed BingWallpaper.exe could not be found. Run updates from the installed app, not the source script.'
+        $errMsg = 'The installed AutoScape.exe could not be found. Run updates from the installed app, not the source script.'
         Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
         Show-ModernDialog -Title "Update Error" -Header "Update Failed" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
         return
@@ -3825,7 +3830,7 @@ function Show-UserGuideDialog {
         catch {}
         return
     }
-    $cleanTitle = "Bing Wallpaper"
+    $cleanTitle = "AutoScape"
     $cleanDate = "Today's Wallpaper"
     $thumbPath = $null
 
@@ -3864,7 +3869,7 @@ function Show-UserGuideDialog {
     $dialogXaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Bing Wallpaper Guide" Width="$modalWidth" SizeToContent="Height"
+        Title="AutoScape Guide" Width="$modalWidth" SizeToContent="Height"
         Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         ResizeMode="NoResize" WindowStyle="SingleBorderWindow">
@@ -3971,7 +3976,10 @@ function Show-UserGuideDialog {
                             </Canvas>
                         </Canvas>
                     </Viewbox>
-                    <TextBlock Text="Bing Wallpaper" FontSize="26" FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="AutoScape" FontSize="26" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,2"/>
+                        <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
 
@@ -4368,6 +4376,8 @@ $window.Add_Closed({
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
 
 
 

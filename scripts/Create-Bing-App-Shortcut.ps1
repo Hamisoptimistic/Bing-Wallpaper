@@ -35,9 +35,9 @@ if (-not $icoPath) {
         $icoPath = Join-Path $assetsFolder 'app.ico'
     }
 }
-$exePath = Join-Path $rootFolder 'BingWallpaper.exe'
+$exePath = Join-Path $rootFolder 'AutoScape.exe'
 $desktopPath = [Environment]::GetFolderPath('Desktop')
-$desktopShortcutPath = Join-Path $desktopPath 'Bing Wallpaper.lnk'
+$desktopShortcutPath = Join-Path $desktopPath 'AutoScape.lnk'
 $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
 
 Add-Type -AssemblyName System.Drawing
@@ -56,8 +56,8 @@ try {
     }
 } catch {}
 
-# 1. Compile standalone Windows GUI executable (BingWallpaper.exe) with embedded icon
-Write-Output "--> Compiling BingWallpaper.exe (zero-console launcher)..."
+# 1. Compile standalone Windows GUI executable (AutoScape.exe) with embedded icon
+Write-Output "--> Compiling AutoScape.exe (zero-console launcher)..."
 $cscCandidates = @(
     "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
     "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
@@ -72,7 +72,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 
-namespace BingWallpaperLauncher
+namespace AutoScapeLauncher
 {
     static class Program
     {
@@ -80,19 +80,19 @@ namespace BingWallpaperLauncher
         static void Main()
         {
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            string tempDir = Path.Combine(Path.GetTempPath(), "BingWallpaper");
+            string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
             string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
             string iconPath = Path.Combine(tempDir, "assets", "app.ico");
 
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.Bing-Wallpaper-UI.ps1"))
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.Bing-Wallpaper-UI.ps1"))
                 using (FileStream destination = File.Create(psScript))
                 {
                     source.CopyTo(destination);
                 }
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("BingWallpaperLauncher.app.ico"))
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.app.ico"))
                 {
                     if (source != null)
                     {
@@ -129,8 +129,8 @@ namespace BingWallpaperLauncher
         "/optimize+",
         "/platform:anycpu",
         "/win32icon:`"$icoPath`"",
-        "/resource:`"$uiPath`",BingWallpaperLauncher.Bing-Wallpaper-UI.ps1",
-        "/resource:`"$icoPath`",BingWallpaperLauncher.app.ico",
+        "/resource:`"$uiPath`",AutoScapeLauncher.Bing-Wallpaper-UI.ps1",
+        "/resource:`"$icoPath`",AutoScapeLauncher.app.ico",
         "/out:`"$exePath`"",
         "`"$csTemp`""
     )
@@ -140,9 +140,15 @@ namespace BingWallpaperLauncher
 
     if ($proc.ExitCode -eq 0 -and (Test-Path $exePath)) {
         $hasExe = $true
-        $checksumPath = Join-Path $rootFolder 'BingWallpaper.exe.sha256'
+        # Clean up legacy executable and checksum if present
+        $legacyExe = Join-Path $rootFolder 'BingWallpaper.exe'
+        $legacySha = Join-Path $rootFolder 'BingWallpaper.exe.sha256'
+        if (Test-Path $legacyExe) { Remove-Item $legacyExe -Force -ErrorAction SilentlyContinue }
+        if (Test-Path $legacySha) { Remove-Item $legacySha -Force -ErrorAction SilentlyContinue }
+
+        $checksumPath = Join-Path $rootFolder 'AutoScape.exe.sha256'
         $checksum = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
-        Set-Content -LiteralPath $checksumPath -Value "$checksum  BingWallpaper.exe" -Encoding ASCII
+        Set-Content -LiteralPath $checksumPath -Value "$checksum  AutoScape.exe" -Encoding ASCII
         Write-Output "    Created $exePath (with embedded authentic icon)"
         Write-Output "    Created $checksumPath"
     }
@@ -158,12 +164,16 @@ function Create-Shortcut($targetPath, $outLnkPath, $iconLocation, $args = '') {
     if ($args) { $sc.Arguments = $args }
     $sc.WorkingDirectory = $rootFolder
     $sc.IconLocation = "$iconLocation,0"
-    $sc.Description = 'Bing Wallpaper - Daily HD & 4K Wallpapers'
+    $sc.Description = 'AutoScape - Bing wallpapers, delivered daily'
     $sc.Save()
 }
 
 $targetExe = if ($hasExe) { $exePath } else { "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" }
 $targetArgs = if ($hasExe) { "" } else { "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$uiPath`"" }
+
+# Clean up legacy shortcut name if present
+$oldDesktopLnk = Join-Path $desktopPath 'Bing Wallpaper.lnk'
+if (Test-Path $oldDesktopLnk) { Remove-Item $oldDesktopLnk -Force -ErrorAction SilentlyContinue }
 
 if (Test-Path $desktopPath) {
     Create-Shortcut -targetPath $targetExe -outLnkPath $desktopShortcutPath -iconLocation $icoPath -args $targetArgs
@@ -172,7 +182,10 @@ if (Test-Path $desktopPath) {
 
 $startMenuPrograms = [Environment]::GetFolderPath('Programs')
 if ($startMenuPrograms -and (Test-Path $startMenuPrograms)) {
-    $startMenuShortcutPath = Join-Path $startMenuPrograms 'Bing Wallpaper.lnk'
+    $oldStartMenuLnk = Join-Path $startMenuPrograms 'Bing Wallpaper.lnk'
+    if (Test-Path $oldStartMenuLnk) { Remove-Item $oldStartMenuLnk -Force -ErrorAction SilentlyContinue }
+
+    $startMenuShortcutPath = Join-Path $startMenuPrograms 'AutoScape.lnk'
     Create-Shortcut -targetPath $targetExe -outLnkPath $startMenuShortcutPath -iconLocation $icoPath -args $targetArgs
     Write-Output "    Created Start Menu shortcut: $startMenuShortcutPath"
 }
@@ -181,7 +194,7 @@ Write-Output ""
 Write-Output "========================================================="
 Write-Output " Setup Complete!"
 Write-Output " You can launch the app directly from:"
-Write-Output "   1. Desktop shortcut:    'Bing Wallpaper'"
-Write-Output "   2. Start Menu shortcut: 'Bing Wallpaper'"
-Write-Output "   3. Project root:        'BingWallpaper.exe'"
+Write-Output "   1. Desktop shortcut:    'AutoScape'"
+Write-Output "   2. Start Menu shortcut: 'AutoScape'"
+Write-Output "   3. Project root:        'AutoScape.exe'"
 Write-Output "========================================================="
