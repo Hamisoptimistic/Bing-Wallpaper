@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.155'
+$script:appVersion = [Version]'1.0.156'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -1692,6 +1692,13 @@ $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 $GuideBtn = $window.FindName('GuideBtn')
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
+if ($ModalDimOverlay) {
+    $ModalDimOverlay.Add_MouseLeftButtonDown({
+        if ($script:activeGuideDialog) {
+            Close-UserGuideDialog
+        }
+    })
+}
 
 function Set-AppDimState {
     param([bool]$Dim, [bool]$Force = $false)
@@ -1702,15 +1709,16 @@ function Set-AppDimState {
         }
     }
     $targetOpacity = if ($Dim) { 0.55 } else { 0.0 }
+    $ModalDimOverlay.IsHitTestVisible = $Dim
     $currentOpacity = [double]$ModalDimOverlay.Opacity
     if ([Math]::Abs($currentOpacity - $targetOpacity) -lt 0.005) { return }
 
-    # Slower, cinematic transition duration: 500ms on open, 440ms on close
-    $durationMs = if ($Dim) { 500 } else { 440 }
+    # Snappy, fluid Fluent-style transition: 180ms on open, 160ms on close
+    $durationMs = if ($Dim) { 180 } else { 160 }
     $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($durationMs))
     $anim = New-Object System.Windows.Media.Animation.DoubleAnimation($currentOpacity, $targetOpacity, $dur)
     $ease = New-Object System.Windows.Media.Animation.CubicEase
-    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
     $anim.EasingFunction = $ease
     $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $anim)
 }
@@ -2738,20 +2746,7 @@ function Show-ModernDialog {
         param([string]$choice)
         $script:dialogChoice = $choice
         Set-AppDimState $false -Force $true
-        $root = $dlg.FindName('DialogRoot')
-        if ($root) {
-            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, [TimeSpan]::FromMilliseconds(380))
-            $ease = New-Object System.Windows.Media.Animation.CubicEase
-            $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-            $fadeOut.EasingFunction = $ease
-            $fadeOut.Add_Completed({
-                    try { $dlg.Close() } catch {}
-                })
-            $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-        }
-        else {
-            try { $dlg.Close() } catch {}
-        }
+        try { $dlg.Close() } catch {}
     }
 
     if ($Buttons -eq 'YesNo') {
@@ -2802,10 +2797,10 @@ function Show-ModernDialog {
             }
         })
 
-    # Smooth entrance animation (slower, cinematic)
+    # Fast and smooth entrance animation
     $root = $dlg.FindName('DialogRoot')
     if ($root) {
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(450))
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(180))
         $ease = New-Object System.Windows.Media.Animation.CubicEase
         $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
         $fadeIn.EasingFunction = $ease
@@ -3391,7 +3386,7 @@ function Load-Gallery {
                     }
                 
                     # Card glow border: visually identical to DropShadowEffect but uses
-                    # no WPF software-render pass Ã¢â‚¬â€ zero per-frame GPU compositing cost.
+                    # no WPF software-render pass ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â zero per-frame GPU compositing cost.
                     $card.BorderThickness = New-Object System.Windows.Thickness(0)
                     $card.BorderBrush = $null
 
@@ -3638,7 +3633,7 @@ function Load-Gallery {
 # Scroll-aware rendering: BitmapCache + LowQuality during scroll
 # (WPF caches each card as a flat texture, skipping per-card compositing).
 # HighQuality restored 150ms after scroll stops.
-# Uses pre-built flat arrays â€” zero PowerShell pipeline work per tick.
+# Uses pre-built flat arrays ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â zero PowerShell pipeline work per tick.
 # =================================================================
 $script:isScrolling = $false
 $script:scrollIdleTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -3934,25 +3929,16 @@ $script:isClosingGuideDialog = $false
 
 function Close-UserGuideDialog {
     if ($script:isClosingGuideDialog) { return }
-    if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+    $dlg = $script:activeGuideDialog
+    if ($dlg -and $dlg.IsVisible) {
         $script:isClosingGuideDialog = $true
-        $dlg = $script:activeGuideDialog
+        $script:activeGuideDialog = $null
         Set-AppDimState $false -Force $true
-        
-        $root = $dlg.FindName('DialogRoot')
-        if ($root) {
-            $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, [TimeSpan]::FromMilliseconds(380))
-            $ease = New-Object System.Windows.Media.Animation.CubicEase
-            $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-            $fadeOut.EasingFunction = $ease
-            $fadeOut.Add_Completed({
-                    try { $dlg.Close() } catch {}
-                    $script:isClosingGuideDialog = $false
-                })
-            $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
+        try {
+            $dlg.Close()
         }
-        else {
-            try { $dlg.Close() } catch {}
+        catch {}
+        finally {
             $script:isClosingGuideDialog = $false
         }
     }
@@ -4422,10 +4408,10 @@ function Show-UserGuideDialog {
     # Track active dialog instance
     $script:activeGuideDialog = $dlg
 
-    # Smooth entrance animation (slower, cinematic)
+    # Fast and smooth entrance animation
     $root = $dlg.FindName('DialogRoot')
     if ($root) {
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(450))
+        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(180))
         $ease = New-Object System.Windows.Media.Animation.CubicEase
         $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
         $fadeIn.EasingFunction = $ease
@@ -4554,6 +4540,8 @@ $script:memTrimTimer.Start()
 # Show the app
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
 
 
 
