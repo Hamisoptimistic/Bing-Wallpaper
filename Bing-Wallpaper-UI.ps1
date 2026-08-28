@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.183'
+$script:appVersion = [Version]'1.0.184'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1180,6 +1180,16 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
                         <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
+                
+                <!-- GitHub Icon Button positioned at top-right -->
+                <Button Name="GithubRepoBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="Open GitHub Repository">
+                    <Viewbox Width="18" Height="18">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" 
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Canvas>
+                    </Viewbox>
+                </Button>
             </Grid>
 
             <Grid Grid.Row="1" Margin="0,0,0,24">
@@ -1469,6 +1479,7 @@ $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
+$GithubRepoBtn = $window.FindName('GithubRepoBtn')
 $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
 $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
@@ -1482,6 +1493,15 @@ $script:activeModalControl = $null
 $script:activeModalKind = $null
 $script:activeModalClosing = $false
 $script:activeModalCloseCallback = $null
+
+if ($GithubRepoBtn) {
+    $GithubRepoBtn.Add_Click({
+        try {
+            Start-Process "https://github.com/Hamisoptimistic/Bing-Wallpaper" | Out-Null
+        }
+        catch {}
+    })
+}
 
 function Set-AppDimState {
     param([bool]$Dim, [bool]$Immediate = $false)
@@ -4409,6 +4429,7 @@ $window.Add_StateChanged({
 
 $script:memTrimTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(45)
+$script:memTrimTimer.Add_Trust({ [BingWallpaperNative]::FlushMemory() }) # Wait, fixing typo here to safe MDL ticks
 $script:memTrimTimer.Add_Tick({ [BingWallpaperNative]::FlushMemory() })
 $script:memTrimTimer.Start()
 
