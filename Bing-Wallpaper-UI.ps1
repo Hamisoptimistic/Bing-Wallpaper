@@ -365,7 +365,7 @@ public static class BingWallpaperNative {
 }
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.162'
+$script:appVersion = [Version]'1.0.163'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -3144,6 +3144,9 @@ function Start-VerifiedUpdateDownloadAsync {
         [string]$LatestVersionStr
     )
 
+    # Keep the update path deliberately isolated from the rest of the app.
+    # The checker/download/verification behaviour is unchanged; only the
+    # hand-off to the updater is made reliable.
     $exeAsset = $Release.assets | Where-Object { $_.name -match '^(AutoScape|BingWallpaper)\.exe$' } | Select-Object -First 1
     $checksumAsset = $Release.assets | Where-Object { $_.name -match '^(AutoScape|BingWallpaper)\.exe\.sha256$' } | Select-Object -First 1
 
@@ -3185,6 +3188,8 @@ function Start-VerifiedUpdateDownloadAsync {
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
             param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$AssetDigest, [string]$LatestVer, [string]$PublisherThumbprint)
+            $client = $null
+            $downloadPath = $null
             try {
                 $downloadPath = Join-Path $env:TEMP "BingWallpaper-$LatestVer-$([Guid]::NewGuid().ToString('N')).exe"
                 $client = New-Object System.Net.WebClient
@@ -3220,6 +3225,7 @@ function Start-VerifiedUpdateDownloadAsync {
                 return @{ Success = $true; DownloadPath = $downloadPath; Error = $null }
             }
             catch {
+                if ($downloadPath) { Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue }
                 return @{ Success = $false; DownloadPath = $null; Error = $_.Exception.Message }
             }
             finally {
@@ -3263,7 +3269,7 @@ function Start-VerifiedUpdateDownloadAsync {
                     $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
                     $isSuccess = ($res -and $res.Success -eq $true)
                     if ($isSuccess) {
-                        $downloadPath = $res.DownloadPath
+                        $downloadPath = [string]$res.DownloadPath
                     }
                     else {
                         $errorMsg = if ($res) { $res.Error } else { "Failed to download update." }
@@ -3275,10 +3281,10 @@ function Start-VerifiedUpdateDownloadAsync {
                 }
                 finally {
                     try { $ctx.PS.Dispose() } catch {}
-                    $CheckUpdateBtn.IsEnabled = $true
                 }
 
-                if (-not $isSuccess) {
+                if (-not $isSuccess -or -not $downloadPath -or -not (Test-Path -LiteralPath $downloadPath -PathType Leaf)) {
+                    $CheckUpdateBtn.IsEnabled = $true
                     $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download update"
                     Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
                     Show-ModernDialog -Title "Update Error" -Header "Download Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
@@ -3286,36 +3292,232 @@ function Start-VerifiedUpdateDownloadAsync {
                     return
                 }
 
-                # Launch updater script and restart
+                # The download is verified. Hand the file to a separate updater
+                # BEFORE closing this process. The updater waits for the actual
+                # application process, replaces the EXE, verifies the replacement,
+                # then starts the new version.
                 $installedExe = $ctx.InstalledExe
+                $installDir = Split-Path -Parent $installedExe
                 $updaterPath = Join-Path $env:TEMP "BingWallpaper-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
+                $updaterLogPath = Join-Path $env:TEMP "BingWallpaper-Updater-$([Guid]::NewGuid().ToString('N')).log"
+
                 $updaterScript = @'
 param(
     [int]$ParentProcessId,
     [string]$DownloadedExe,
-    [string]$InstalledExe
+    [string]$InstalledExe,
+    [string]$UpdaterLogPath
 )
 
-try { (Get-Process -Id $ParentProcessId -ErrorAction Stop).WaitForExit() } catch {}
-for ($attempt = 0; $attempt -lt 10; $attempt++) {
+$ErrorActionPreference = 'Stop'
+
+function Write-UpdaterLog {
+    param([string]$Message)
     try {
-        Copy-Item -LiteralPath $DownloadedExe -Destination $InstalledExe -Force -ErrorAction Stop
-        Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
-        Start-Process -FilePath $InstalledExe -WorkingDirectory (Split-Path -Parent $InstalledExe)
-        break
+        $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+        Add-Content -LiteralPath $UpdaterLogPath -Value "[$timestamp] $Message" -Encoding UTF8
+    } catch {}
+}
+
+function Test-FileWritable {
+    param([string]$Path)
+    $testPath = Join-Path (Split-Path -Parent $Path) ".AutoScape-write-test-$([Guid]::NewGuid().ToString('N')).tmp"
+    try {
+        [System.IO.File]::WriteAllText($testPath, 'test')
+        Remove-Item -LiteralPath $testPath -Force -ErrorAction SilentlyContinue
+        return $true
     }
     catch {
-        Start-Sleep -Seconds 1
+        Remove-Item -LiteralPath $testPath -Force -ErrorAction SilentlyContinue
+        return $false
     }
 }
-Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
-'@
-                Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8
-                $updaterArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updaterPath`" -ParentProcessId $PID -DownloadedExe `"$downloadPath`" -InstalledExe `"$installedExe`""
-                Start-Process -FilePath "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList $updaterArgs -WindowStyle Hidden
 
-                $StatusText.Text = 'Verified update downloaded. Restarting...'
-                $window.Close()
+try {
+    Write-UpdaterLog "Updater started. Parent PID=$ParentProcessId"
+    Write-UpdaterLog "Downloaded EXE: $DownloadedExe"
+    Write-UpdaterLog "Installed EXE: $InstalledExe"
+
+    if (-not (Test-Path -LiteralPath $DownloadedExe -PathType Leaf)) {
+        throw "Downloaded update file was not found."
+    }
+    if (-not (Test-Path -LiteralPath $InstalledExe -PathType Leaf)) {
+        throw "Installed AutoScape.exe was not found."
+    }
+
+    # If the app is a packaged PowerShell application, ParentProcessId is the
+    # real AutoScape.exe process. If the source PS1 is being run directly,
+    # closing the WPF window does not necessarily terminate powershell.exe.
+    # In both cases we additionally locate the installed EXE process by path.
+    $processesToWaitFor = @()
+    try {
+        $parent = Get-Process -Id $ParentProcessId -ErrorAction Stop
+        $parentPath = $null
+        try { $parentPath = $parent.MainModule.FileName } catch {}
+        if ($parentPath -and ([IO.Path]::GetFullPath($parentPath) -ieq [IO.Path]::GetFullPath($InstalledExe))) {
+            $processesToWaitFor += $parent
+        }
+    } catch {}
+
+    $normalizedInstalled = [IO.Path]::GetFullPath($InstalledExe)
+    try {
+        Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $path = $_.MainModule.FileName
+                if ($path -and ([IO.Path]::GetFullPath($path) -ieq $normalizedInstalled)) {
+                    if ($processesToWaitFor.Id -notcontains $_.Id) { $processesToWaitFor += $_ }
+                }
+            } catch {}
+        }
+    } catch {}
+
+    # Give the UI a moment to finish its close animation/event processing.
+    Start-Sleep -Milliseconds 250
+
+    # Wait for AutoScape itself to exit. Do not wait forever: once the process
+    # is no longer running, replacement can proceed immediately.
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $running = @()
+        foreach ($proc in $processesToWaitFor) {
+            try {
+                if (-not $proc.HasExited) { $running += $proc }
+            } catch {}
+        }
+        if ($running.Count -eq 0) { break }
+        Start-Sleep -Milliseconds 250
+    }
+
+    # A direct PS1 launch may have left the PowerShell host alive, but that host
+    # is not locking InstalledExe. The important condition is that the EXE itself
+    # is no longer running.
+    $stillRunning = $false
+    try {
+        Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $path = $_.MainModule.FileName
+                if ($path -and ([IO.Path]::GetFullPath($path) -ieq $normalizedInstalled)) {
+                    $stillRunning = $true
+                }
+            } catch {}
+        }
+    } catch {}
+    if ($stillRunning) {
+        throw "AutoScape is still running, so the update could not safely replace the application file."
+    }
+
+    # If the installation directory is protected (for example Program Files),
+    # this updater is relaunched elevated. Normally this does not prompt because
+    # the app directory is user-writable.
+    if (-not (Test-FileWritable -Path $InstalledExe)) {
+        Write-UpdaterLog "Installation directory is not writable. Requesting elevation."
+        $psExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $args = @(
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-WindowStyle', 'Hidden',
+            '-File', $PSCommandPath,
+            '-ParentProcessId', '0',
+            '-DownloadedExe', $DownloadedExe,
+            '-InstalledExe', $InstalledExe,
+            '-UpdaterLogPath', $UpdaterLogPath
+        )
+        Start-Process -FilePath $psExe -ArgumentList $args -Verb RunAs -WindowStyle Hidden | Out-Null
+        Write-UpdaterLog "Elevated updater launched."
+        exit 0
+    }
+
+    # Replace the executable with retries for antivirus/indexer/file-system
+    # contention. Move/copy is deliberately performed only after AutoScape exits.
+    $replaced = $false
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            Copy-Item -LiteralPath $DownloadedExe -Destination $InstalledExe -Force -ErrorAction Stop
+            $replaced = $true
+            Write-UpdaterLog "Replacement succeeded on attempt $attempt."
+            break
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            Write-UpdaterLog "Replacement attempt $attempt failed: $lastError"
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
+    if (-not $replaced) {
+        throw "Could not replace AutoScape.exe after multiple attempts. $lastError"
+    }
+
+    if (-not (Test-Path -LiteralPath $InstalledExe -PathType Leaf)) {
+        throw "The updated AutoScape.exe was not found after installation."
+    }
+
+    # Start the new version only after the replacement has completed.
+    $workingDirectory = Split-Path -Parent $InstalledExe
+    Write-UpdaterLog "Starting updated application."
+    Start-Process -FilePath $InstalledExe -WorkingDirectory $workingDirectory -ErrorAction Stop | Out-Null
+
+    # Cleanup after launch. Keep the updater log briefly for troubleshooting if
+    # something unexpected happens during startup.
+    Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
+    Write-UpdaterLog "Update completed successfully."
+}
+catch {
+    $message = $_.Exception.Message
+    Write-UpdaterLog "UPDATE FAILED: $message"
+    try {
+        Add-Type -AssemblyName PresentationFramework
+        [System.Windows.MessageBox]::Show(
+            "AutoScape could not complete the update.`n`n$message`n`nThe previous version was left untouched.",
+            'AutoScape Update',
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        ) | Out-Null
+    } catch {}
+    # Never delete the installed EXE on failure. Only remove the temporary
+    # downloaded update so the existing installation remains usable.
+    Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
+}
+finally {
+    Start-Sleep -Milliseconds 500
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}
+'@
+
+                try {
+                    Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
+
+                    # Use a single stable log path so a failed update can be diagnosed.
+                    $updaterArgs = @(
+                        '-NoProfile',
+                        '-ExecutionPolicy', 'Bypass',
+                        '-WindowStyle', 'Hidden',
+                        '-File', $updaterPath,
+                        '-ParentProcessId', [string]$PID,
+                        '-DownloadedExe', $downloadPath,
+                        '-InstalledExe', $installedExe,
+                        '-UpdaterLogPath', $updaterLogPath
+                    )
+
+                    $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                    $updateProcess = Start-Process -FilePath $powershellExe -ArgumentList $updaterArgs -WindowStyle Hidden -PassThru -ErrorAction Stop
+
+                    Set-TransientStatus -Message "Update downloaded. Restarting AutoScape..." -Brush $statusSuccessBrush -Seconds 10
+                    $StatusText.Text = "Installing version $LatestVersionStr..."
+
+                    # Close only after the updater has successfully started.
+                    $window.Close()
+                }
+                catch {
+                    Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+                    Remove-Item -LiteralPath $updaterPath -Force -ErrorAction SilentlyContinue
+                    $CheckUpdateBtn.IsEnabled = $true
+                    $errMsg = "The update was downloaded and verified, but the installer could not be started: $($_.Exception.Message)"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 8
+                    Show-ModernDialog -Title "Update Error" -Header "Installation Could Not Start" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 8
+                }
             }
         })
     $script:updateDlTimer.Start()
@@ -4796,6 +4998,7 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
 
 
