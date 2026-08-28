@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.187'
+$script:appVersion = [Version]'1.0.188'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -3350,41 +3350,28 @@ function Load-Gallery {
     $selectedRegion = Get-SelectedRegionCode
     $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
-    $galleryCacheFile = Join-Path $cacheBaseDir "gallery_cache_${selectedRegion}.json"
 
-    if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
-        try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
+    # Always start from a clean slate: no gallery-metadata cache file is read or written
+    # anymore, and any previously downloaded thumbnails are purged so every launch and
+    # every refresh re-downloads everything fresh from Bing. $thumbCacheDir is still used
+    # as scratch space to hold the just-downloaded bytes (WPF's Image control needs a
+    # file/URI source), not as a persistent cache.
+    if (Test-Path -LiteralPath $thumbCacheDir) {
+        try { Remove-Item -LiteralPath $thumbCacheDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}
     }
+    try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
 
-    $renderedFromCache = $false
-    if (Test-Path -LiteralPath $galleryCacheFile) {
-        try {
-            $cachedJson = Get-Content -LiteralPath $galleryCacheFile -Raw -Encoding UTF8
-            if ($cachedJson) {
-                $cachedImages = ConvertFrom-Json -InputObject $cachedJson
-                if ($cachedImages -and $cachedImages.Count -gt 0) {
-                    Render-GalleryGrid -Images $cachedImages -ThumbCacheDir $thumbCacheDir -SkipAnimation
-                    $renderedFromCache = $true
-                    $StatusText.Text = 'AutoScape'
-                }
-            }
-        }
-        catch {}
-    }
-
-    if (-not $renderedFromCache) {
-        $GalleryPanel.Children.Clear()
-        $script:selectedCard = $null
-        $script:selectedImage = $null
-        $script:selection.Card = $null
-        $script:selection.Image = $null
-        $script:loadedImages = @()
-        $script:userHasExplicitlySelectedWallpaper = $false
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        $StatusText.Opacity = 1
-        $StatusText.Text = 'Connecting to Bing...'
-        $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
-    }
+    $GalleryPanel.Children.Clear()
+    $script:selectedCard = $null
+    $script:selectedImage = $null
+    $script:selection.Card = $null
+    $script:selection.Image = $null
+    $script:loadedImages = @()
+    $script:userHasExplicitlySelectedWallpaper = $false
+    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+    $StatusText.Opacity = 1
+    $StatusText.Text = 'Connecting to Bing...'
+    $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
@@ -3455,11 +3442,9 @@ function Load-Gallery {
     $asyncOp = $ps.BeginInvoke()
 
     $script:galleryRunspaceContext = @{
-        PS                = $ps
-        AsyncOp           = $asyncOp
-        ThumbCacheDir     = $thumbCacheDir
-        GalleryCacheFile  = $galleryCacheFile
-        RenderedFromCache = $renderedFromCache
+        PS            = $ps
+        AsyncOp       = $asyncOp
+        ThumbCacheDir = $thumbCacheDir
     }
 
     $script:galleryTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -3495,33 +3480,14 @@ function Load-Gallery {
             }
 
             if (-not $isSuccess -or $images.Count -eq 0) {
-                if (-not $ctx.RenderedFromCache) {
-                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                    $StatusText.Opacity = 1
-                    $StatusText.Foreground = $statusErrorBrush
-                    $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
-                }
+                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                $StatusText.Opacity = 1
+                $StatusText.Foreground = $statusErrorBrush
+                $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
                 return
             }
 
-            try {
-                $jsonOut = ConvertTo-Json -InputObject $images -Depth 3
-                Set-Content -LiteralPath $ctx.GalleryCacheFile -Value $jsonOut -Encoding UTF8 -Force
-            }
-            catch {}
-
-            $needsRender = $true
-            if ($ctx.RenderedFromCache -and $script:loadedImages -and $script:loadedImages.Count -eq $images.Count) {
-                $currentFirst = if ($script:loadedImages.Count -gt 0) { $script:loadedImages[0].urlbase } else { '' }
-                $newFirst = if ($images.Count -gt 0) { $images[0].urlbase } else { '' }
-                if ($currentFirst -eq $newFirst) {
-                    $needsRender = $false
-                }
-            }
-
-            if ($needsRender) {
-                Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir -SkipAnimation:($ctx.RenderedFromCache)
-            }
+            Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir
 
             $script:loadingCounter = 0
             $script:loadingTotal = $images.Count
@@ -4477,7 +4443,4 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
-
-
 
