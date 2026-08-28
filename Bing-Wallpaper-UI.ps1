@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.185'
+$script:appVersion = [Version]'1.0.186'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1181,15 +1181,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
                     </StackPanel>
                 </StackPanel>
                 
-                <!-- GitHub Icon Button positioned at top-right -->
-                <Button Name="GithubRepoBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="Open GitHub Repository">
-                    <Viewbox Width="18" Height="18">
-                        <Canvas Width="24" Height="24">
-                            <Path Data="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" 
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                        </Canvas>
-                    </Viewbox>
-                </Button>
+
             </Grid>
 
             <Grid Grid.Row="1" Margin="0,0,0,24">
@@ -1479,7 +1471,6 @@ $StatusText = $window.FindName('StatusText')
 $CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
-$GithubRepoBtn = $window.FindName('GithubRepoBtn')
 $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
 $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
@@ -1493,15 +1484,6 @@ $script:activeModalControl = $null
 $script:activeModalKind = $null
 $script:activeModalClosing = $false
 $script:activeModalCloseCallback = $null
-
-if ($GithubRepoBtn) {
-    $GithubRepoBtn.Add_Click({
-        try {
-            Start-Process "https://github.com/Hamisoptimistic/Bing-Wallpaper" | Out-Null
-        }
-        catch {}
-    })
-}
 
 function Set-AppDimState {
     param([bool]$Dim, [bool]$Immediate = $false)
@@ -4156,10 +4138,47 @@ function Show-UserGuideDialog {
 
             <!-- Footer -->
             <Grid Grid.Row="2" Margin="0,12,0,0">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="Crafted with " FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
-                    <TextBlock Name="GuideHeartIcon" Text="&#xEB52;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#FF334B" VerticalAlignment="Center" Margin="3,2,3,0"/>
-                    <TextBlock Text=" by HamB" FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- GitHub button: self-contained so the dynamically created modal does not depend on homepage resources -->
+                    <Button Name="GuideGithubRepoBtn"
+                            Width="38" Height="38"
+                            HorizontalAlignment="Center"
+                            Background="#262626"
+                            Foreground="#D8D8D8"
+                            BorderThickness="0"
+                            Cursor="Hand"
+                            ToolTip="Open GitHub Repository"
+                            Margin="0,0,0,15">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Name="GithubBorder"
+                                        Background="{TemplateBinding Background}"
+                                        CornerRadius="10">
+                                    <Viewbox Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Data="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"
+                                                  Fill="{TemplateBinding Foreground}"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="GithubBorder" Property="Background" Value="#333333"/>
+                                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="GithubBorder" Property="Background" Value="#1F1F1F"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="Crafted with " FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
+                        <TextBlock Name="GuideHeartIcon" Text="&#xEB52;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#FF334B" VerticalAlignment="Center" Margin="3,2,3,0"/>
+                        <TextBlock Text=" by HamB" FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Grid>
@@ -4172,6 +4191,18 @@ function Show-UserGuideDialog {
 
     $guideRoot = $dlg.FindName('DialogRoot')
     if ($guideRoot) { $guideRoot.Opacity = 1.0 }
+
+    # The GitHub button belongs to this dynamically created guide dialog.
+    # It is found only after XAML loading succeeds, so it cannot interfere with modal creation.
+    $guideGithubRepoBtn = $dlg.FindName('GuideGithubRepoBtn')
+    if ($guideGithubRepoBtn) {
+        $guideGithubRepoBtn.Add_Click({
+            try {
+                Start-Process "https://github.com/Hamisoptimistic/Bing-Wallpaper" | Out-Null
+            }
+            catch {}
+        })
+    }
 
     $imgControl = $dlg.FindName('GuideLatestImage')
     if ($imgControl -and $thumbPath) {
@@ -4446,5 +4477,6 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
 
