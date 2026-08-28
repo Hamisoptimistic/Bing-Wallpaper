@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.184'
+$script:appVersion = [Version]'1.0.185'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -4446,3 +4446,5 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
