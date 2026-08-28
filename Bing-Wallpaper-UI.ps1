@@ -4504,7 +4504,7 @@ function Show-UserGuideDialog {
                             <TextBlock Text="4K resolution is used by default" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
                             <TextBlock Text="Everyday wallpaper changes automatically at 12am" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
                             <TextBlock Text="Fit is the default wallpaper style" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
-                            <TextBlock Text="Your country is selected by default" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
+                            <TextBlock Text="Default region is selected based on your location" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
                             <TextBlock Text="Wallpapers change hourly by default and use your location" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Border>
