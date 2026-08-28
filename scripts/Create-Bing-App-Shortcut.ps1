@@ -87,14 +87,25 @@ namespace AutoScapeLauncher
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
+                
                 using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.Bing-Wallpaper-UI.ps1"))
-                using (FileStream destination = File.Create(psScript))
-                {
-                    source.CopyTo(destination);
-                }
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.app.ico"))
                 {
                     if (source != null)
+                    {
+                        bool needsExtract = !File.Exists(psScript) || new FileInfo(psScript).Length != source.Length;
+                        if (needsExtract)
+                        {
+                            using (FileStream destination = File.Create(psScript))
+                            {
+                                source.CopyTo(destination);
+                            }
+                        }
+                    }
+                }
+
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.app.ico"))
+                {
+                    if (source != null && !File.Exists(iconPath))
                     {
                         using (FileStream destination = File.Create(iconPath))
                         {
@@ -103,10 +114,7 @@ namespace AutoScapeLauncher
                     }
                 }
             }
-            catch
-            {
-                return;
-            }
+            catch {}
 
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
