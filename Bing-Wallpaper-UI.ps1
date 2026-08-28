@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.181'
+$script:appVersion = [Version]'1.0.182'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -812,6 +812,9 @@ if ($AutoApply) {
         exit 1
     }
 }
+
+# Set the application identity before creating any WPF window so Windows groups the taskbar entry under AutoScape, not PowerShell.
+try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") } catch {}
 
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -1354,34 +1357,57 @@ $window.Add_MouseMove({
     }
 })
 
-try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") } catch {}
-
 $scriptDir = $PSScriptRoot
 if (-not $scriptDir -and $MyInvocation.MyCommand.Path) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
 if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
-$script:taskbarIconPath = $null
-$primaryIcon = Join-Path $scriptDir 'assets\app.ico'
-if (Test-Path -LiteralPath $primaryIcon) {
-    try {
-        $window.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new((Resolve-Path -LiteralPath $primaryIcon).Path))
-        $script:taskbarIconPath = (Resolve-Path -LiteralPath $primaryIcon).Path
-    }
-    catch {}
-}
-else {
-    $iconCandidates = @((Join-Path $scriptDir 'app.ico'), (Join-Path $scriptDir 'assets\bing.ico'), (Join-Path $scriptDir 'bing.ico'))
-    foreach ($iconPath in $iconCandidates) {
-        if (Test-Path -LiteralPath $iconPath) {
+function Set-AutoScapeIcon {
+    param([System.Windows.Window]$TargetWindow)
+    $candidates = @(
+        (Join-Path $scriptDir 'assets\app.ico'),
+        (Join-Path $scriptDir 'app.ico'),
+        (Join-Path $scriptDir 'assets\bing.ico'),
+        (Join-Path $scriptDir 'bing.ico')
+    )
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
             try {
-                $window.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new((Resolve-Path -LiteralPath $iconPath).Path))
-                $script:taskbarIconPath = (Resolve-Path -LiteralPath $iconPath).Path
-                break
-            }
-            catch {}
+                $frame = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new((Resolve-Path -LiteralPath $path).Path), [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat, [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
+                $TargetWindow.Icon = $frame
+                return $path
+            } catch {}
         }
     }
+
+    # No external icon required: render a tiny AutoScape-style icon as the WPF fallback.
+    try {
+        $dv = New-Object System.Windows.Media.DrawingVisual
+        $dc = $dv.RenderOpen()
+        $dc.DrawRoundedRectangle([System.Windows.Media.Brushes]::Transparent, $null, [System.Windows.Rect]::new(0,0,48,48), 10, 10)
+        $bg = New-Object System.Windows.Media.LinearGradientBrush([System.Windows.Media.Color]::FromRgb(20,88,190), [System.Windows.Media.Color]::FromRgb(77,166,235), 45)
+        $dc.DrawRoundedRectangle($bg, $null, [System.Windows.Rect]::new(3,3,42,42), 8, 8)
+        $sun = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255,231,149))
+        $dc.DrawEllipse($sun, $null, [System.Windows.Point]::new(33,14), 4.5, 4.5)
+        $mount = New-Object System.Windows.Media.StreamGeometry
+        $mountContext = $mount.Open()
+        $mountContext.BeginFigure([System.Windows.Point]::new(6,38), $true, $true)
+        $mountContext.LineTo([System.Windows.Point]::new(17,27), $false, $false)
+        $mountContext.LineTo([System.Windows.Point]::new(23,32), $false, $false)
+        $mountContext.LineTo([System.Windows.Point]::new(29,24), $false, $false)
+        $mountContext.LineTo([System.Windows.Point]::new(42,38), $false, $false)
+        $mountContext.Close()
+        $mount.Freeze()
+        $dc.DrawGeometry([System.Windows.Media.Brushes]::White, $null, $mount)
+        $dc.Close()
+        $rt = New-Object System.Windows.Media.Imaging.RenderTargetBitmap(48,48,96,96,[System.Windows.Media.PixelFormats]::Pbgra32)
+        $rt.Render($dv)
+        $rt.Freeze()
+        $TargetWindow.Icon = $rt
+    } catch {}
+    return $null
 }
+
+$script:taskbarIconPath = Set-AutoScapeIcon -TargetWindow $window
 
 $applyDarkTitleBar = {
     try {
@@ -3852,19 +3878,25 @@ function Show-UserGuideDialog {
             </Grid.RowDefinitions>
 
             <!-- Close Button -->
-            <Button Name="GuideCloseButton" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="32" Height="32"
-                    HorizontalAlignment="Right" VerticalAlignment="Top" Background="#262626" Foreground="#AFAFAF"
-                    BorderThickness="1" BorderBrush="#3D3D3D" Cursor="Hand" ToolTip="Close" Panel.ZIndex="100">
+            <Button Name="GuideCloseButton" Width="32" Height="32"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Background="#262626" Foreground="#E8E8E8"
+                    BorderThickness="0" Cursor="Hand" ToolTip="Close" Panel.ZIndex="100">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Name="CloseBorder" Background="{TemplateBinding Background}" CornerRadius="7">
+                            <Canvas Width="20" Height="20">
+                                <Path Data="M 5,5 L 15,15 M 15,5 L 5,15"
+                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#E81123"/>
-                                <Setter TargetName="Border" Property="BorderBrush" Value="#E81123"/>
+                                <Setter TargetName="CloseBorder" Property="Background" Value="#E81123"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CloseBorder" Property="Background" Value="#C50F1F"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -3976,7 +4008,7 @@ function Show-UserGuideDialog {
                 <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0" Name="GuidePreviewCard" Background="#212121" CornerRadius="12" BorderThickness="0" ClipToBounds="True" Margin="0,0,0,16" Cursor="Hand">
@@ -3998,7 +4030,7 @@ function Show-UserGuideDialog {
                         </Grid>
                     </Border>
 
-                    <Border Grid.Row="1" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18" VerticalAlignment="Stretch">
+                    <Border Grid.Row="1" Name="GuideDefaultCard" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18" VerticalAlignment="Top">
                         <StackPanel VerticalAlignment="Top">
                             <TextBlock Text="Default Behavior" FontSize="18" FontWeight="Bold" Foreground="#0078D4" Margin="0,0,0,16"/>
                             <TextBlock Text="4K resolution is used by default" FontSize="13.5" Foreground="#FFFFFF" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12"/>
@@ -4011,7 +4043,7 @@ function Show-UserGuideDialog {
                 </Grid>
 
                 <!-- Right Column -->
-                <Border Grid.Column="2" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18">
+                <Border Grid.Column="2" Name="GuideFeaturesPanel" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18" VerticalAlignment="Top">
                     <StackPanel>
                         <TextBlock Text="Essential Features" FontSize="18" FontWeight="Bold" Foreground="#0078D4" Margin="0,0,0,16"/>
 
@@ -4180,8 +4212,34 @@ function Show-UserGuideDialog {
     }
 
     $card = $dlg.FindName('GuidePreviewCard')
+    $defaultCard = $dlg.FindName('GuideDefaultCard')
+    $featuresPanel = $dlg.FindName('GuideFeaturesPanel')
     $revealRect = $dlg.FindName('GuideRevealRect')
     $revealBorder = $dlg.FindName('GuideRevealBorder')
+
+    # Keep the Default Behavior card bottom aligned with the Essential Features panel
+    # while preserving natural sizing when its text changes or wraps.
+    $syncGuideColumns = {
+        try {
+            if (-not $defaultCard -or -not $featuresPanel -or -not $card) { return }
+            $previewHeight = $card.ActualHeight + 16
+            $defaultNatural = $defaultCard.DesiredSize.Height
+            $featuresNatural = $featuresPanel.DesiredSize.Height
+            $bodyHeight = [Math]::Max($featuresNatural, ($previewHeight + $defaultNatural))
+            $defaultCard.MinHeight = [Math]::Max(0, $bodyHeight - $previewHeight)
+            $featuresPanel.MinHeight = $bodyHeight
+        } catch {}
+    }
+
+    if ($featuresPanel) {
+        $featuresPanel.Add_SizeChanged({ & $syncGuideColumns })
+    }
+    if ($card) {
+        $card.Add_SizeChanged({ & $syncGuideColumns })
+        $dlg.Add_Loaded({
+            $dlg.Dispatcher.BeginInvoke([Action]{ & $syncGuideColumns }, [System.Windows.Threading.DispatcherPriority]::Loaded) | Out-Null
+        })
+    }
 
     if ($card) {
         $cardClip = New-Object System.Windows.Media.RectangleGeometry
@@ -4367,8 +4425,4 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
-
-
-
 
