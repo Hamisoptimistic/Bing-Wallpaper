@@ -264,7 +264,7 @@ public static class BingWallpaperNative {
 
     [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IShellItem {
-        void size();
+        void BindToHandler();
         void GetParent();
         void GetDisplayName([In] uint sigdnName, [Out, MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
         void GetAttributes();
@@ -362,7 +362,7 @@ public static class BingWallpaperNative {
     }
 }
 
-$script:appVersion = [Version]'1.0.172'
+$script:appVersion = [Version]'1.0.173'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = ''
 
@@ -2743,31 +2743,24 @@ function Start-VerifiedUpdateDownloadAsync {
         return
     }
 
+    # Explicitly determine the AutoScape/BingWallpaper executable location
     $installedExe = $null
-    try {
-        $proc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-        if ($proc -and $proc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $proc)) {
-            $installedExe = (Resolve-Path -LiteralPath $proc).Path
-        }
+    
+    $candidates = @()
+    if ($PSScriptRoot) {
+        $candidates += (Join-Path $PSScriptRoot 'AutoScape.exe')
+        $candidates += (Join-Path $PSScriptRoot 'BingWallpaper.exe')
     }
-    catch {}
+    $candidates += (Join-Path (Get-Location).Path 'AutoScape.exe')
+    $candidates += (Join-Path (Get-Location).Path 'BingWallpaper.exe')
+    $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\BingWallpaper.exe')
+    $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScape.exe')
+    $candidates += (Join-Path $env:PROGRAMFILES 'AutoScape\AutoScape.exe')
 
-    if (-not $installedExe) {
-        $candidates = @()
-        if ($PSScriptRoot) {
-            $candidates += (Join-Path $PSScriptRoot 'AutoScape.exe')
-            $candidates += (Join-Path $PSScriptRoot 'BingWallpaper.exe')
-        }
-        $candidates += (Join-Path (Get-Location).Path 'AutoScape.exe')
-        $candidates += (Join-Path (Get-Location).Path 'BingWallpaper.exe')
-        $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\BingWallpaper.exe')
-        $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScape.exe')
-
-        foreach ($c in $candidates) {
-            if ($c -and (Test-Path -LiteralPath $c)) {
-                $installedExe = (Resolve-Path -LiteralPath $c).Path
-                break
-            }
+    foreach ($c in $candidates) {
+        if ($c -and (Test-Path -LiteralPath $c -PathType Leaf)) {
+            $installedExe = (Resolve-Path -LiteralPath $c).Path
+            break
         }
     }
 
@@ -2874,7 +2867,6 @@ function Start-VerifiedUpdateDownloadAsync {
             $updaterPath = Join-Path $env:TEMP "AutoScape-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
             $updaterScript = @'
 param(
-    [int]$ParentProcessId,
     [string]$DownloadedExe,
     [string]$InstalledExe,
     [string]$WorkingDirectory
@@ -2883,16 +2875,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 try {
-    try {
-        $p = Get-Process -Id $ParentProcessId -ErrorAction Stop
-        $p.WaitForExit(30000)
-    } catch {}
+    # Give the parent application window time to exit cleanly
+    Start-Sleep -Seconds 1
 
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
     while ([DateTime]::UtcNow -lt $deadline) {
         $running = $false
         try {
-            Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+            Get-Process -Name 'AutoScape','BingWallpaper' -ErrorAction SilentlyContinue | ForEach-Object {
                 try {
                     if ($_.MainModule.FileName -and ([IO.Path]::GetFullPath($_.MainModule.FileName) -ieq [IO.Path]::GetFullPath($InstalledExe))) {
                         $running = $true
@@ -2901,7 +2891,7 @@ try {
             }
         } catch {}
         if (-not $running) { break }
-        Start-Sleep -Milliseconds 250
+        Start-Sleep -Milliseconds 300
     }
 
     $lastError = $null
@@ -2920,10 +2910,12 @@ try {
     }
 
     if (-not $done) {
-        throw "Could not replace AutoScape.exe. $lastError"
+        throw "Could not replace $InstalledExe. $lastError"
     }
 
-    Start-Process -FilePath $InstalledExe -WorkingDirectory $WorkingDirectory -ErrorAction Stop | Out-Null
+    if (Test-Path -LiteralPath $InstalledExe) {
+        Start-Process -FilePath $InstalledExe -WorkingDirectory $WorkingDirectory -ErrorAction Stop | Out-Null
+    }
 }
 catch {
     try {
@@ -2946,7 +2938,6 @@ finally {
             Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
 
             $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-            $parentProcessId = [System.Diagnostics.Process]::GetCurrentProcess().Id
 
             function Quote-UpdaterArgument([string]$Value) {
                 if ($null -eq $Value) { return '""' }
@@ -2958,7 +2949,6 @@ finally {
                 '-ExecutionPolicy Bypass'
                 '-WindowStyle Hidden'
                 ('-File ' + (Quote-UpdaterArgument $updaterPath))
-                ('-ParentProcessId ' + (Quote-UpdaterArgument ([string]$parentProcessId)))
                 ('-DownloadedExe ' + (Quote-UpdaterArgument $downloadPath))
                 ('-InstalledExe ' + (Quote-UpdaterArgument $installedExe))
                 ('-WorkingDirectory ' + (Quote-UpdaterArgument $installDir))
@@ -2972,6 +2962,7 @@ finally {
             }
 
             Start-Process @startParams | Out-Null
+            
             [System.Windows.Application]::Current.Shutdown()
             [Environment]::Exit(0)
         }
@@ -3938,7 +3929,6 @@ function Show-UserGuideDialog {
 
             <Button Name="GuideCloseButton" Style="{StaticResource GuideCloseButtonStyle}" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="32" Height="32" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" Foreground="#AFAFAF" BorderThickness="0" ToolTip="Close" Panel.ZIndex="100"/>
 
-            <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,24" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
                     <Viewbox Width="36" Height="36" Margin="0,0,14,0">
@@ -3966,7 +3956,7 @@ function Show-UserGuideDialog {
                                     <Path Data="M175 657L302 544L376 600L458 516L553 625L610 561L720 671L858 760V830H175Z" Fill="{StaticResource guide_m2}"/>
                                     <Path Data="M302 544L376 600L346 584L325 608L302 590L275 613Z" Fill="#BBDCF5" Opacity="0.9"/>
                                     <Path Data="M458 516L553 625L514 601L486 630L458 602L432 625Z" Fill="#CDE5FA" Opacity="0.85"/>
-                                    <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z" Fill="{StaticResource guide_m1}"/>
+                                    <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z" Fill="{StaticResource m1}"/>
                                     <Path Data="M268 590L337 632L420 695L505 751L590 793L458 741L382 699L320 653Z" Fill="#165DB8" Opacity="0.82"/>
                                     <Path Data="M515 830L590 760L675 700L760 747L880 683L900 830Z" Fill="#3984D4" Opacity="0.78"/>
                                     <Path Data="M675 700L760 747L720 735L690 759L654 730Z" Fill="#79B6E9" Opacity="0.62"/>
@@ -3981,7 +3971,6 @@ function Show-UserGuideDialog {
                 </StackPanel>
             </Grid>
 
-            <!-- Two-Column Body -->
             <Grid Grid.Row="1" Margin="0,0,0,18">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="380"/>
@@ -3989,7 +3978,6 @@ function Show-UserGuideDialog {
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Column -->
                 <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -4027,7 +4015,6 @@ function Show-UserGuideDialog {
                     </Border>
                 </Grid>
 
-                <!-- Right Column -->
                 <Border Grid.Column="2" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18">
                     <StackPanel>
                         <TextBlock Text="Essential Features" FontSize="18" FontWeight="Bold" Foreground="#0078D4" Margin="0,0,0,16"/>
@@ -4055,7 +4042,7 @@ function Show-UserGuideDialog {
                                 <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#00CACC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
                                     <TextBlock Text="Browse &amp; Preview" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Explore recent days of Bing imagery. Double-click to apply" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    <TextBlock Text="Explore recent days of Bing imagery. Single click to inspect, double-click to apply" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -4119,7 +4106,6 @@ function Show-UserGuideDialog {
                 </Border>
             </Grid>
 
-            <!-- Footer -->
             <Grid Grid.Row="2" Margin="0,12,0,0">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <TextBlock Text="Crafted with " FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
@@ -4384,4 +4370,3 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
