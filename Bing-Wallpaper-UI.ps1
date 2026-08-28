@@ -4027,7 +4027,7 @@ function Show-UserGuideDialog {
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#00CACC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                                    <TextBlock Text="Browse &amp; Preview" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
+                                    <TextBlock Text="Browse" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
                                     <TextBlock Text="Explore recent days of Bing imagery. Single click to inspect, double-click to apply" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </Grid>
