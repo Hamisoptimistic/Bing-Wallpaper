@@ -1,4 +1,4 @@
-﻿﻿[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -264,7 +264,7 @@ public static class BingWallpaperNative {
 
     [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IShellItem {
-        void size();
+        void BindToHandler();
         void GetParent();
         void GetDisplayName([In] uint sigdnName, [Out, MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
         void GetAttributes();
@@ -362,7 +362,7 @@ public static class BingWallpaperNative {
     }
 }
 
-$script:appVersion = [Version]'1.0.172'
+$script:appVersion = [Version]'1.0.175'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = ''
 
@@ -2743,91 +2743,31 @@ function Start-VerifiedUpdateDownloadAsync {
         return
     }
 
-    # Resolve the actual installed application executable.
-    #
-    # IMPORTANT:
-    # GetCurrentProcess().MainModule.FileName returns powershell.exe/pwsh.exe
-    # when this script is launched by PowerShell. The old code compared the
-    # FULL PATH against "powershell.exe", so the check failed and the updater
-    # accidentally treated:
-    #   C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
-    # as the application that needed to be replaced.
-    #
-    # Never allow a PowerShell host executable to become the update target.
+    # Explicitly determine the AutoScape/BingWallpaper executable location
     $installedExe = $null
-    $hostExecutables = @(
-        'powershell.exe',
-        'pwsh.exe',
-        'pwsh-preview.exe',
-        'powershell_ise.exe'
-    )
-
-    try {
-        $proc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-        if ($proc -and (Test-Path -LiteralPath $proc)) {
-            $procName = [System.IO.Path]::GetFileName($proc)
-            if ($hostExecutables -notcontains $procName.ToLowerInvariant()) {
-                $installedExe = (Resolve-Path -LiteralPath $proc).Path
-            }
-        }
+    
+    $candidates = @()
+    if ($PSScriptRoot) {
+        $candidates += (Join-Path $PSScriptRoot 'AutoScape.exe')
+        $candidates += (Join-Path $PSScriptRoot 'BingWallpaper.exe')
     }
-    catch {}
+    $candidates += (Join-Path (Get-Location).Path 'AutoScape.exe')
+    $candidates += (Join-Path (Get-Location).Path 'BingWallpaper.exe')
+    $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\BingWallpaper.exe')
+    $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScape.exe')
+    $candidates += (Join-Path $env:PROGRAMFILES 'AutoScape\AutoScape.exe')
 
-    # If we are running the .ps1 through PowerShell, resolve the real
-    # AutoScape/BingWallpaper executable next to the script or in the
-    # persistent per-user installation directory.
-    if (-not $installedExe) {
-        $candidates = @()
-
-        if ($PSScriptRoot) {
-            $candidates += (Join-Path $PSScriptRoot 'AutoScape.exe')
-            $candidates += (Join-Path $PSScriptRoot 'BingWallpaper.exe')
-        }
-
-        try {
-            $currentDir = (Get-Location).Path
-            $candidates += (Join-Path $currentDir 'AutoScape.exe')
-            $candidates += (Join-Path $currentDir 'BingWallpaper.exe')
-        }
-        catch {}
-
-        $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScape.exe')
-        $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\BingWallpaper.exe')
-
-        foreach ($c in $candidates) {
-            if (-not $c) { continue }
-
-            try {
-                if (-not (Test-Path -LiteralPath $c -PathType Leaf)) { continue }
-
-                $resolvedCandidate = (Resolve-Path -LiteralPath $c -ErrorAction Stop).Path
-                $candidateName = [System.IO.Path]::GetFileName($resolvedCandidate)
-
-                # Absolute safety check: the updater must never target the
-                # PowerShell host itself, even if a candidate path is wrong.
-                if ($hostExecutables -contains $candidateName.ToLowerInvariant()) {
-                    continue
-                }
-
-                if ([System.IO.Path]::GetExtension($resolvedCandidate) -ine '.exe') {
-                    continue
-                }
-
-                $installedExe = $resolvedCandidate
-                break
-            }
-            catch {}
+    foreach ($c in $candidates) {
+        if ($c -and (Test-Path -LiteralPath $c -PathType Leaf)) {
+            $installedExe = (Resolve-Path -LiteralPath $c).Path
+            break
         }
     }
 
-    # Do not silently invent a target path. If no real application EXE can be
-    # found, fail before the download/install hand-off starts.
     if (-not $installedExe) {
-        $errMsg = 'Could not locate the installed AutoScape executable. The update was not installed.'
-        Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 8
-        Show-ModernDialog -Title "Update Error" -Header "Application Not Found" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
-        $CheckUpdateBtn.IsEnabled = $true
-        return
+        $appDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper'
+        if (-not (Test-Path -LiteralPath $appDir)) { New-Item -ItemType Directory -Path $appDir -Force | Out-Null }
+        $installedExe = Join-Path $appDir 'AutoScape.exe'
     }
 
     $CheckUpdateBtn.IsEnabled = $false
@@ -2927,7 +2867,6 @@ function Start-VerifiedUpdateDownloadAsync {
             $updaterPath = Join-Path $env:TEMP "AutoScape-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
             $updaterScript = @'
 param(
-    [int]$ParentProcessId,
     [string]$DownloadedExe,
     [string]$InstalledExe,
     [string]$WorkingDirectory
@@ -2936,16 +2875,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 try {
-    try {
-        $p = Get-Process -Id $ParentProcessId -ErrorAction Stop
-        $p.WaitForExit(30000)
-    } catch {}
+    # Give the parent application window time to exit cleanly
+    Start-Sleep -Seconds 1
 
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
     while ([DateTime]::UtcNow -lt $deadline) {
         $running = $false
         try {
-            Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+            Get-Process -Name 'AutoScape','BingWallpaper' -ErrorAction SilentlyContinue | ForEach-Object {
                 try {
                     if ($_.MainModule.FileName -and ([IO.Path]::GetFullPath($_.MainModule.FileName) -ieq [IO.Path]::GetFullPath($InstalledExe))) {
                         $running = $true
@@ -2954,7 +2891,7 @@ try {
             }
         } catch {}
         if (-not $running) { break }
-        Start-Sleep -Milliseconds 250
+        Start-Sleep -Milliseconds 300
     }
 
     $lastError = $null
@@ -2973,10 +2910,12 @@ try {
     }
 
     if (-not $done) {
-        throw "Could not replace AutoScape.exe. $lastError"
+        throw "Could not replace $InstalledExe. $lastError"
     }
 
-    Start-Process -FilePath $InstalledExe -WorkingDirectory $WorkingDirectory -ErrorAction Stop | Out-Null
+    if (Test-Path -LiteralPath $InstalledExe) {
+        Start-Process -FilePath $InstalledExe -WorkingDirectory $WorkingDirectory -ErrorAction Stop | Out-Null
+    }
 }
 catch {
     try {
@@ -2999,7 +2938,6 @@ finally {
             Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
 
             $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-            $parentProcessId = [System.Diagnostics.Process]::GetCurrentProcess().Id
 
             function Quote-UpdaterArgument([string]$Value) {
                 if ($null -eq $Value) { return '""' }
@@ -3011,7 +2949,6 @@ finally {
                 '-ExecutionPolicy Bypass'
                 '-WindowStyle Hidden'
                 ('-File ' + (Quote-UpdaterArgument $updaterPath))
-                ('-ParentProcessId ' + (Quote-UpdaterArgument ([string]$parentProcessId)))
                 ('-DownloadedExe ' + (Quote-UpdaterArgument $downloadPath))
                 ('-InstalledExe ' + (Quote-UpdaterArgument $installedExe))
                 ('-WorkingDirectory ' + (Quote-UpdaterArgument $installDir))
@@ -3025,6 +2962,7 @@ finally {
             }
 
             Start-Process @startParams | Out-Null
+            
             [System.Windows.Application]::Current.Shutdown()
             [Environment]::Exit(0)
         }
@@ -3895,93 +3833,7 @@ function Show-UserGuideDialog {
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="$modalWidth" Height="$modalHeight"
         Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI">
-    <UserControl.Resources>
-        <LinearGradientBrush x:Key="guide_b1" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#174BCB" Offset="0"/>
-            <GradientStop Color="#0B3AA5" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="guide_b2" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#1470D5" Offset="0"/>
-            <GradientStop Color="#0758BD" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="guide_sky" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#54A8F4" Offset="0"/>
-            <GradientStop Color="#8BC8F6" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="guide_m1" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#08459F" Offset="0"/>
-            <GradientStop Color="#0A62C2" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="guide_m2" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#2C72CB" Offset="0"/>
-            <GradientStop Color="#5E9FDF" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="guide_m3" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#79B5EA" Offset="0"/>
-            <GradientStop Color="#9CCDF0" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="guide_snow" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#E5EEFF" Offset="0"/>
-            <GradientStop Color="#FFFFFF" Offset="1"/>
-        </LinearGradientBrush>
-        <RectangleGeometry x:Key="guide_clip" Rect="173,263,678,539" RadiusX="36" RadiusY="36"/>
-
-        <Style x:Key="DialogBtn" TargetType="Button">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="MinWidth" Value="150"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Name="BtnBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="18,6,18,6"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.88"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.75"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    
-        <Style x:Key="GuideCloseButtonStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#AFAFAF"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Name="CloseBorder" Background="{TemplateBinding Background}" CornerRadius="7">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="CloseBorder" Property="Background" Value="#3A1E22"/>
-                                <Setter Property="Foreground" Value="#FF6B6B"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="CloseBorder" Property="Background" Value="#55252B"/>
-                                <Setter Property="Foreground" Value="#FF8A8A"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="CloseBorder" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
-    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" Opacity="0">
+    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" Opacity="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -3989,7 +3841,25 @@ function Show-UserGuideDialog {
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Button Name="GuideCloseButton" Style="{StaticResource GuideCloseButtonStyle}" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="32" Height="32" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" Foreground="#AFAFAF" BorderThickness="0" ToolTip="Close" Panel.ZIndex="100"/>
+            <!-- Close Button -->
+            <Button Name="GuideCloseButton" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="32" Height="32"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Background="#262626" Foreground="#AFAFAF"
+                    BorderThickness="1" BorderBrush="#3D3D3D" Cursor="Hand" ToolTip="Close" Panel.ZIndex="100">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#E81123"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#E81123"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
 
             <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,24" HorizontalAlignment="Center">
@@ -3997,29 +3867,79 @@ function Show-UserGuideDialog {
                     <Viewbox Width="36" Height="36" Margin="0,0,14,0">
                         <Canvas Width="760" Height="720">
                             <Canvas Canvas.Left="-135" Canvas.Top="-135" Width="1024" Height="1024">
-                                <Rectangle Canvas.Left="245" Canvas.Top="147" Width="534" Height="151" RadiusX="34" RadiusY="34" Fill="{StaticResource guide_b1}">
+                                <Rectangle Canvas.Left="245" Canvas.Top="147" Width="534" Height="151" RadiusX="34" RadiusY="34">
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#174BCB" Offset="0"/>
+                                            <GradientStop Color="#0B3AA5" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
                                     <Rectangle.Effect>
                                         <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
                                     </Rectangle.Effect>
                                 </Rectangle>
 
-                                <Rectangle Canvas.Left="209" Canvas.Top="205" Width="606" Height="168" RadiusX="36" RadiusY="36" Fill="{StaticResource guide_b2}"/>
+                                <Rectangle Canvas.Left="209" Canvas.Top="205" Width="606" Height="168" RadiusX="36" RadiusY="36">
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#1470D5" Offset="0"/>
+                                            <GradientStop Color="#0758BD" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
 
-                                <Rectangle Canvas.Left="173" Canvas.Top="263" Width="678" Height="539" RadiusX="36" RadiusY="36" Fill="{StaticResource guide_sky}">
+                                <Rectangle Canvas.Left="173" Canvas.Top="263" Width="678" Height="539" RadiusX="36" RadiusY="36">
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#54A8F4" Offset="0"/>
+                                            <GradientStop Color="#8BC8F6" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
                                     <Rectangle.Effect>
                                         <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
                                     </Rectangle.Effect>
                                 </Rectangle>
 
-                                <Canvas Clip="{StaticResource guide_clip}">
+                                <Canvas>
+                                    <Canvas.Clip>
+                                        <RectangleGeometry Rect="173,263,678,539" RadiusX="36" RadiusY="36"/>
+                                    </Canvas.Clip>
                                     <Ellipse Canvas.Left="80" Canvas.Top="175" Width="820" Height="380" Fill="#B9DEFA" Opacity="0.18"/>
                                     <Ellipse Canvas.Left="642" Canvas.Top="295" Width="110" Height="110" Fill="#FFE995"/>
-                                    <Path Data="M235 625L360 510L425 558L495 424L570 505L635 450L810 616L880 690V830H205V830Z" Fill="{StaticResource guide_m3}"/>
-                                    <Path Data="M360 510L495 424L570 505L532 485L500 535L468 501L430 552L403 531Z" Fill="{StaticResource guide_snow}"/>
-                                    <Path Data="M175 657L302 544L376 600L458 516L553 625L610 561L720 671L858 760V830H175Z" Fill="{StaticResource guide_m2}"/>
+                                    <Path Data="M235 625L360 510L425 558L495 424L570 505L635 450L810 616L880 690V830H205V830Z">
+                                        <Path.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#79B5EA" Offset="0"/>
+                                                <GradientStop Color="#9CCDF0" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Path.Fill>
+                                    </Path>
+                                    <Path Data="M360 510L495 424L570 505L532 485L500 535L468 501L430 552L403 531Z">
+                                        <Path.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#E5EEFF" Offset="0"/>
+                                                <GradientStop Color="#FFFFFF" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Path.Fill>
+                                    </Path>
+                                    <Path Data="M175 657L302 544L376 600L458 516L553 625L610 561L720 671L858 760V830H175Z">
+                                        <Path.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#2C72CB" Offset="0"/>
+                                                <GradientStop Color="#5E9FDF" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Path.Fill>
+                                    </Path>
                                     <Path Data="M302 544L376 600L346 584L325 608L302 590L275 613Z" Fill="#BBDCF5" Opacity="0.9"/>
                                     <Path Data="M458 516L553 625L514 601L486 630L458 602L432 625Z" Fill="#CDE5FA" Opacity="0.85"/>
-                                    <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z" Fill="{StaticResource guide_m1}"/>
+                                    <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z">
+                                        <Path.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#08459F" Offset="0"/>
+                                                <GradientStop Color="#0A62C2" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Path.Fill>
+                                    </Path>
                                     <Path Data="M268 590L337 632L420 695L505 751L590 793L458 741L382 699L320 653Z" Fill="#165DB8" Opacity="0.82"/>
                                     <Path Data="M515 830L590 760L675 700L760 747L880 683L900 830Z" Fill="#3984D4" Opacity="0.78"/>
                                     <Path Data="M675 700L760 747L720 735L690 759L654 730Z" Fill="#79B6E9" Opacity="0.62"/>
@@ -4108,7 +4028,7 @@ function Show-UserGuideDialog {
                                 <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#00CACC" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
                                     <TextBlock Text="Browse &amp; Preview" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Explore recent days of Bing imagery. Double-click to apply" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    <TextBlock Text="Explore recent days of Bing imagery. Single click to inspect, double-click to apply" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
