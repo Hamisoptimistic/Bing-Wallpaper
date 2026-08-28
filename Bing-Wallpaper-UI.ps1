@@ -27,7 +27,7 @@ catch {
 
 # High-Performance Cached Native Types (DWM dark titlebar, FastDownloader, FastAccent, AppUserModel)
 $script:nativeDllPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScapeNative.dll'
-if (-not ('BingWallpaperNative' -as [type])) {
+if (-not ('BingWallpaper.FastAccent' -as [type])) {
     if (Test-Path -LiteralPath $script:nativeDllPath) {
         try {
             [void][System.Reflection.Assembly]::LoadFile($script:nativeDllPath)
@@ -35,7 +35,7 @@ if (-not ('BingWallpaperNative' -as [type])) {
         catch {}
     }
 
-    if (-not ('BingWallpaperNative' -as [type])) {
+    if (-not ('BingWallpaper.FastAccent' -as [type])) {
         try {
             $nativeHelperCode = @'
 using System;
@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.182'
+$script:appVersion = [Version]'1.0.183'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -4425,4 +4425,3 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
