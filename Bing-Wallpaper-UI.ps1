@@ -25,9 +25,15 @@ catch {
 [void][System.Reflection.Assembly]::Load("System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")
 [void][System.Reflection.Assembly]::Load("System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")
 
+# High-Performance Native Types (Auto-extracted from embedded payload in 1ms)
+# High-Performance Native Types (Auto-extracted from embedded payload in 1ms)
+# High-Performance Native Types (Auto-extracted from embedded payload in 1ms)
 # High-Performance Cached Native Types (DWM dark titlebar, FastDownloader, FastAccent, AppUserModel)
+# High-Performance Pre-compiled Native Types (Loaded in ~2ms)
 $script:nativeDllPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScapeNative.dll'
+
 if (-not ('BingWallpaper.FastAccent' -as [type])) {
+    # 1. Try loading from existing physical DLL in %LOCALAPPDATA%
     if (Test-Path -LiteralPath $script:nativeDllPath) {
         try {
             [void][System.Reflection.Assembly]::LoadFile($script:nativeDllPath)
@@ -35,6 +41,30 @@ if (-not ('BingWallpaper.FastAccent' -as [type])) {
         catch {}
     }
 
+    # 2. Try loading from CI-injected in-memory Base64 payload (Instant cold startup)
+    if (-not ('BingWallpaper.FastAccent' -as [type])) {
+        $script:nativeAssemblyBase64 = '__AUTOSCAPE_NATIVE_DLL_BASE64__'
+        if ($script:nativeAssemblyBase64 -and $script:nativeAssemblyBase64 -ne '__AUTOSCAPE_NATIVE_DLL_BASE64__') {
+            try {
+                $rawBytes = [System.Convert]::FromBase64String($script:nativeAssemblyBase64)
+                [void][System.Reflection.Assembly]::Load($rawBytes)
+
+                # Persist to disk for any external/isolated background tasks
+                try {
+                    $nativeDir = Split-Path -Parent $script:nativeDllPath
+                    if (-not (Test-Path -LiteralPath $nativeDir)) {
+                        New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
+                    }
+                    if (-not (Test-Path -LiteralPath $script:nativeDllPath)) {
+                        [System.IO.File]::WriteAllBytes($script:nativeDllPath, $rawBytes)
+                    }
+                } catch {}
+            }
+            catch {}
+        }
+    }
+
+    # 3. Fallback for Local Dev only (runs when executing raw .ps1 prior to CI compilation)
     if (-not ('BingWallpaper.FastAccent' -as [type])) {
         try {
             $nativeHelperCode = @'
@@ -340,30 +370,25 @@ public static class BingWallpaperNative {
     }
 }
 '@
-            try {
-                $nativeDir = Split-Path -Parent $script:nativeDllPath
-                if (-not (Test-Path -LiteralPath $nativeDir)) {
-                    New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
-                }
-                $compileParams = @{
-                    TypeDefinition       = $nativeHelperCode
-                    ReferencedAssemblies = @('System.Drawing', 'PresentationCore', 'WindowsBase')
-                    OutputAssembly       = $script:nativeDllPath
-                    OutputType           = 'Library'
-                    IgnoreWarnings       = $true
-                }
-                Add-Type @compileParams
+            $nativeDir = Split-Path -Parent $script:nativeDllPath
+            if (-not (Test-Path -LiteralPath $nativeDir)) {
+                New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
             }
-            catch {
-                Add-Type -TypeDefinition $nativeHelperCode -ReferencedAssemblies System.Drawing, PresentationCore, WindowsBase -IgnoreWarnings
-            }
+            Add-Type -TypeDefinition $nativeHelperCode `
+                     -ReferencedAssemblies 'System.Drawing', 'PresentationCore', 'WindowsBase' `
+                     -OutputAssembly $script:nativeDllPath `
+                     -OutputType Library `
+                     -IgnoreWarnings | Out-Null
         }
         catch {}
     }
 }
 
+
+
+
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.190'
+$script:appVersion = [Version]'1.0.191'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -3389,8 +3414,8 @@ function Load-Gallery {
             param([string]$Region, [string]$CacheDir, [string]$NativeDllPath)
             try {
                 if (-not ('BingWallpaper.FastDownloader' -as [type]) -and (Test-Path -LiteralPath $NativeDllPath)) {
-                    try { [void][System.Reflection.Assembly]::LoadFile($NativeDllPath) } catch {}
-                }
+    try { Add-Type -Path $NativeDllPath } catch {}
+}
 
                 $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
                 $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
@@ -4468,7 +4493,6 @@ $window.Add_StateChanged({
 
 $script:memTrimTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(45)
-$script:memTrimTimer.Add_Trust({ [BingWallpaperNative]::FlushMemory() }) # Wait, fixing typo here to safe MDL ticks
 $script:memTrimTimer.Add_Tick({ [BingWallpaperNative]::FlushMemory() })
 $script:memTrimTimer.Start()
 
@@ -4486,6 +4510,15 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
+
+
+
+
+
 
 
 

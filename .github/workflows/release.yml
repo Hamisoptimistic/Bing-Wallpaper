@@ -26,27 +26,7 @@ jobs:
         id: build_step
         shell: powershell
         run: |
-          $commitCount = (git rev-list --count HEAD).Trim()
-          if (-not ($commitCount -match '^\d+$')) { $commitCount = '1' }
-          $ver = "1.0.$commitCount"
-          Write-Output "Generated Auto-Version: $ver"
-
-          # Automatically update $script:appVersion in Bing-Wallpaper-UI.ps1
-          $uiContent = Get-Content -LiteralPath .\Bing-Wallpaper-UI.ps1 -Raw
-          $uiContent = $uiContent -replace '\$script:appVersion\s*=\s*\[Version\][''"][^''"]+[''"]', "`$script:appVersion = [Version]'$ver'"
-          Set-Content -LiteralPath .\Bing-Wallpaper-UI.ps1 -Value $uiContent -Encoding UTF8
-
-          # Compile executable
-          powershell -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
-          if (-not (Test-Path .\AutoScape.exe)) {
-            throw "AutoScape.exe failed to compile"
-          }
-          if (-not (Test-Path .\AutoScape.exe.sha256)) {
-            $hash = (Get-FileHash -LiteralPath .\AutoScape.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-            Set-Content -LiteralPath .\AutoScape.exe.sha256 -Value "$hash  AutoScape.exe" -Encoding ASCII
-          }
-
-          "version=$ver" >> $env:GITHUB_OUTPUT
+          .\scripts\Build-Release.ps1
 
       - name: Publish Latest Release
         uses: softprops/action-gh-release@v2
