@@ -20,29 +20,40 @@ if ($uiContent -match $nativePattern) {
     throw "Could not extract `$nativeHelperCode block from $uiScriptPath"
 }
 
-# 3. Pre-compile DLL on CI Runner
-$tempDll = Join-Path ([System.IO.Path]::GetTempPath()) "AutoScapeNative.dll"
-if (Test-Path -LiteralPath $tempDll) {
-    Remove-Item -LiteralPath $tempDll -Force -ErrorAction SilentlyContinue
+# 3. Pre-compile AutoScapeNative.dll on the CI runner as a REAL file sitting next
+#    to the script - not a Base64 blob pasted into the .ps1. Embedding a large
+#    Base64-encoded assembly literal directly in PowerShell script text is one of
+#    the heaviest triggers for AMSI/Defender's static-analysis heuristics, and it
+#    materially slows down every launch on a machine that hasn't seen the script
+#    before (i.e. every end user's machine). Create-Bing-App-Shortcut.ps1 embeds
+#    this DLL as its own resource inside AutoScape.exe, alongside the script and
+#    the icon, and extracts it back to a real .dll file at runtime.
+$nativeDllOutPath = Join-Path (Get-Location) "AutoScapeNative.dll"
+if (Test-Path -LiteralPath $nativeDllOutPath) {
+    Remove-Item -LiteralPath $nativeDllOutPath -Force -ErrorAction SilentlyContinue
 }
 
 $compileParams = @{
     TypeDefinition       = $nativeSource
     ReferencedAssemblies = @('System.Drawing', 'PresentationCore', 'WindowsBase')
-    OutputAssembly       = $tempDll
+    OutputAssembly       = $nativeDllOutPath
     OutputType           = 'Library'
     IgnoreWarnings       = $true
 }
 Add-Type @compileParams | Out-Null
 
-$base64Dll = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($tempDll))
+if (-not (Test-Path -LiteralPath $nativeDllOutPath)) {
+    throw "AutoScapeNative.dll failed to compile"
+}
+Write-Host "Compiled native helper DLL: $nativeDllOutPath"
 
-# 4. Inject Version & Base64 Payload into Bing-Wallpaper-UI.ps1
+# 4. Inject Version into Bing-Wallpaper-UI.ps1. No Base64 payload injection
+#    anymore - the native DLL now travels as a real file / embedded resource.
 $uiContent = $uiContent -replace '\$script:appVersion\s*=\s*\[Version\][''"][^''"]+[''"]', "`$script:appVersion = [Version]'$ver'"
-$uiContent = $uiContent -replace '__AUTOSCAPE_NATIVE_DLL_BASE64__', $base64Dll
 Set-Content -LiteralPath $uiScriptPath -Value $uiContent -Encoding UTF8
 
-# 5. Compile Executable
+# 5. Compile Executable (embeds Bing-Wallpaper-UI.ps1, AutoScapeNative.dll and
+#    the icon as resources inside AutoScape.exe)
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
 
 if (-not (Test-Path .\AutoScape.exe)) {
@@ -52,6 +63,9 @@ if (-not (Test-Path .\AutoScape.exe)) {
 # 6. Generate Checksum
 $hash = (Get-FileHash -LiteralPath .\AutoScape.exe -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath .\AutoScape.exe.sha256 -Value "$hash  AutoScape.exe" -Encoding ASCII
+
+# 7. Clean up the loose build-time DLL now that it's embedded in AutoScape.exe
+Remove-Item -LiteralPath $nativeDllOutPath -Force -ErrorAction SilentlyContinue
 
 # Output version to GitHub Environment if running under CI
 if ($env:GITHUB_OUTPUT) {

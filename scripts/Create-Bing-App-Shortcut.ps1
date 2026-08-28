@@ -39,6 +39,14 @@ $exePath = Join-Path $rootFolder 'AutoScape.exe'
 $desktopPath = [Environment]::GetFolderPath('Desktop')
 $desktopShortcutPath = Join-Path $desktopPath 'AutoScape.lnk'
 $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
+$nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
+$hasNativeDll = Test-Path -LiteralPath $nativeDllPath
+if (-not $hasNativeDll) {
+    Write-Output "--> WARNING: AutoScapeNative.dll not found at $nativeDllPath."
+    Write-Output "    AutoScape.exe will still work, but it will fall back to compiling the"
+    Write-Output "    native helper at runtime (slower first launch). Run Build-Release.ps1"
+    Write-Output "    first to produce AutoScapeNative.dll before packaging a real release."
+}
 
 Add-Type -AssemblyName System.Drawing
 
@@ -76,6 +84,34 @@ namespace AutoScapeLauncher
 {
     static class Program
     {
+        // PowerShell 7 (pwsh.exe) cold-starts noticeably faster than the legacy
+        // Windows PowerShell 5.1 host. Use it when present; otherwise fall back
+        // to the classic host that's guaranteed to exist on every Windows 10/11
+        // machine, so behavior is unchanged on machines without PS7 installed.
+        static string FindPwsh()
+        {
+            try
+            {
+                string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                string standardPath = Path.Combine(programFiles, "PowerShell", "7", "pwsh.exe");
+                if (File.Exists(standardPath)) return standardPath;
+
+                string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+                foreach (string dir in pathEnv.Split(Path.PathSeparator))
+                {
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(dir)) continue;
+                        string candidate = Path.Combine(dir, "pwsh.exe");
+                        if (File.Exists(candidate)) return candidate;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            return null;
+        }
+
         [STAThread]
         static void Main()
         {
@@ -83,11 +119,12 @@ namespace AutoScapeLauncher
             string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
             string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
             string iconPath = Path.Combine(tempDir, "assets", "app.ico");
+            string nativeDll = Path.Combine(tempDir, "AutoScapeNative.dll");
 
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
-                
+
                 using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.Bing-Wallpaper-UI.ps1"))
                 {
                     if (source != null)
@@ -113,12 +150,34 @@ namespace AutoScapeLauncher
                         }
                     }
                 }
+
+                // Native helper DLL: extracted as a real file next to the script instead
+                // of being pasted into the script as a Base64 string. Keeping it out of the
+                // .ps1's text avoids the AMSI/Defender scan overhead a large Base64 blob in
+                // script content triggers on every launch.
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.AutoScapeNative.dll"))
+                {
+                    if (source != null)
+                    {
+                        bool needsExtract = !File.Exists(nativeDll) || new FileInfo(nativeDll).Length != source.Length;
+                        if (needsExtract)
+                        {
+                            using (FileStream destination = File.Create(nativeDll))
+                            {
+                                source.CopyTo(destination);
+                            }
+                        }
+                    }
+                }
             }
             catch {}
 
+            string pwshPath = FindPwsh();
+            string hostExe = pwshPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
+
             ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
-            psi.Arguments = string.Format("-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{0}\"", psScript);
+            psi.FileName = hostExe;
+            psi.Arguments = string.Format("-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{0}\"", psScript);
             psi.WorkingDirectory = appDir;
             psi.CreateNoWindow = true;
             psi.UseShellExecute = false;
@@ -138,7 +197,12 @@ namespace AutoScapeLauncher
         "/platform:anycpu",
         "/win32icon:`"$icoPath`"",
         "/resource:`"$uiPath`",AutoScapeLauncher.Bing-Wallpaper-UI.ps1",
-        "/resource:`"$icoPath`",AutoScapeLauncher.app.ico",
+        "/resource:`"$icoPath`",AutoScapeLauncher.app.ico"
+    )
+    if ($hasNativeDll) {
+        $compileArgs += "/resource:`"$nativeDllPath`",AutoScapeLauncher.AutoScapeNative.dll"
+    }
+    $compileArgs += @(
         "/out:`"$exePath`"",
         "`"$csTemp`""
     )
@@ -159,6 +223,11 @@ namespace AutoScapeLauncher
         Set-Content -LiteralPath $checksumPath -Value "$checksum  AutoScape.exe" -Encoding ASCII
         Write-Output "    Created $exePath (with embedded authentic icon)"
         Write-Output "    Created $checksumPath"
+        if ($hasNativeDll) {
+            Write-Output "    Embedded AutoScapeNative.dll as a resource (no runtime compile needed)"
+        } else {
+            Write-Output "    NOTE: AutoScapeNative.dll was NOT embedded - app will compile it at first run"
+        }
     }
 }
 

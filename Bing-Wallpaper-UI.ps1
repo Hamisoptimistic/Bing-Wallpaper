@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -9,6 +9,8 @@ param(
     [ValidateSet('Fit', 'Fill', 'Stretch', 'Center', 'Tile', 'Span')]
     [string]$Style = 'Fit'
 )
+
+$script:startStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 # Enforce modern security protocols to prevent connection blocks or downgrade attacks
 try {
@@ -25,48 +27,73 @@ catch {
 [void][System.Reflection.Assembly]::Load("System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")
 [void][System.Reflection.Assembly]::Load("System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")
 
-# High-Performance Native Types (Auto-extracted from embedded payload in 1ms)
-# High-Performance Native Types (Auto-extracted from embedded payload in 1ms)
-# High-Performance Native Types (Auto-extracted from embedded payload in 1ms)
 # High-Performance Cached Native Types (DWM dark titlebar, FastDownloader, FastAccent, AppUserModel)
-# High-Performance Pre-compiled Native Types (Loaded in ~2ms)
+# The compiled DLL now ships as its own embedded resource in AutoScape.exe (extracted
+# next to this script by the launcher stub) instead of a Base64 blob pasted into this
+# file. A giant Base64-encoded-assembly literal sitting in script text is one of the
+# heaviest triggers for AMSI/Defender's static-analysis heuristics, and re-extracting a
+# real DLL to disk avoids that scan cost on every launch.
 $script:nativeDllPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScapeNative.dll'
+$script:nativeDllExtractedPath = Join-Path $PSScriptRoot 'AutoScapeNative.dll'
+$script:nativeLoadLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\native-load.log'
+
+function Write-NativeLoadLog {
+    param([string]$Message)
+    try {
+        $logDir = Split-Path -Parent $script:nativeLoadLogPath
+        if (-not (Test-Path -LiteralPath $logDir)) {
+            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        }
+        Add-Content -LiteralPath $script:nativeLoadLogPath -Value "$(Get-Date -Format 'u')  $Message" -Encoding UTF8
+    }
+    catch {}
+}
 
 if (-not ('BingWallpaper.FastAccent' -as [type])) {
-    # 1. Try loading from existing physical DLL in %LOCALAPPDATA%
-    if (Test-Path -LiteralPath $script:nativeDllPath) {
+    # 1. Fastest path: DLL sitting right next to this script, extracted from
+    #    AutoScape.exe's embedded resources by the launcher stub on this run.
+    if (Test-Path -LiteralPath $script:nativeDllExtractedPath) {
+        try {
+            [void][System.Reflection.Assembly]::LoadFile($script:nativeDllExtractedPath)
+            Write-NativeLoadLog "OK: loaded native DLL from extracted path ($script:nativeDllExtractedPath)"
+
+            # Mirror into %LOCALAPPDATA% too, since a background runspace elsewhere
+            # in this script loads the native DLL again by path from $script:nativeDllPath.
+            try {
+                $nativeDir = Split-Path -Parent $script:nativeDllPath
+                if (-not (Test-Path -LiteralPath $nativeDir)) {
+                    New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
+                }
+                if (-not (Test-Path -LiteralPath $script:nativeDllPath)) {
+                    Copy-Item -LiteralPath $script:nativeDllExtractedPath -Destination $script:nativeDllPath -Force
+                }
+            }
+            catch {
+                Write-NativeLoadLog "WARN: could not mirror extracted DLL into LOCALAPPDATA cache: $($_.Exception.Message)"
+            }
+        }
+        catch {
+            Write-NativeLoadLog "FAIL: could not load extracted DLL ($script:nativeDllExtractedPath): $($_.Exception.Message)"
+        }
+    }
+
+    # 2. Try loading from an existing physical DLL already cached in %LOCALAPPDATA%
+    #    (covers running this script directly during development, without the exe wrapper).
+    if (-not ('BingWallpaper.FastAccent' -as [type]) -and (Test-Path -LiteralPath $script:nativeDllPath)) {
         try {
             [void][System.Reflection.Assembly]::LoadFile($script:nativeDllPath)
+            Write-NativeLoadLog "OK: loaded native DLL from LOCALAPPDATA cache ($script:nativeDllPath)"
         }
-        catch {}
-    }
-
-    # 2. Try loading from CI-injected in-memory Base64 payload (Instant cold startup)
-    
-    if (-not ('BingWallpaper.FastAccent' -as [type])) {
-        $script:nativeAssemblyBase64 = '__AUTOSCAPE_NATIVE_DLL_BASE64__'
-        if ($script:nativeAssemblyBase64.Length -gt 100) {
-            try {
-                $rawBytes = [System.Convert]::FromBase64String($script:nativeAssemblyBase64)
-                [void][System.Reflection.Assembly]::Load($rawBytes)
-
-                # Persist to disk for any external/isolated background tasks
-                try {
-                    $nativeDir = Split-Path -Parent $script:nativeDllPath
-                    if (-not (Test-Path -LiteralPath $nativeDir)) {
-                        New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
-                    }
-                    if (-not (Test-Path -LiteralPath $script:nativeDllPath)) {
-                        [System.IO.File]::WriteAllBytes($script:nativeDllPath, $rawBytes)
-                    }
-                } catch {}
-            }
-            catch {}
+        catch {
+            Write-NativeLoadLog "FAIL: could not load cached DLL ($script:nativeDllPath): $($_.Exception.Message)"
         }
     }
 
-    # 3. Fallback for Local Dev only (runs when executing raw .ps1 prior to CI compilation)
+    # 3. Fallback for Local Dev only (runs when executing raw .ps1 prior to CI compilation).
+    #    This should NEVER fire in a shipped build - if it does, AutoScapeNative.dll
+    #    failed to get embedded/extracted correctly and the build needs fixing.
     if (-not ('BingWallpaper.FastAccent' -as [type])) {
+        Write-NativeLoadLog "WARNING: falling back to runtime Add-Type compile (this should not happen in a release build)"
         try {
             $nativeHelperCode = @'
 using System;
@@ -380,8 +407,11 @@ public static class BingWallpaperNative {
                      -OutputAssembly $script:nativeDllPath `
                      -OutputType Library `
                      -IgnoreWarnings | Out-Null
+            Write-NativeLoadLog "Runtime compile fallback SUCCEEDED, cached at $script:nativeDllPath"
         }
-        catch {}
+        catch {
+            Write-NativeLoadLog "Runtime compile fallback FAILED: $($_.Exception.Message)"
+        }
     }
 }
 
@@ -4517,24 +4547,8 @@ $script:memTrimTimer.Start()
         $e.Handled = $true
     })
 
+
+
+[System.Console]::WriteLine("Window Ready at: $($script:startStopwatch.ElapsedMilliseconds)ms")
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
