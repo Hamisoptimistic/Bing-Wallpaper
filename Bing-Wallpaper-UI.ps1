@@ -389,7 +389,7 @@ public static class BingWallpaperNative {
 
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.192'
+$script:appVersion = [Version]'1.0.193'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -3799,21 +3799,29 @@ $SpotlightTargetBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Updat
 
 $initialRegionCode = Get-DetectedRegionCode
 $detectedItem = $RegionBox.Items | Where-Object { $_.Tag -eq $initialRegionCode } | Select-Object -First 1
-if ($detectedItem) { $RegionBox.SelectedItem = $detectedItem }
+if ($detectedItem) { 
+    $RegionBox.SelectedItem = $detectedItem 
+}
 
-$RegionBox.Add_SelectionChanged({ Load-Gallery })
+# Attach selection handler and trigger Load-Gallery only AFTER window renders
+$window.Add_ContentRendered({
+    $RegionBox.Add_SelectionChanged({ Load-Gallery })
+    Load-Gallery
+})
+
 $RefreshBtn.Add_Click({
-        if ($script:isRefreshAnimating) { return }
-        if (-not $RefreshIcon) {
-            Load-Gallery
-            return
-        }
-        $script:isRefreshAnimating = $true
-        $RefreshBtn.IsEnabled = $false
-        Start-RefreshAnimation
-    })
+    if ($script:isRefreshAnimating) { return }
+    if (-not $RefreshIcon) {
+        Load-Gallery
+        return
+    }
+    $script:isRefreshAnimating = $true
+    $RefreshBtn.IsEnabled = $false
+    Start-RefreshAnimation
+})
 
-$window.Add_ContentRendered({ Load-Gallery })
+
+
 $window.Add_SizeChanged({ Update-GalleryViewportHeight })
 $GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
 
@@ -4511,6 +4519,7 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
 
 
