@@ -362,7 +362,17 @@ public static class BingWallpaperNative {
     }
 }
 
-$script:appVersion = [Version]'1.0.175'
+# Dynamically detect the installed executable's version; fallback to script version
+$script:appVersion = [Version]'1.0.178'
+try {
+    $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
+        $fileVer = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($currentProc).FileVersion
+        if ($fileVer -match '^\d+(\.\d+){1,3}$') {
+            $script:appVersion = [Version]$fileVer
+        }
+    }
+} catch {}
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = ''
 
@@ -4357,4 +4367,5 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
