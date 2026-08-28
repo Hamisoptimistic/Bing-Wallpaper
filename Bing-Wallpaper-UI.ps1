@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.188'
+$script:appVersion = [Version]'1.0.189'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -372,7 +372,8 @@ try {
             $script:appVersion = [Version]$fileVer
         }
     }
-} catch {}
+}
+catch {}
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = ''
 
@@ -1348,16 +1349,16 @@ function Find-RevealBorders($visual) {
 $window.Add_Loaded({ Find-RevealBorders $window })
 
 $window.Add_MouseMove({
-    param($evtSender, $e)
-    foreach ($item in $script:revealElements) {
-        try {
-            $pos = $e.GetPosition($item.Element)
-            $item.Brush.Center = $pos
-            $item.Brush.GradientOrigin = $pos
+        param($evtSender, $e)
+        foreach ($item in $script:revealElements) {
+            try {
+                $pos = $e.GetPosition($item.Element)
+                $item.Brush.Center = $pos
+                $item.Brush.GradientOrigin = $pos
+            }
+            catch {}
         }
-        catch {}
-    }
-})
+    })
 
 $scriptDir = $PSScriptRoot
 if (-not $scriptDir -and $MyInvocation.MyCommand.Path) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
@@ -1377,7 +1378,8 @@ function Set-AutoScapeIcon {
                 $frame = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new((Resolve-Path -LiteralPath $path).Path), [System.Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat, [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
                 $TargetWindow.Icon = $frame
                 return $path
-            } catch {}
+            }
+            catch {}
         }
     }
 
@@ -1385,27 +1387,28 @@ function Set-AutoScapeIcon {
     try {
         $dv = New-Object System.Windows.Media.DrawingVisual
         $dc = $dv.RenderOpen()
-        $dc.DrawRoundedRectangle([System.Windows.Media.Brushes]::Transparent, $null, [System.Windows.Rect]::new(0,0,48,48), 10, 10)
-        $bg = New-Object System.Windows.Media.LinearGradientBrush([System.Windows.Media.Color]::FromRgb(20,88,190), [System.Windows.Media.Color]::FromRgb(77,166,235), 45)
-        $dc.DrawRoundedRectangle($bg, $null, [System.Windows.Rect]::new(3,3,42,42), 8, 8)
-        $sun = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255,231,149))
-        $dc.DrawEllipse($sun, $null, [System.Windows.Point]::new(33,14), 4.5, 4.5)
+        $dc.DrawRoundedRectangle([System.Windows.Media.Brushes]::Transparent, $null, [System.Windows.Rect]::new(0, 0, 48, 48), 10, 10)
+        $bg = New-Object System.Windows.Media.LinearGradientBrush([System.Windows.Media.Color]::FromRgb(20, 88, 190), [System.Windows.Media.Color]::FromRgb(77, 166, 235), 45)
+        $dc.DrawRoundedRectangle($bg, $null, [System.Windows.Rect]::new(3, 3, 42, 42), 8, 8)
+        $sun = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 231, 149))
+        $dc.DrawEllipse($sun, $null, [System.Windows.Point]::new(33, 14), 4.5, 4.5)
         $mount = New-Object System.Windows.Media.StreamGeometry
         $mountContext = $mount.Open()
-        $mountContext.BeginFigure([System.Windows.Point]::new(6,38), $true, $true)
-        $mountContext.LineTo([System.Windows.Point]::new(17,27), $false, $false)
-        $mountContext.LineTo([System.Windows.Point]::new(23,32), $false, $false)
-        $mountContext.LineTo([System.Windows.Point]::new(29,24), $false, $false)
-        $mountContext.LineTo([System.Windows.Point]::new(42,38), $false, $false)
+        $mountContext.BeginFigure([System.Windows.Point]::new(6, 38), $true, $true)
+        $mountContext.LineTo([System.Windows.Point]::new(17, 27), $false, $false)
+        $mountContext.LineTo([System.Windows.Point]::new(23, 32), $false, $false)
+        $mountContext.LineTo([System.Windows.Point]::new(29, 24), $false, $false)
+        $mountContext.LineTo([System.Windows.Point]::new(42, 38), $false, $false)
         $mountContext.Close()
         $mount.Freeze()
         $dc.DrawGeometry([System.Windows.Media.Brushes]::White, $null, $mount)
         $dc.Close()
-        $rt = New-Object System.Windows.Media.Imaging.RenderTargetBitmap(48,48,96,96,[System.Windows.Media.PixelFormats]::Pbgra32)
+        $rt = New-Object System.Windows.Media.Imaging.RenderTargetBitmap(48, 48, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
         $rt.Render($dv)
         $rt.Freeze()
         $TargetWindow.Icon = $rt
-    } catch {}
+    }
+    catch {}
     return $null
 }
 
@@ -1435,6 +1438,11 @@ $applyDarkTitleBar = {
 
 $window.Add_SourceInitialized($applyDarkTitleBar)
 
+$window.Add_StateChanged({
+        if ($script:activeModalControl) {
+            Close-InWindowModal
+        }
+    })
 function Save-Settings {
     try {
         $settingsObj = @{
@@ -1518,21 +1526,21 @@ function Set-AppDimState {
         $timer = New-Object System.Windows.Threading.DispatcherTimer
         $timer.Interval = [TimeSpan]::FromMilliseconds(160)
         $timer.Add_Tick({
-            param($sender,$e)
-            $sender.Stop()
-            $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
-            $ModalDimOverlay.Opacity = 0.0
-            $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
-            $ModalDimOverlay.IsHitTestVisible = $false
-        })
+                param($sender, $e)
+                $sender.Stop()
+                $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+                $ModalDimOverlay.Opacity = 0.0
+                $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+                $ModalDimOverlay.IsHitTestVisible = $false
+            })
         $timer.Start()
     }
 }
 
 function Open-InWindowModal {
     param(
-        [Parameter(Mandatory=$true)]$Control,
-        [ValidateSet('Guide','Dialog')][string]$Kind = 'Dialog',
+        [Parameter(Mandatory = $true)]$Control,
+        [ValidateSet('Guide', 'Dialog')][string]$Kind = 'Dialog',
         [scriptblock]$CloseCallback = $null
     )
 
@@ -1571,12 +1579,12 @@ function Open-InWindowModal {
     $ease = New-Object System.Windows.Media.Animation.CubicEase
     $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
 
-    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0,1.0,$duration)
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
     $fade.EasingFunction = $ease
     $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
     $Control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
 
-    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0,0.55,$duration)
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 0.55, $duration)
     $dimAnim.EasingFunction = $ease
     $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
     $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
@@ -1600,7 +1608,7 @@ function Close-InWindowModal {
         $script:activeModalCloseCallback = $null
         $script:activeModalClosing = $false
 
-        try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty,$null) } catch {}
+        try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null) } catch {}
         $ModalHost.Children.Clear()
         $ModalHost.Visibility = [System.Windows.Visibility]::Collapsed
         $ModalHost.IsHitTestVisible = $false
@@ -1619,58 +1627,59 @@ function Close-InWindowModal {
     $ease = New-Object System.Windows.Media.Animation.CubicEase
     $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseIn
 
-    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$control.Opacity,0.0,$duration)
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$control.Opacity, 0.0, $duration)
     $fade.EasingFunction = $ease
     $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
-    $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty,$fade)
+    $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
 
-    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$ModalDimOverlay.Opacity,0.0,$duration)
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$ModalDimOverlay.Opacity, 0.0, $duration)
     $dimAnim.EasingFunction = $ease
     $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
-    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty,$dimAnim)
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
 
     $timer = New-Object System.Windows.Threading.DispatcherTimer
     $timer.Interval = [TimeSpan]::FromMilliseconds(160)
     $timer.Add_Tick({
-        param($sender,$e)
-        $sender.Stop()
+            param($sender, $e)
+            $sender.Stop()
 
-        $callback = $script:activeModalCloseCallback
-        $script:activeModalControl = $null
-        $script:activeModalKind = $null
-        $script:activeModalCloseCallback = $null
-        $script:activeModalClosing = $false
+            $callback = $script:activeModalCloseCallback
+            $script:activeModalControl = $null
+            $script:activeModalKind = $null
+            $script:activeModalCloseCallback = $null
+            $script:activeModalClosing = $false
 
-        try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty,$null) } catch {}
+            try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null) } catch {}
 
-        $ModalHost.Children.Clear()
-        $ModalHost.Visibility = [System.Windows.Visibility]::Collapsed
-        $ModalHost.IsHitTestVisible = $false
+            $ModalHost.Children.Clear()
+            $ModalHost.Visibility = [System.Windows.Visibility]::Collapsed
+            $ModalHost.IsHitTestVisible = $false
 
-        $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty,$null)
-        $ModalDimOverlay.Opacity = 0.0
-        $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
-        $ModalDimOverlay.IsHitTestVisible = $false
+            $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+            $ModalDimOverlay.Opacity = 0.0
+            $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+            $ModalDimOverlay.IsHitTestVisible = $false
 
-        if ($callback) { & $callback }
-    })
+            if ($callback) { & $callback }
+        })
     $timer.Start()
 }
 
 if ($ModalHost) {
     $ModalHost.Add_PreviewMouseLeftButtonDown({
-        param($s,$e)
-        if (-not $script:activeModalControl -or $script:activeModalClosing) { return }
-        $source = $e.OriginalSource -as [System.Windows.DependencyObject]
-        $inside = $false
-        try {
-            if ($source) { $inside = $source.IsDescendantOf($script:activeModalControl) }
-        } catch { $inside = $false }
-        if (-not $inside) {
-            Close-InWindowModal
-            $e.Handled=$true
-        }
-    })
+            param($s, $e)
+            if (-not $script:activeModalControl -or $script:activeModalClosing) { return }
+            $source = $e.OriginalSource -as [System.Windows.DependencyObject]
+            $inside = $false
+            try {
+                if ($source) { $inside = $source.IsDescendantOf($script:activeModalControl) }
+            }
+            catch { $inside = $false }
+            if (-not $inside) {
+                Close-InWindowModal
+                $e.Handled = $true
+            }
+        })
 }
 
 function Start-RefreshAnimation {
@@ -1688,18 +1697,18 @@ function Start-RefreshAnimation {
     $script:refreshDelayTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(560)
     $script:refreshDelayTimer.Add_Tick({
-        $script:refreshDelayTimer.Stop()
-        $script:refreshDelayTimer = $null
-        $finishedRotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
-        $finishedRotation.Angle = 0
-        try {
-            Load-Gallery
-        }
-        finally {
-            $script:isRefreshAnimating = $false
-            $RefreshBtn.IsEnabled = $true
-        }
-    })
+            $script:refreshDelayTimer.Stop()
+            $script:refreshDelayTimer = $null
+            $finishedRotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
+            $finishedRotation.Angle = 0
+            try {
+                Load-Gallery
+            }
+            finally {
+                $script:isRefreshAnimating = $false
+                $RefreshBtn.IsEnabled = $true
+            }
+        })
     $script:refreshDelayTimer.Start()
 }
 
@@ -1768,53 +1777,53 @@ $StyleBox.Add_SelectionChanged($saveHandler)
 $FolderBox.Add_TextChanged($saveHandler)
 
 $FolderBox.Add_PreviewMouseLeftButtonDown({
-    $picked = $null
-    $modernFailed = $false
+        $picked = $null
+        $modernFailed = $false
 
-    try {
-        $dialog = New-Object Microsoft.Win32.OpenFolderDialog
-        $dialog.Title = 'Select Download Folder'
-        if (Test-Path -LiteralPath $FolderBox.Text) {
-            $dialog.InitialDirectory = $FolderBox.Text
-        }
-
-        [BingWallpaperNative]::EnableDarkDialogs()
-
-        $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
-        $darkTimer.Add_Tick({
-            $hwnd = [BingWallpaperNative]::ForegroundWindow()
-            if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNative]::IsDialogWindow($hwnd)) {
-                [BingWallpaperNative]::ForceDarkDialog($hwnd)
-            }
-        })
-
-        $darkTimer.Start()
         try {
-            if ($dialog.ShowDialog($window) -eq $true) {
-                $picked = $dialog.FolderName
+            $dialog = New-Object Microsoft.Win32.OpenFolderDialog
+            $dialog.Title = 'Select Download Folder'
+            if (Test-Path -LiteralPath $FolderBox.Text) {
+                $dialog.InitialDirectory = $FolderBox.Text
+            }
+
+            [BingWallpaperNative]::EnableDarkDialogs()
+
+            $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+            $darkTimer.Add_Tick({
+                    $hwnd = [BingWallpaperNative]::ForegroundWindow()
+                    if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNative]::IsDialogWindow($hwnd)) {
+                        [BingWallpaperNative]::ForceDarkDialog($hwnd)
+                    }
+                })
+
+            $darkTimer.Start()
+            try {
+                if ($dialog.ShowDialog($window) -eq $true) {
+                    $picked = $dialog.FolderName
+                }
+            }
+            finally {
+                $darkTimer.Stop()
             }
         }
-        finally {
-            $darkTimer.Stop()
+        catch {
+            $modernFailed = $true
         }
-    }
-    catch {
-        $modernFailed = $true
-    }
 
-    if ($modernFailed) {
-        $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
-        $legacyRes = [BingWallpaperNative]::PickFolder($helper.Handle, 'Select Download Folder')
-        if (-not [string]::IsNullOrEmpty($legacyRes)) {
-            $picked = $legacyRes
+        if ($modernFailed) {
+            $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+            $legacyRes = [BingWallpaperNative]::PickFolder($helper.Handle, 'Select Download Folder')
+            if (-not [string]::IsNullOrEmpty($legacyRes)) {
+                $picked = $legacyRes
+            }
         }
-    }
 
-    if ($picked) {
-        $FolderBox.Text = $picked
-    }
-})
+        if ($picked) {
+            $FolderBox.Text = $picked
+        }
+    })
 
 $script:selection = @{
     Card  = $null
@@ -1964,50 +1973,50 @@ function Apply-WallpaperAsync {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam, [string]$LockScreenFnCode)
-        try {
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            $wc.DownloadFile($Uri, $Temp)
-            $wc.Dispose()
-            if (Test-Path -LiteralPath $Temp) {
-                if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
-                Move-Item -LiteralPath $Temp -Destination $Dest -Force
-            }
-
-            if ($TargetParam -eq 'Desktop' -or $TargetParam -eq 'Both') {
-                $styleVal = '6'; $tileVal = '0'
-                switch ($StyleParam) {
-                    'Fit' { $styleVal = '6'; $tileVal = '0' }
-                    'Fill' { $styleVal = '10'; $tileVal = '0' }
-                    'Stretch' { $styleVal = '2'; $tileVal = '0' }
-                    'Center' { $styleVal = '0'; $tileVal = '0' }
-                    'Tile' { $styleVal = '0'; $tileVal = '1' }
-                    'Span' { $styleVal = '22'; $tileVal = '0' }
+            param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam, [string]$LockScreenFnCode)
+            try {
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                $wc.DownloadFile($Uri, $Temp)
+                $wc.Dispose()
+                if (Test-Path -LiteralPath $Temp) {
+                    if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+                    Move-Item -LiteralPath $Temp -Destination $Dest -Force
                 }
-                Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'WallpaperStyle' -Value $styleVal -Force -ErrorAction SilentlyContinue
-                Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'TileWallpaper' -Value $tileVal -Force -ErrorAction SilentlyContinue
 
-                if (![BingWallpaperNative]::SystemParametersInfo(20, 0, $Dest, 3)) {
-                    throw 'Windows could not apply the downloaded image as desktop wallpaper.'
+                if ($TargetParam -eq 'Desktop' -or $TargetParam -eq 'Both') {
+                    $styleVal = '6'; $tileVal = '0'
+                    switch ($StyleParam) {
+                        'Fit' { $styleVal = '6'; $tileVal = '0' }
+                        'Fill' { $styleVal = '10'; $tileVal = '0' }
+                        'Stretch' { $styleVal = '2'; $tileVal = '0' }
+                        'Center' { $styleVal = '0'; $tileVal = '0' }
+                        'Tile' { $styleVal = '0'; $tileVal = '1' }
+                        'Span' { $styleVal = '22'; $tileVal = '0' }
+                    }
+                    Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'WallpaperStyle' -Value $styleVal -Force -ErrorAction SilentlyContinue
+                    Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'TileWallpaper' -Value $tileVal -Force -ErrorAction SilentlyContinue
+
+                    if (![BingWallpaperNative]::SystemParametersInfo(20, 0, $Dest, 3)) {
+                        throw 'Windows could not apply the downloaded image as desktop wallpaper.'
+                    }
                 }
-            }
 
-            if ($TargetParam -eq 'Lock screen' -or $TargetParam -eq 'Both') {
-                Invoke-Expression $LockScreenFnCode
-                $cacheDirectory = Split-Path -Parent $Dest
-                $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
-                Copy-Item -LiteralPath $Dest -Destination $lockScreenCachePath -Force
-                $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
-                if (-not $resLock) { throw 'Windows could not apply the lock screen image.' }
-            }
+                if ($TargetParam -eq 'Lock screen' -or $TargetParam -eq 'Both') {
+                    Invoke-Expression $LockScreenFnCode
+                    $cacheDirectory = Split-Path -Parent $Dest
+                    $lockScreenCachePath = Join-Path $cacheDirectory "current_lockscreen.jpg"
+                    Copy-Item -LiteralPath $Dest -Destination $lockScreenCachePath -Force
+                    $resLock = Set-LockScreenImageIsolated -ImagePath $lockScreenCachePath
+                    if (-not $resLock) { throw 'Windows could not apply the lock screen image.' }
+                }
 
-            return @{ Success = $true; Error = $null; Dest = $Dest }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
-        }
-    }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style).AddArgument($fnLockScreenCode)
+                return @{ Success = $true; Error = $null; Dest = $Dest }
+            }
+            catch {
+                return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
+            }
+        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style).AddArgument($fnLockScreenCode)
 
     $asyncOp = $ps.BeginInvoke()
     $script:applyContext = @{ PS = $ps; AsyncOp = $asyncOp; Target = $Target }
@@ -2020,44 +2029,44 @@ function Apply-WallpaperAsync {
     $script:applyTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:applyTimer.Interval = [TimeSpan]::FromMilliseconds(30)
     $script:applyTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:applyContext) {
-            $timerSender.Stop()
-            return
-        }
-        if ($script:applyContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:applyContext
-            $script:applyContext = $null
-            $script:applyTimer = $null
-
-            $isSuccess = $false
-            $errorMsg = $null
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                $errorMsg = if ($res) { $res.Error } else { $null }
+            param($timerSender, $timerArgs)
+            if (-not $script:applyContext) {
+                $timerSender.Stop()
+                return
             }
-            catch {
+            if ($script:applyContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:applyContext
+                $script:applyContext = $null
+                $script:applyTimer = $null
+
                 $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-                $UpdateBtn.IsEnabled = $true
-                $DownloadBtn.IsEnabled = $true
-            }
+                $errorMsg = $null
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    $errorMsg = if ($res) { $res.Error } else { $null }
+                }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                    $UpdateBtn.IsEnabled = $true
+                    $DownloadBtn.IsEnabled = $true
+                }
 
-            if ($isSuccess) {
-                Set-TransientStatus -Message (Get-AppliedSuccessMessage $ctx.Target)
+                if ($isSuccess) {
+                    Set-TransientStatus -Message (Get-AppliedSuccessMessage $ctx.Target)
+                }
+                else {
+                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "apply wallpaper"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                }
             }
-            else {
-                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "apply wallpaper"
-                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-            }
-        }
-    })
+        })
     $script:applyTimer.Start()
 }
 
@@ -2078,20 +2087,20 @@ function Restore-StatusTextDefaultWithFade {
     $script:fadeTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:fadeTimer.Interval = [TimeSpan]::FromMilliseconds(320)
     $script:fadeTimer.Add_Tick({
-        $script:fadeTimer.Stop()
-        if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
-            $StatusText.Foreground = $statusErrorBrush
-            $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
-        }
-        else {
-            $StatusText.Foreground = $statusDefaultBrush
-            $StatusText.Text = 'Double-click any wallpaper to apply'
-        }
-        $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $dur)
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-        [BingWallpaperNative]::FlushMemory()
-    })
+            $script:fadeTimer.Stop()
+            if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
+                $StatusText.Foreground = $statusErrorBrush
+                $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
+            }
+            else {
+                $StatusText.Foreground = $statusDefaultBrush
+                $StatusText.Text = 'Double-click any wallpaper to apply'
+            }
+            $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
+            $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $dur)
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+            [BingWallpaperNative]::FlushMemory()
+        })
     $script:fadeTimer.Start()
 }
 
@@ -2156,77 +2165,77 @@ function Update-SpotlightScheduledTaskAsync {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
-        try {
-            if ($Enable) {
-                $appDataDir = Join-Path $AppDataRoot 'BingWallpaper'
-                if (-not (Test-Path -LiteralPath $appDataDir)) {
-                    New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
-                }
-
-                $isExe = ($ScriptPath -match '\.exe$')
-
-                if ($isExe) {
-                    $persistentScriptPath = Join-Path $appDataDir 'BingWallpaper.exe'
-                    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                        try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+            param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
+            try {
+                if ($Enable) {
+                    $appDataDir = Join-Path $AppDataRoot 'BingWallpaper'
+                    if (-not (Test-Path -LiteralPath $appDataDir)) {
+                        New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
                     }
+
+                    $isExe = ($ScriptPath -match '\.exe$')
+
+                    if ($isExe) {
+                        $persistentScriptPath = Join-Path $appDataDir 'BingWallpaper.exe'
+                        if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                            try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                        }
                     
-                    $actionArgs = "-AutoApply -Target `"$Target`""
-                    $action = New-ScheduledTaskAction -Execute $persistentScriptPath -Argument $actionArgs
-                }
-                else {
-                    $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
-                    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                        try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                        $actionArgs = "-AutoApply -Target `"$Target`""
+                        $action = New-ScheduledTaskAction -Execute $persistentScriptPath -Argument $actionArgs
                     }
+                    else {
+                        $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
+                        if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                            try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
+                        }
 
-                    $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
-                    if (Test-Path -LiteralPath $legacyCmd) {
-                        Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
-                    }
+                        $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
+                        if (Test-Path -LiteralPath $legacyCmd) {
+                            Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
+                        }
 
-                    $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
-                    $vbsCode = @"
+                        $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
+                        $vbsCode = @"
 Set objShell = WScript.CreateObject("WScript.Shell")
 scriptPath = WScript.Arguments(0)
 target = WScript.Arguments(1)
 cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & scriptPath & """ -AutoApply -Target """ & target & """"
 objShell.Run cmd, 0, False
 "@
-                    Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
+                        Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
 
-                    $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
-                    $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
-                }
+                        $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
+                        $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
+                    }
 
-                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+                    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
-                if ($Minutes -eq 0) {
-                    $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-                }
-                elseif ($Minutes -le 1) {
-                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
-                }
-                elseif ($Minutes -lt 60) {
-                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
-                }
-                elseif ($Minutes -lt 1440) {
-                    $hours = [math]::Max(1, [int]($Minutes / 60))
-                    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+                    if ($Minutes -eq 0) {
+                        $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+                    }
+                    elseif ($Minutes -le 1) {
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
+                    }
+                    elseif ($Minutes -lt 60) {
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
+                    }
+                    elseif ($Minutes -lt 1440) {
+                        $hours = [math]::Max(1, [int]($Minutes / 60))
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+                    }
+                    else {
+                        $trigger = New-ScheduledTaskTrigger -Daily -At ((Get-Date).Date)
+                    }
+
+                    Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
                 }
                 else {
-                    $trigger = New-ScheduledTaskTrigger -Daily -At ((Get-Date).Date)
+                    Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
                 }
-
-                Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
             }
-            else {
-                Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
-            }
-        }
-        catch {}
-    }).AddArgument($bgEnable).AddArgument($bgMinutes).AddArgument($bgTarget).AddArgument($bgScriptPath).AddArgument($bgAppDataRoot)
+            catch {}
+        }).AddArgument($bgEnable).AddArgument($bgMinutes).AddArgument($bgTarget).AddArgument($bgScriptPath).AddArgument($bgAppDataRoot)
 
     $null = $ps.BeginInvoke()
 }
@@ -2284,15 +2293,15 @@ function Set-SpotlightState {
             $script:SpotlightHideTimer = New-Object System.Windows.Threading.DispatcherTimer
             $script:SpotlightHideTimer.Interval = [TimeSpan]::FromMilliseconds(190)
             $script:SpotlightHideTimer.Add_Tick({
-                if ($script:SpotlightHideTimer) {
-                    $script:SpotlightHideTimer.Stop()
-                    $script:SpotlightHideTimer = $null
-                }
-                if (-not $script:SpotlightEnabled) {
-                    $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                    $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
-                }
-            })
+                    if ($script:SpotlightHideTimer) {
+                        $script:SpotlightHideTimer.Stop()
+                        $script:SpotlightHideTimer = $null
+                    }
+                    if (-not $script:SpotlightEnabled) {
+                        $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                        $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
+                    }
+                })
             $script:SpotlightHideTimer.Start()
         }
     }
@@ -2348,9 +2357,9 @@ function Set-TransientStatus {
     $script:statusResetTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:statusResetTimer.Interval = [TimeSpan]::FromSeconds($Seconds)
     $script:statusResetTimer.Add_Tick({
-        $script:statusResetTimer.Stop()
-        Restore-StatusTextDefaultWithFade
-    })
+            $script:statusResetTimer.Stop()
+            Restore-StatusTextDefaultWithFade
+        })
     $script:statusResetTimer.Start()
 }
 
@@ -2585,9 +2594,9 @@ function Show-ModernDialog {
     }
 
     $dlg.Add_PreviewKeyDown({
-        param($s,$e)
-        if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled=$true; & $closeWithFade 'Cancel' }
-    })
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled = $true; & $closeWithFade 'Cancel' }
+        })
 
     $root = $dlg.FindName('DialogRoot')
     if ($root) { $root.Opacity = 1.0 }
@@ -2612,76 +2621,76 @@ function Start-VerifiedUpdate {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$Repository, [Version]$CurrentAppVersion)
-        try {
-            function Invoke-GhJson([string]$Uri) {
+            param([string]$Repository, [Version]$CurrentAppVersion)
+            try {
+                function Invoke-GhJson([string]$Uri) {
+                    try {
+                        return Invoke-RestMethod -Uri $Uri -Headers @{ 'User-Agent' = 'BingWallpaper-Updater' } -UseBasicParsing -ErrorAction Stop
+                    }
+                    catch {
+                        $wc = New-Object System.Net.WebClient
+                        $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
+                        return $wc.DownloadString($Uri) | ConvertFrom-Json
+                    }
+                }
+
+                function Parse-RelVer([string]$TagName, [string]$ReleaseName, [string]$ReleaseBody) {
+                    $cleanTag = ($TagName -replace '^[vV]', '').Trim()
+                    if ($cleanTag -match '^\d+(\.\d+){1,3}$') { return [Version]$cleanTag }
+                    if ($ReleaseName -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                        $v = $Matches[1]
+                        if ($v -notmatch '\.') { $v = "$v.0" }
+                        if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                    }
+                    if ($ReleaseBody -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
+                        $v = $Matches[1]
+                        if ($v -notmatch '\.') { $v = "$v.0" }
+                        if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                    }
+                    return $null
+                }
+
+                $release = $null
+                $latestVersion = $null
+
                 try {
-                    return Invoke-RestMethod -Uri $Uri -Headers @{ 'User-Agent' = 'BingWallpaper-Updater' } -UseBasicParsing -ErrorAction Stop
+                    $releaseUri = "https://api.github.com/repos/$Repository/releases/latest"
+                    $latestRel = Invoke-GhJson -Uri $releaseUri
+                    $latestVersion = Parse-RelVer -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
+                    $release = $latestRel
                 }
                 catch {
-                    $wc = New-Object System.Net.WebClient
-                    $wc.Headers.Add('User-Agent', 'BingWallpaper-Updater')
-                    return $wc.DownloadString($Uri) | ConvertFrom-Json
+                    $allReleasesUri = "https://api.github.com/repos/$Repository/releases?per_page=10"
+                    $allReleases = Invoke-GhJson -Uri $allReleasesUri
+                    foreach ($rel in $allReleases) {
+                        try {
+                            $ver = Parse-RelVer -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
+                            if ($ver -and ($null -eq $latestVersion -or $ver -gt $latestVersion)) {
+                                $latestVersion = $ver
+                                $release = $rel
+                            }
+                        }
+                        catch {}
+                    }
                 }
-            }
 
-            function Parse-RelVer([string]$TagName, [string]$ReleaseName, [string]$ReleaseBody) {
-                $cleanTag = ($TagName -replace '^[vV]', '').Trim()
-                if ($cleanTag -match '^\d+(\.\d+){1,3}$') { return [Version]$cleanTag }
-                if ($ReleaseName -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+                if (-not $release -or -not $latestVersion) {
+                    return @{ Success = $false; Error = "No releases with a valid version tag were found in repository '$Repository'." }
                 }
-                if ($ReleaseBody -match '[vV]?(\d+\.\d+(\.\d+){0,2})') {
-                    $v = $Matches[1]
-                    if ($v -notmatch '\.') { $v = "$v.0" }
-                    if ($v -match '^\d+(\.\d+){1,3}$') { return [Version]$v }
+
+                $hasUpdate = ($latestVersion -gt $CurrentAppVersion)
+                return @{
+                    Success       = $true
+                    HasUpdate     = $hasUpdate
+                    LatestVersion = $latestVersion.ToString()
+                    Release       = $release
+                    Error         = $null
                 }
-                return $null
-            }
-
-            $release = $null
-            $latestVersion = $null
-
-            try {
-                $releaseUri = "https://api.github.com/repos/$Repository/releases/latest"
-                $latestRel = Invoke-GhJson -Uri $releaseUri
-                $latestVersion = Parse-RelVer -TagName $latestRel.tag_name -ReleaseName $latestRel.name -ReleaseBody $latestRel.body
-                $release = $latestRel
             }
             catch {
-                $allReleasesUri = "https://api.github.com/repos/$Repository/releases?per_page=10"
-                $allReleases = Invoke-GhJson -Uri $allReleasesUri
-                foreach ($rel in $allReleases) {
-                    try {
-                        $ver = Parse-RelVer -TagName $rel.tag_name -ReleaseName $rel.name -ReleaseBody $rel.body
-                        if ($ver -and ($null -eq $latestVersion -or $ver -gt $latestVersion)) {
-                            $latestVersion = $ver
-                            $release = $rel
-                        }
-                    }
-                    catch {}
-                }
+                return @{ Success = $false; Error = $_.Exception.Message }
             }
-
-            if (-not $release -or -not $latestVersion) {
-                return @{ Success = $false; Error = "No releases with a valid version tag were found in repository '$Repository'." }
-            }
-
-            $hasUpdate = ($latestVersion -gt $CurrentAppVersion)
-            return @{
-                Success       = $true
-                HasUpdate     = $hasUpdate
-                LatestVersion = $latestVersion.ToString()
-                Release       = $release
-                Error         = $null
-            }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message }
-        }
-    }).AddArgument($repo).AddArgument($currentVersion)
+        }).AddArgument($repo).AddArgument($currentVersion)
 
     $asyncOp = $ps.BeginInvoke()
     $script:updateContext = @{
@@ -2698,70 +2707,70 @@ function Start-VerifiedUpdate {
     $script:updateTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:updateTimer.Interval = [TimeSpan]::FromMilliseconds(40)
     $script:updateTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:updateContext) {
-            $timerSender.Stop()
-            return
-        }
-
-        if ($script:updateContext.AsyncOp.IsCompleted -and $script:updateContext.Stopwatch.ElapsedMilliseconds -ge 750) {
-            $timerSender.Stop()
-            $ctx = $script:updateContext
-            $script:updateContext = $null
-            $script:updateTimer = $null
-
-            $isSuccess = $false
-            $errorMsg = $null
-            $hasUpdate = $false
-            $latestVersionStr = ''
-            $release = $null
-
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                if ($isSuccess) {
-                    $hasUpdate = [bool]$res.HasUpdate
-                    $latestVersionStr = [string]$res.LatestVersion
-                    $release = $res.Release
-                }
-                else {
-                    $errorMsg = if ($res) { $res.Error } else { "Failed to check for updates." }
-                }
+            param($timerSender, $timerArgs)
+            if (-not $script:updateContext) {
+                $timerSender.Stop()
+                return
             }
-            catch {
+
+            if ($script:updateContext.AsyncOp.IsCompleted -and $script:updateContext.Stopwatch.ElapsedMilliseconds -ge 750) {
+                $timerSender.Stop()
+                $ctx = $script:updateContext
+                $script:updateContext = $null
+                $script:updateTimer = $null
+
                 $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-                $CheckUpdateBtn.IsEnabled = $true
-            }
+                $errorMsg = $null
+                $hasUpdate = $false
+                $latestVersionStr = ''
+                $release = $null
 
-            if (-not $isSuccess) {
-                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "check for updates"
-                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
-                Show-ModernDialog -Title "Update Error" -Header "Connection Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
-                return
-            }
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    if ($isSuccess) {
+                        $hasUpdate = [bool]$res.HasUpdate
+                        $latestVersionStr = [string]$res.LatestVersion
+                        $release = $res.Release
+                    }
+                    else {
+                        $errorMsg = if ($res) { $res.Error } else { "Failed to check for updates." }
+                    }
+                }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                    $CheckUpdateBtn.IsEnabled = $true
+                }
 
-            if (-not $hasUpdate) {
-                Set-TransientStatus -Message 'You are up to date.' -Brush $statusSuccessBrush -Seconds 3.5
-                Show-ModernDialog -Title "AutoScape" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
-                return
-            }
+                if (-not $isSuccess) {
+                    $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "check for updates"
+                    Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                    Show-ModernDialog -Title "Update Error" -Header "Connection Error" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
+                    return
+                }
 
-            Set-TransientStatus -Message "Version $latestVersionStr is available." -Brush $statusDefaultBrush -Seconds 60
-            $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new update is available. Would you like to install it now? The app will restart automatically when finished." -Icon "Update" -Buttons "YesNo"
+                if (-not $hasUpdate) {
+                    Set-TransientStatus -Message 'You are up to date.' -Brush $statusSuccessBrush -Seconds 3.5
+                    Show-ModernDialog -Title "AutoScape" -Header "You're all up to date" -Message "You already have the latest version ($($script:appVersion))." -Icon "Success" -Buttons "OK" | Out-Null
+                    return
+                }
+
+                Set-TransientStatus -Message "Version $latestVersionStr is available." -Brush $statusDefaultBrush -Seconds 60
+                $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new update is available. Would you like to install it now? The app will restart automatically when finished." -Icon "Update" -Buttons "YesNo"
             
-            if ($confirmation -ne 'Yes') {
-                Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush -Seconds 3.5
-                return
-            }
+                if ($confirmation -ne 'Yes') {
+                    Set-TransientStatus -Message 'Update cancelled.' -Brush $statusDefaultBrush -Seconds 3.5
+                    return
+                }
 
-            Start-VerifiedUpdateDownloadAsync -Release $release -LatestVersionStr $latestVersionStr
-        }
-    })
+                Start-VerifiedUpdateDownloadAsync -Release $release -LatestVersionStr $latestVersionStr
+            }
+        })
     $script:updateTimer.Start()
 }
 
@@ -2817,49 +2826,50 @@ function Start-VerifiedUpdateDownloadAsync {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$LatestVer, [string]$PublisherThumbprint)
+            param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$LatestVer, [string]$PublisherThumbprint)
 
-        $client = $null
-        $downloadPath = $null
-        try {
-            $downloadPath = Join-Path $env:TEMP "AutoScape-update-$([Guid]::NewGuid().ToString('N')).exe"
-            $client = New-Object System.Net.WebClient
-            $client.Headers.Add('User-Agent', 'AutoScape-Updater')
-            $client.DownloadFile($DownloadUrl, $downloadPath)
+            $client = $null
+            $downloadPath = $null
+            try {
+                $downloadPath = Join-Path $env:TEMP "AutoScape-update-$([Guid]::NewGuid().ToString('N')).exe"
+                $client = New-Object System.Net.WebClient
+                $client.Headers.Add('User-Agent', 'AutoScape-Updater')
+                $client.DownloadFile($DownloadUrl, $downloadPath)
 
-            if ($ChecksumUrl) {
-                try {
-                    $checksumText = $client.DownloadString($ChecksumUrl)
-                    $match = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b')
-                    if ($match.Success) {
-                        $expectedHash = $match.Value.ToUpperInvariant()
-                        $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
-                        if ($actualHash -ne $expectedHash) {
-                            throw 'The downloaded update failed SHA-256 verification.'
+                if ($ChecksumUrl) {
+                    try {
+                        $checksumText = $client.DownloadString($ChecksumUrl)
+                        $match = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b')
+                        if ($match.Success) {
+                            $expectedHash = $match.Value.ToUpperInvariant()
+                            $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
+                            if ($actualHash -ne $expectedHash) {
+                                throw 'The downloaded update failed SHA-256 verification.'
+                            }
                         }
                     }
-                } catch {
-                    if ($_ -like "*failed SHA-256*") { throw $_ }
+                    catch {
+                        if ($_ -like "*failed SHA-256*") { throw $_ }
+                    }
                 }
-            }
 
-            if ($PublisherThumbprint) {
-                $signature = Get-AuthenticodeSignature -FilePath $downloadPath
-                if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $PublisherThumbprint) {
-                    throw 'The update failed Authenticode signature verification.'
+                if ($PublisherThumbprint) {
+                    $signature = Get-AuthenticodeSignature -FilePath $downloadPath
+                    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $PublisherThumbprint) {
+                        throw 'The update failed Authenticode signature verification.'
+                    }
                 }
-            }
 
-            return @{ Success = $true; DownloadPath = $downloadPath; Error = $null }
-        }
-        catch {
-            if ($downloadPath) { Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue }
-            return @{ Success = $false; DownloadPath = $null; Error = $_.Exception.Message }
-        }
-        finally {
-            if ($client) { $client.Dispose() }
-        }
-    }).AddArgument($downloadUrl).AddArgument($checksumUrl).AddArgument($LatestVersionStr).AddArgument($publisherThumbprint)
+                return @{ Success = $true; DownloadPath = $downloadPath; Error = $null }
+            }
+            catch {
+                if ($downloadPath) { Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue }
+                return @{ Success = $false; DownloadPath = $null; Error = $_.Exception.Message }
+            }
+            finally {
+                if ($client) { $client.Dispose() }
+            }
+        }).AddArgument($downloadUrl).AddArgument($checksumUrl).AddArgument($LatestVersionStr).AddArgument($publisherThumbprint)
 
     $asyncOp = $ps.BeginInvoke()
     $script:updateDlContext = @{
@@ -2873,37 +2883,37 @@ function Start-VerifiedUpdateDownloadAsync {
     $script:updateDlTimer.Interval = [TimeSpan]::FromMilliseconds(40)
 
     $script:updateDlTimer.Add_Tick({
-        param($timerSender, $timerArgs)
+            param($timerSender, $timerArgs)
 
-        if (-not $script:updateDlContext) {
-            $timerSender.Stop()
-            return
-        }
-
-        if (-not $script:updateDlContext.AsyncOp.IsCompleted) { return }
-
-        $timerSender.Stop()
-        $ctx = $script:updateDlContext
-        $script:updateDlContext = $null
-        $script:updateDlTimer = $null
-
-        try {
-            $results = $ctx.PS.EndInvoke($ctx.AsyncOp)
-            $res = if ($results -and $results.Count) { $results[0] } else { $null }
-
-            if (-not $res -or $res.Success -ne $true) {
-                throw (if ($res -and $res.Error) { [string]$res.Error } else { 'The update could not be downloaded.' })
+            if (-not $script:updateDlContext) {
+                $timerSender.Stop()
+                return
             }
 
-            $downloadPath = [string]$res.DownloadPath
-            $installedExe = [string]$ctx.InstalledExe
-            $installDir = Split-Path -Parent $installedExe
+            if (-not $script:updateDlContext.AsyncOp.IsCompleted) { return }
 
-            Set-TransientStatus -Message "Update downloaded. Restarting..." -Brush $statusSuccessBrush -Seconds 10
-            $StatusText.Text = "Installing version $LatestVersionStr..."
+            $timerSender.Stop()
+            $ctx = $script:updateDlContext
+            $script:updateDlContext = $null
+            $script:updateDlTimer = $null
 
-            $updaterPath = Join-Path $env:TEMP "AutoScape-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
-            $updaterScript = @'
+            try {
+                $results = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                $res = if ($results -and $results.Count) { $results[0] } else { $null }
+
+                if (-not $res -or $res.Success -ne $true) {
+                    throw (if ($res -and $res.Error) { [string]$res.Error } else { 'The update could not be downloaded.' })
+                }
+
+                $downloadPath = [string]$res.DownloadPath
+                $installedExe = [string]$ctx.InstalledExe
+                $installDir = Split-Path -Parent $installedExe
+
+                Set-TransientStatus -Message "Update downloaded. Restarting..." -Brush $statusSuccessBrush -Seconds 10
+                $StatusText.Text = "Installing version $LatestVersionStr..."
+
+                $updaterPath = Join-Path $env:TEMP "AutoScape-Updater-$([Guid]::NewGuid().ToString('N')).ps1"
+                $updaterScript = @'
 param(
     [string]$DownloadedExe,
     [string]$InstalledExe,
@@ -2973,51 +2983,51 @@ finally {
 }
 '@
 
-            Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
+                Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
 
-            $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
-            function Quote-UpdaterArgument([string]$Value) {
-                if ($null -eq $Value) { return '""' }
-                return '"' + ($Value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
-            }
+                function Quote-UpdaterArgument([string]$Value) {
+                    if ($null -eq $Value) { return '""' }
+                    return '"' + ($Value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+                }
 
-            $updaterArgumentLine = @(
-                '-NoProfile'
-                '-ExecutionPolicy Bypass'
-                '-WindowStyle Hidden'
-                ('-File ' + (Quote-UpdaterArgument $updaterPath))
-                ('-DownloadedExe ' + (Quote-UpdaterArgument $downloadPath))
-                ('-InstalledExe ' + (Quote-UpdaterArgument $installedExe))
-                ('-WorkingDirectory ' + (Quote-UpdaterArgument $installDir))
-            ) -join ' '
+                $updaterArgumentLine = @(
+                    '-NoProfile'
+                    '-ExecutionPolicy Bypass'
+                    '-WindowStyle Hidden'
+                    ('-File ' + (Quote-UpdaterArgument $updaterPath))
+                    ('-DownloadedExe ' + (Quote-UpdaterArgument $downloadPath))
+                    ('-InstalledExe ' + (Quote-UpdaterArgument $installedExe))
+                    ('-WorkingDirectory ' + (Quote-UpdaterArgument $installDir))
+                ) -join ' '
 
-            $startParams = @{
-                FilePath = $powershellExe
-                ArgumentList = $updaterArgumentLine
-                WindowStyle = 'Hidden'
-                ErrorAction = 'Stop'
-            }
+                $startParams = @{
+                    FilePath     = $powershellExe
+                    ArgumentList = $updaterArgumentLine
+                    WindowStyle  = 'Hidden'
+                    ErrorAction  = 'Stop'
+                }
 
-            Start-Process @startParams | Out-Null
+                Start-Process @startParams | Out-Null
             
-            [System.Windows.Application]::Current.Shutdown()
-            [Environment]::Exit(0)
-        }
-        catch {
-            try { $ctx.PS.Dispose() } catch {}
-            if ($downloadPath) { Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue }
-            if ($updaterPath) { Remove-Item -LiteralPath $updaterPath -Force -ErrorAction SilentlyContinue }
+                [System.Windows.Application]::Current.Shutdown()
+                [Environment]::Exit(0)
+            }
+            catch {
+                try { $ctx.PS.Dispose() } catch {}
+                if ($downloadPath) { Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue }
+                if ($updaterPath) { Remove-Item -LiteralPath $updaterPath -Force -ErrorAction SilentlyContinue }
 
-            $CheckUpdateBtn.IsEnabled = $true
-            $errMsg = "The update could not be started: $($_.Exception.Message)"
-            Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 8
-            Show-ModernDialog -Title "Update Error" -Header "Installation Could Not Start" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
-        }
-        finally {
-            try { $ctx.PS.Dispose() } catch {}
-        }
-    })
+                $CheckUpdateBtn.IsEnabled = $true
+                $errMsg = "The update could not be started: $($_.Exception.Message)"
+                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 8
+                Show-ModernDialog -Title "Update Error" -Header "Installation Could Not Start" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
+            }
+            finally {
+                try { $ctx.PS.Dispose() } catch {}
+            }
+        })
 
     $script:updateDlTimer.Start()
 }
@@ -3104,10 +3114,10 @@ function Render-GalleryGrid {
         $cardClip.RadiusY = 12
         $card.Clip = $cardClip
         $card.Add_SizeChanged({
-            param($evtSender, $e)
-            $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
-            Update-GalleryViewportHeight
-        })
+                param($evtSender, $e)
+                $evtSender.Clip.Rect = [System.Windows.Rect]::new(0, 0, $evtSender.ActualWidth, $evtSender.ActualHeight)
+                Update-GalleryViewportHeight
+            })
         $card.Padding = New-Object System.Windows.Thickness(0)
         $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
         $card.Cursor = [System.Windows.Input.Cursors]::Hand
@@ -3153,31 +3163,31 @@ function Render-GalleryGrid {
         $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
 
         $card.Add_MouseEnter({ 
-            param($evtSender, $e)
-            if ($evtSender -ne $script:selectedCard) {
-                $evtSender.Background = $cardHoverBg
-            }
+                param($evtSender, $e)
+                if ($evtSender -ne $script:selectedCard) {
+                    $evtSender.Background = $cardHoverBg
+                }
 
-            $grid = $evtSender.Child
-            if ($grid -and $grid.Children.Count -gt 1) {
-                $grid.Children[1].Opacity = 1
-            }
-        })
+                $grid = $evtSender.Child
+                if ($grid -and $grid.Children.Count -gt 1) {
+                    $grid.Children[1].Opacity = 1
+                }
+            })
 
         $card.Add_MouseLeave({ 
-            param($evtSender, $e)
-            if ($evtSender -ne $script:selectedCard) {
-                $evtSender.Background = $cardUnselectedBg
-            }
-            else {
-                Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
-            }
+                param($evtSender, $e)
+                if ($evtSender -ne $script:selectedCard) {
+                    $evtSender.Background = $cardUnselectedBg
+                }
+                else {
+                    Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
+                }
 
-            $grid = $evtSender.Child
-            if ($grid -and $grid.Children.Count -gt 1) {
-                $grid.Children[1].Opacity = 0
-            }
-        })
+                $grid = $evtSender.Child
+                if ($grid -and $grid.Children.Count -gt 1) {
+                    $grid.Children[1].Opacity = 0
+                }
+            })
 
         $stack = New-Object System.Windows.Controls.StackPanel
         $stack.IsHitTestVisible = $false
@@ -3275,15 +3285,15 @@ function Render-GalleryGrid {
         $stack.Children.Add($detailsContainer)
 
         $card.Add_MouseLeftButtonDown({
-            param($evtSender, $e)
-            $clickedImage = $evtSender.Tag 
-            $script:userHasExplicitlySelectedWallpaper = $true
-            Select-Card $evtSender $clickedImage
+                param($evtSender, $e)
+                $clickedImage = $evtSender.Tag 
+                $script:userHasExplicitlySelectedWallpaper = $true
+                Select-Card $evtSender $clickedImage
         
-            if ($e.ClickCount -eq 2) {
-                Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
-            }
-        })
+                if ($e.ClickCount -eq 2) {
+                    Apply-WallpaperAsync -Image $clickedImage -Card $evtSender -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
+                }
+            })
 
         $GalleryPanel.Children.Add($card)
         [void]$script:galleryCards.Add($card)
@@ -3311,21 +3321,21 @@ function Render-GalleryGrid {
     $script:qualityUpgradeTimer.Interval = [TimeSpan]::FromMilliseconds($upgradeDelay)
     $localPanel = $GalleryPanel
     $script:qualityUpgradeTimer.Add_Tick({
-        param($qtSender, $qtArgs)
-        $qtSender.Stop()
-        foreach ($c in $localPanel.Children) {
-            $grid = $c.Child
-            if ($grid) {
-                $st = $grid.Children | Where-Object { $_ -is [System.Windows.Controls.StackPanel] } | Select-Object -First 1
-                if ($st -and $st.Children.Count -gt 0) {
-                    $ib = $st.Children[0]
-                    if ($ib -and $ib.Child -is [System.Windows.Controls.Image]) {
-                        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($ib.Child, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+            param($qtSender, $qtArgs)
+            $qtSender.Stop()
+            foreach ($c in $localPanel.Children) {
+                $grid = $c.Child
+                if ($grid) {
+                    $st = $grid.Children | Where-Object { $_ -is [System.Windows.Controls.StackPanel] } | Select-Object -First 1
+                    if ($st -and $st.Children.Count -gt 0) {
+                        $ib = $st.Children[0]
+                        if ($ib -and $ib.Child -is [System.Windows.Controls.Image]) {
+                            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($ib.Child, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                        }
                     }
                 }
             }
-        }
-    })
+        })
     $script:qualityUpgradeTimer.Start()
 }
 
@@ -3375,69 +3385,69 @@ function Load-Gallery {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-        param([string]$Region, [string]$CacheDir, [string]$NativeDllPath)
-        try {
-            if (-not ('BingWallpaper.FastDownloader' -as [type]) -and (Test-Path -LiteralPath $NativeDllPath)) {
-                try { [void][System.Reflection.Assembly]::LoadFile($NativeDllPath) } catch {}
-            }
+            param([string]$Region, [string]$CacheDir, [string]$NativeDllPath)
+            try {
+                if (-not ('BingWallpaper.FastDownloader' -as [type]) -and (Test-Path -LiteralPath $NativeDllPath)) {
+                    try { [void][System.Reflection.Assembly]::LoadFile($NativeDllPath) } catch {}
+                }
 
-            $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
-            $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
-            $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
+                $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
+                $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
+                $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
         
-            $wc = New-Object System.Net.WebClient
-            $wc.Encoding = [System.Text.Encoding]::UTF8
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            $json1 = $wc.DownloadString($uri1)
-            $json2 = $wc.DownloadString($uri2)
-            $wc.Dispose()
+                $wc = New-Object System.Net.WebClient
+                $wc.Encoding = [System.Text.Encoding]::UTF8
+                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                $json1 = $wc.DownloadString($uri1)
+                $json2 = $wc.DownloadString($uri2)
+                $wc.Dispose()
 
-            $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
-            $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
+                $batch1 = if ($json1) { (ConvertFrom-Json -InputObject $json1).images } else { @() }
+                $batch2 = if ($json2) { (ConvertFrom-Json -InputObject $json2).images } else { @() }
 
-            $allImages = @()
-            if ($batch1) { $allImages += $batch1 }
-            if ($batch2) { $allImages += $batch2 }
+                $allImages = @()
+                if ($batch1) { $allImages += $batch1 }
+                if ($batch2) { $allImages += $batch2 }
 
-            $uniqueImages = $allImages | Group-Object -Property urlbase | ForEach-Object { $_.Group[0] } | Sort-Object -Property enddate -Descending
-            if (-not $uniqueImages -or $uniqueImages.Count -eq 0) {
-                return @{ Success = $false; Error = "Unable to connect to Bing."; Images = @() }
-            }
+                $uniqueImages = $allImages | Group-Object -Property urlbase | ForEach-Object { $_.Group[0] } | Sort-Object -Property enddate -Descending
+                if (-not $uniqueImages -or $uniqueImages.Count -eq 0) {
+                    return @{ Success = $false; Error = "Unable to connect to Bing."; Images = @() }
+                }
 
-            $urlBases = [string[]]($uniqueImages | ForEach-Object { [string]$_.urlbase })
-            if ('BingWallpaper.FastDownloader' -as [type]) {
-                [BingWallpaper.FastDownloader]::DownloadThumbnailsParallel($urlBases, $CacheDir)
-            }
-            else {
-                $wc2 = New-Object System.Net.WebClient
-                $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                foreach ($ub in $urlBases) {
-                    $safe = $ub -replace '[^a-zA-Z0-9]', ''
-                    $target = Join-Path $CacheDir "${safe}_thumb.jpg"
-                    if (-not (Test-Path -LiteralPath $target)) {
-                        try { $wc2.DownloadFile("https://www.bing.com${ub}_1920x1080.jpg", $target) } catch {}
+                $urlBases = [string[]]($uniqueImages | ForEach-Object { [string]$_.urlbase })
+                if ('BingWallpaper.FastDownloader' -as [type]) {
+                    [BingWallpaper.FastDownloader]::DownloadThumbnailsParallel($urlBases, $CacheDir)
+                }
+                else {
+                    $wc2 = New-Object System.Net.WebClient
+                    $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    foreach ($ub in $urlBases) {
+                        $safe = $ub -replace '[^a-zA-Z0-9]', ''
+                        $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                        if (-not (Test-Path -LiteralPath $target)) {
+                            try { $wc2.DownloadFile("https://www.bing.com${ub}_1920x1080.jpg", $target) } catch {}
+                        }
+                    }
+                    $wc2.Dispose()
+                }
+
+                $resultImages = @()
+                foreach ($img in $uniqueImages) {
+                    $resultImages += [PSCustomObject]@{
+                        urlbase   = [string]$img.urlbase
+                        url       = [string]$img.url
+                        title     = [string]$img.title
+                        copyright = [string]$img.copyright
+                        enddate   = [string]$img.enddate
                     }
                 }
-                $wc2.Dispose()
-            }
 
-            $resultImages = @()
-            foreach ($img in $uniqueImages) {
-                $resultImages += [PSCustomObject]@{
-                    urlbase   = [string]$img.urlbase
-                    url       = [string]$img.url
-                    title     = [string]$img.title
-                    copyright = [string]$img.copyright
-                    enddate   = [string]$img.enddate
-                }
+                return @{ Success = $true; Error = $null; Images = $resultImages }
             }
-
-            return @{ Success = $true; Error = $null; Images = $resultImages }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
-        }
-    }).AddArgument($selectedRegion).AddArgument($thumbCacheDir).AddArgument($script:nativeDllPath)
+            catch {
+                return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
+            }
+        }).AddArgument($selectedRegion).AddArgument($thumbCacheDir).AddArgument($script:nativeDllPath)
 
     $asyncOp = $ps.BeginInvoke()
 
@@ -3450,64 +3460,64 @@ function Load-Gallery {
     $script:galleryTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:galleryTimer.Interval = [TimeSpan]::FromMilliseconds(30)
     $script:galleryTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:galleryRunspaceContext) {
-            $timerSender.Stop()
-            return
-        }
-        if ($script:galleryRunspaceContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:galleryRunspaceContext
-            $script:galleryRunspaceContext = $null
-            $script:galleryTimer = $null
-
-            $images = @()
-            $isSuccess = $false
-            $errorMsg = $null
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                $images = if ($res -and $res.Images) { @($res.Images) } else { @() }
-                $errorMsg = if ($res) { $res.Error } else { "Failed to load wallpapers." }
-            }
-            catch {
-                $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-            }
-
-            if (-not $isSuccess -or $images.Count -eq 0) {
-                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                $StatusText.Opacity = 1
-                $StatusText.Foreground = $statusErrorBrush
-                $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+            param($timerSender, $timerArgs)
+            if (-not $script:galleryRunspaceContext) {
+                $timerSender.Stop()
                 return
             }
+            if ($script:galleryRunspaceContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                $ctx = $script:galleryRunspaceContext
+                $script:galleryRunspaceContext = $null
+                $script:galleryTimer = $null
 
-            Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir
+                $images = @()
+                $isSuccess = $false
+                $errorMsg = $null
+                try {
+                    $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                    $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                    $isSuccess = ($res -and $res.Success -eq $true)
+                    $images = if ($res -and $res.Images) { @($res.Images) } else { @() }
+                    $errorMsg = if ($res) { $res.Error } else { "Failed to load wallpapers." }
+                }
+                catch {
+                    $isSuccess = $false
+                    $errorMsg = $_.Exception.Message
+                }
+                finally {
+                    try { $ctx.PS.Dispose() } catch {}
+                }
 
-            $script:loadingCounter = 0
-            $script:loadingTotal = $images.Count
+                if (-not $isSuccess -or $images.Count -eq 0) {
+                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                    $StatusText.Opacity = 1
+                    $StatusText.Foreground = $statusErrorBrush
+                    $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+                    return
+                }
+
+                Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir
+
+                $script:loadingCounter = 0
+                $script:loadingTotal = $images.Count
         
-            if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
-            $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
-            $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
-            $script:loadingStatusTimer.Add_Tick({
-                $script:loadingCounter++
-                if ($script:loadingCounter -le $script:loadingTotal) {
-                    $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
-                }
-                else {
-                    $script:loadingStatusTimer.Stop()
-                    Restore-StatusTextDefaultWithFade
-                }
-            })
-            $script:loadingStatusTimer.Start()
-        }
-    })
+                if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+                $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
+                $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
+                $script:loadingStatusTimer.Add_Tick({
+                        $script:loadingCounter++
+                        if ($script:loadingCounter -le $script:loadingTotal) {
+                            $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
+                        }
+                        else {
+                            $script:loadingStatusTimer.Stop()
+                            Restore-StatusTextDefaultWithFade
+                        }
+                    })
+                $script:loadingStatusTimer.Start()
+            }
+        })
     $script:galleryTimer.Start()
 }
 
@@ -3515,204 +3525,204 @@ $script:isScrolling = $false
 $script:scrollIdleTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:scrollIdleTimer.Interval = [TimeSpan]::FromMilliseconds(150)
 $script:scrollIdleTimer.Add_Tick({
-    param($sit, $sia)
-    $sit.Stop()
-    $script:isScrolling = $false
-    if ($script:galleryCards) {
-        foreach ($c in $script:galleryCards) {
-            $c.CacheMode = $null
-        }
-    }
-    if ($script:galleryImageControls) {
-        foreach ($img in $script:galleryImageControls) {
-            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::HighQuality)
-        }
-    }
-})
-
-$GalleryScrollViewer.Add_ScrollChanged({
-    param($scSender, $scArgs)
-    if ($scArgs.VerticalChange -eq 0) { return }
-    if (-not $script:isScrolling) {
-        $script:isScrolling = $true
+        param($sit, $sia)
+        $sit.Stop()
+        $script:isScrolling = $false
         if ($script:galleryCards) {
-            $bmpCache = New-Object System.Windows.Media.BitmapCache
             foreach ($c in $script:galleryCards) {
-                $c.CacheMode = $bmpCache
+                $c.CacheMode = $null
             }
         }
         if ($script:galleryImageControls) {
             foreach ($img in $script:galleryImageControls) {
-                [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::LowQuality)
-            }
-        }
-    }
-    $script:scrollIdleTimer.Stop()
-    $script:scrollIdleTimer.Start()
-})
-
-$UpdateBtn.Add_Click({
-    $targetImage = $null
-    $targetCard = $null
-
-    if ($script:selectedCard -and $script:selectedImage) { 
-        $targetImage = $script:selectedImage 
-        $targetCard = $script:selectedCard
-    }
-    elseif ($script:selection.Card -and $script:selection.Image) { 
-        $targetImage = $script:selection.Image 
-        $targetCard = $script:selection.Card
-    }
-    elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) { 
-        $targetImage = $script:loadedImages[0] 
-        if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
-            $targetCard = $GalleryPanel.Children[0]
-        }
-    }
-    else { 
-        $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
-        if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
-            $targetCard = $GalleryPanel.Children[0]
-        }
-    }
-    if (-not $targetImage) { return }
-
-    Apply-WallpaperAsync -Image $targetImage -Card $targetCard -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
-})
-
-$DownloadBtn.Add_Click({
-    $targetImage = $null
-    $targetCard = $null
-
-    if ($script:selectedCard -and $script:selectedImage) {
-        $targetImage = $script:selectedImage
-        $targetCard = $script:selectedCard
-    }
-    elseif ($script:selection.Card -and $script:selection.Image) {
-        $targetImage = $script:selection.Image
-        $targetCard = $script:selection.Card
-    }
-    elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) {
-        $targetImage = $script:loadedImages[0]
-        if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
-            $targetCard = $GalleryPanel.Children[0]
-        }
-    }
-    else {
-        $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
-        if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
-            $targetCard = $GalleryPanel.Children[0]
-        }
-    }
-
-    if (-not $targetImage) { return }
-    $actionTitle = Get-CleanImageTitle $targetImage
-
-    $UpdateBtn.IsEnabled = $false
-    $DownloadBtn.IsEnabled = $false
-    $StatusText.Foreground = $statusDefaultBrush
-    $StatusText.Text = "Downloading $actionTitle..."
-
-    if ($targetCard) { Start-CardDownloadAnimation $targetCard }
-
-    $downloadFolder = $FolderBox.Text
-    if (-not (Test-Path -LiteralPath $downloadFolder)) {
-        try { New-Item -ItemType Directory -Path $downloadFolder -Force | Out-Null } catch {}
-    }
-
-    $imageUri = Get-BingImageUri -Image $targetImage -Resolution $ResolutionBox.SelectedItem
-    $imageDate = if ($targetImage.enddate -and ($targetImage.enddate -match '^\d{8}$')) { $targetImage.enddate } else { (Get-Date).ToString('yyyyMMdd') }
-    $cleanTitle = ($actionTitle -replace '[\\/:*?"<>|\x00-\x1F]', '').Trim()
-    $cleanTitle = ($cleanTitle -replace '\s+', ' ').Trim()
-    if ($cleanTitle.Length -gt 60) { $cleanTitle = $cleanTitle.Substring(0, 60).Trim() }
-    $fileName = if ($cleanTitle) { "Bing-$imageDate-$cleanTitle.jpg" } else { "Bing-$imageDate.jpg" }
-    $downloadPath = Join-Path $downloadFolder $fileName
-    $tempPath = "$downloadPath.tmp"
-
-    $ps = [powershell]::Create()
-    [void]$ps.AddScript({
-        param([string]$Uri, [string]$Temp, [string]$Dest)
-        try {
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            $wc.DownloadFile($Uri, $Temp)
-            $wc.Dispose()
-            if (Test-Path -LiteralPath $Temp) {
-                if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
-                Move-Item -LiteralPath $Temp -Destination $Dest -Force
-            }
-            return @{ Success = $true; Error = $null }
-        }
-        catch {
-            return @{ Success = $false; Error = $_.Exception.Message }
-        }
-    }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath)
-
-    $asyncOp = $ps.BeginInvoke()
-    $script:dlContext = @{ PS = $ps; AsyncOp = $asyncOp; TargetCard = $targetCard }
-
-    if ($script:downloadTimer) {
-        $script:downloadTimer.Stop()
-        $script:downloadTimer = $null
-    }
-
-    $script:downloadTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:downloadTimer.Interval = [TimeSpan]::FromMilliseconds(30)
-    $script:downloadTimer.Add_Tick({
-        param($timerSender, $timerArgs)
-        if (-not $script:dlContext) {
-            $timerSender.Stop()
-            return
-        }
-        if ($script:dlContext.AsyncOp.IsCompleted) {
-            $timerSender.Stop()
-            $ctx = $script:dlContext
-            $script:dlContext = $null
-            $script:downloadTimer = $null
-
-            $isSuccess = $false
-            $errorMsg = $null
-            try {
-                $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
-                $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
-                $isSuccess = ($res -and $res.Success -eq $true)
-                $errorMsg = if ($res) { $res.Error } else { $null }
-            }
-            catch {
-                $isSuccess = $false
-                $errorMsg = $_.Exception.Message
-            }
-            finally {
-                try { $ctx.PS.Dispose() } catch {}
-                $UpdateBtn.IsEnabled = $true
-                $DownloadBtn.IsEnabled = $true
-            }
-
-            if ($isSuccess) {
-                if ($ctx.TargetCard) { Stop-CardDownloadAnimation $ctx.TargetCard $true }
-                Set-TransientStatus -Message "Wallpaper downloaded"
-            }
-            else {
-                if ($ctx.TargetCard) { Stop-CardDownloadAnimation $ctx.TargetCard $false }
-                $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download wallpaper"
-                Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::HighQuality)
             }
         }
     })
-    $script:downloadTimer.Start()
-})
+
+$GalleryScrollViewer.Add_ScrollChanged({
+        param($scSender, $scArgs)
+        if ($scArgs.VerticalChange -eq 0) { return }
+        if (-not $script:isScrolling) {
+            $script:isScrolling = $true
+            if ($script:galleryCards) {
+                $bmpCache = New-Object System.Windows.Media.BitmapCache
+                foreach ($c in $script:galleryCards) {
+                    $c.CacheMode = $bmpCache
+                }
+            }
+            if ($script:galleryImageControls) {
+                foreach ($img in $script:galleryImageControls) {
+                    [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::LowQuality)
+                }
+            }
+        }
+        $script:scrollIdleTimer.Stop()
+        $script:scrollIdleTimer.Start()
+    })
+
+$UpdateBtn.Add_Click({
+        $targetImage = $null
+        $targetCard = $null
+
+        if ($script:selectedCard -and $script:selectedImage) { 
+            $targetImage = $script:selectedImage 
+            $targetCard = $script:selectedCard
+        }
+        elseif ($script:selection.Card -and $script:selection.Image) { 
+            $targetImage = $script:selection.Image 
+            $targetCard = $script:selection.Card
+        }
+        elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) { 
+            $targetImage = $script:loadedImages[0] 
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
+        }
+        else { 
+            $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
+        }
+        if (-not $targetImage) { return }
+
+        Apply-WallpaperAsync -Image $targetImage -Card $targetCard -Resolution $ResolutionBox.SelectedItem -Target $TargetBox.SelectedItem -Style $StyleBox.SelectedItem
+    })
+
+$DownloadBtn.Add_Click({
+        $targetImage = $null
+        $targetCard = $null
+
+        if ($script:selectedCard -and $script:selectedImage) {
+            $targetImage = $script:selectedImage
+            $targetCard = $script:selectedCard
+        }
+        elseif ($script:selection.Card -and $script:selection.Image) {
+            $targetImage = $script:selection.Image
+            $targetCard = $script:selection.Card
+        }
+        elseif ($script:loadedImages -and $script:loadedImages.Count -gt 0) {
+            $targetImage = $script:loadedImages[0]
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
+        }
+        else {
+            $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
+            if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
+                $targetCard = $GalleryPanel.Children[0]
+            }
+        }
+
+        if (-not $targetImage) { return }
+        $actionTitle = Get-CleanImageTitle $targetImage
+
+        $UpdateBtn.IsEnabled = $false
+        $DownloadBtn.IsEnabled = $false
+        $StatusText.Foreground = $statusDefaultBrush
+        $StatusText.Text = "Downloading $actionTitle..."
+
+        if ($targetCard) { Start-CardDownloadAnimation $targetCard }
+
+        $downloadFolder = $FolderBox.Text
+        if (-not (Test-Path -LiteralPath $downloadFolder)) {
+            try { New-Item -ItemType Directory -Path $downloadFolder -Force | Out-Null } catch {}
+        }
+
+        $imageUri = Get-BingImageUri -Image $targetImage -Resolution $ResolutionBox.SelectedItem
+        $imageDate = if ($targetImage.enddate -and ($targetImage.enddate -match '^\d{8}$')) { $targetImage.enddate } else { (Get-Date).ToString('yyyyMMdd') }
+        $cleanTitle = ($actionTitle -replace '[\\/:*?"<>|\x00-\x1F]', '').Trim()
+        $cleanTitle = ($cleanTitle -replace '\s+', ' ').Trim()
+        if ($cleanTitle.Length -gt 60) { $cleanTitle = $cleanTitle.Substring(0, 60).Trim() }
+        $fileName = if ($cleanTitle) { "Bing-$imageDate-$cleanTitle.jpg" } else { "Bing-$imageDate.jpg" }
+        $downloadPath = Join-Path $downloadFolder $fileName
+        $tempPath = "$downloadPath.tmp"
+
+        $ps = [powershell]::Create()
+        [void]$ps.AddScript({
+                param([string]$Uri, [string]$Temp, [string]$Dest)
+                try {
+                    $wc = New-Object System.Net.WebClient
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $wc.DownloadFile($Uri, $Temp)
+                    $wc.Dispose()
+                    if (Test-Path -LiteralPath $Temp) {
+                        if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+                        Move-Item -LiteralPath $Temp -Destination $Dest -Force
+                    }
+                    return @{ Success = $true; Error = $null }
+                }
+                catch {
+                    return @{ Success = $false; Error = $_.Exception.Message }
+                }
+            }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath)
+
+        $asyncOp = $ps.BeginInvoke()
+        $script:dlContext = @{ PS = $ps; AsyncOp = $asyncOp; TargetCard = $targetCard }
+
+        if ($script:downloadTimer) {
+            $script:downloadTimer.Stop()
+            $script:downloadTimer = $null
+        }
+
+        $script:downloadTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:downloadTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+        $script:downloadTimer.Add_Tick({
+                param($timerSender, $timerArgs)
+                if (-not $script:dlContext) {
+                    $timerSender.Stop()
+                    return
+                }
+                if ($script:dlContext.AsyncOp.IsCompleted) {
+                    $timerSender.Stop()
+                    $ctx = $script:dlContext
+                    $script:dlContext = $null
+                    $script:downloadTimer = $null
+
+                    $isSuccess = $false
+                    $errorMsg = $null
+                    try {
+                        $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+                        $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+                        $isSuccess = ($res -and $res.Success -eq $true)
+                        $errorMsg = if ($res) { $res.Error } else { $null }
+                    }
+                    catch {
+                        $isSuccess = $false
+                        $errorMsg = $_.Exception.Message
+                    }
+                    finally {
+                        try { $ctx.PS.Dispose() } catch {}
+                        $UpdateBtn.IsEnabled = $true
+                        $DownloadBtn.IsEnabled = $true
+                    }
+
+                    if ($isSuccess) {
+                        if ($ctx.TargetCard) { Stop-CardDownloadAnimation $ctx.TargetCard $true }
+                        Set-TransientStatus -Message "Wallpaper downloaded"
+                    }
+                    else {
+                        if ($ctx.TargetCard) { Stop-CardDownloadAnimation $ctx.TargetCard $false }
+                        $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download wallpaper"
+                        Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
+                    }
+                }
+            })
+        $script:downloadTimer.Start()
+    })
 
 $CheckUpdateBtn.Add_Click({
-    try {
-        Start-VerifiedUpdate
-    }
-    catch {
-        [System.Windows.Forms.MessageBox]::Show(
-            "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
-            "Update check error"
-        ) | Out-Null
-    }
-})
+        try {
+            Start-VerifiedUpdate
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
+                "Update check error"
+            ) | Out-Null
+        }
+    })
 
 @(
     @{ Label = 'On Login'; Minutes = 0 },
@@ -3742,20 +3752,20 @@ if ($spotlightWasEnabled) {
 }
 
 $SpotlightPill.Add_PreviewMouseLeftButtonDown({
-    param($sender, $e)
-    $e.Handled = $true
-    $newState = -not $script:SpotlightEnabled
-    Set-SpotlightState -Enabled $newState
-    Update-SpotlightScheduledTaskAsync -Enable $newState
-    Save-Settings
+        param($sender, $e)
+        $e.Handled = $true
+        $newState = -not $script:SpotlightEnabled
+        Set-SpotlightState -Enabled $newState
+        Update-SpotlightScheduledTaskAsync -Enable $newState
+        Save-Settings
     
-    if ($newState) {
-        Set-TransientStatus -Message "Automatic wallpaper changing enabled." -Brush $statusSuccessBrush
-    }
-    else {
-        Set-TransientStatus -Message "Automatic wallpaper changing disabled." -Brush $statusErrorBrush
-    }
-})
+        if ($newState) {
+            Set-TransientStatus -Message "Automatic wallpaper changing enabled." -Brush $statusSuccessBrush
+        }
+        else {
+            Set-TransientStatus -Message "Automatic wallpaper changing disabled." -Brush $statusErrorBrush
+        }
+    })
 
 $SpotlightIntervalBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
 $SpotlightTargetBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
@@ -3766,15 +3776,15 @@ if ($detectedItem) { $RegionBox.SelectedItem = $detectedItem }
 
 $RegionBox.Add_SelectionChanged({ Load-Gallery })
 $RefreshBtn.Add_Click({
-    if ($script:isRefreshAnimating) { return }
-    if (-not $RefreshIcon) {
-        Load-Gallery
-        return
-    }
-    $script:isRefreshAnimating = $true
-    $RefreshBtn.IsEnabled = $false
-    Start-RefreshAnimation
-})
+        if ($script:isRefreshAnimating) { return }
+        if (-not $RefreshIcon) {
+            Load-Gallery
+            return
+        }
+        $script:isRefreshAnimating = $true
+        $RefreshBtn.IsEnabled = $false
+        Start-RefreshAnimation
+    })
 
 $window.Add_ContentRendered({ Load-Gallery })
 $window.Add_SizeChanged({ Update-GalleryViewportHeight })
@@ -3829,8 +3839,15 @@ function Show-UserGuideDialog {
         $screenWidth = $window.ActualWidth
         $screenHeight = $window.ActualHeight
     }
-    $modalWidth = [Math]::Max(1050, [int]($screenWidth * 0.70))
-    $modalHeight = [Math]::Max(680, [int]($screenHeight * 0.70))
+    # The dialog must never be forced bigger than the space actually available (window,
+    # or screen if the window itself is small/not maximized) - a fixed floor here is what
+    # was causing content to render off the visible window on small monitors. Leave a
+    # small margin (48px) so the dialog doesn't touch the window edges, and scale the
+    # preferred size with the available space instead of a flat pixel minimum.
+    $maxModalWidth = [Math]::Max(320, [int]$screenWidth - 48)
+    $maxModalHeight = [Math]::Max(320, [int]$screenHeight - 48)
+    $modalWidth = [Math]::Min($maxModalWidth, [Math]::Max(700, [int]($screenWidth * 0.72)))
+    $modalHeight = [Math]::Min($maxModalHeight, [Math]::Max(520, [int]($screenHeight * 0.72)))
 
     $dialogXaml = @"
 <UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -3964,12 +3981,14 @@ function Show-UserGuideDialog {
                 </StackPanel>
             </Grid>
 
-            <!-- Two-Column Body -->
-            <Grid Grid.Row="1" Margin="0,0,0,18">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="380"/>
+            <!-- Two-Column Body (scrolls instead of clipping if the dialog is ever
+                 too small to fit everything at once) -->
+            <ScrollViewer Grid.Row="1" Margin="0,0,0,18" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.35*" MinWidth="260" MaxWidth="380"/>
                     <ColumnDefinition Width="24"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="2*" MinWidth="320"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Left Column -->
@@ -3979,24 +3998,36 @@ function Show-UserGuideDialog {
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Name="GuidePreviewCard" Background="#212121" CornerRadius="12" BorderThickness="0" ClipToBounds="True" Margin="0,0,0,16" Cursor="Hand">
-                        <Border.Effect>
-                            <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.3" Direction="270"/>
-                        </Border.Effect>
-                        <Grid>
-                            <StackPanel IsHitTestVisible="False">
-                                <Border Height="185" CornerRadius="12,12,0,0" ClipToBounds="True" Background="#141414">
-                                    <Image Name="GuideLatestImage" Stretch="UniformToFill"/>
-                                </Border>
-                                <StackPanel Margin="14,12,14,14">
-                                    <TextBlock Name="GuideLatestTitle" Text="$cleanTitle" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
-                                    <TextBlock Name="GuideLatestDate" Text="$cleanDate" FontSize="13" Foreground="#A0A0A0" TextTrimming="CharacterEllipsis"/>
+                    <Grid Grid.Row="0" Margin="0,0,0,16">
+                        <!-- Shadow-only layer: WPF rasterizes anything under an Effect
+                             (like DropShadowEffect) into an offscreen bitmap that isn't
+                             DPI-aware, which is why the title/date text under the image
+                             was blurry even after the image itself was fixed - the whole
+                             card, image AND text, was being drawn through the shadow's
+                             low-res render pass. Keeping the shadow on its own effect-only
+                             layer behind the real (effect-free) card keeps the content
+                             crisp at any DPI. -->
+                        <Border Name="GuidePreviewShadow" Background="#212121" CornerRadius="12" BorderThickness="0" IsHitTestVisible="False">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.3" Direction="270"/>
+                            </Border.Effect>
+                        </Border>
+                        <Border Name="GuidePreviewCard" Background="#212121" CornerRadius="12" BorderThickness="0" ClipToBounds="True" Cursor="Hand">
+                            <Grid>
+                                <StackPanel IsHitTestVisible="False">
+                                    <Border Height="185" CornerRadius="12,12,0,0" ClipToBounds="True" Background="#141414">
+                                        <Image Name="GuideLatestImage" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <StackPanel Margin="14,12,14,14">
+                                        <TextBlock Name="GuideLatestTitle" Text="$cleanTitle" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                                        <TextBlock Name="GuideLatestDate" Text="$cleanDate" FontSize="13" Foreground="#A0A0A0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                            <Rectangle Name="GuideRevealRect" RadiusX="12" RadiusY="12" Opacity="0" IsHitTestVisible="False"/>
-                            <Border Name="GuideRevealBorder" CornerRadius="12" BorderThickness="1.5" IsHitTestVisible="False"/>
-                        </Grid>
-                    </Border>
+                                <Rectangle Name="GuideRevealRect" RadiusX="12" RadiusY="12" Opacity="0" IsHitTestVisible="False"/>
+                                <Border Name="GuideRevealBorder" CornerRadius="12" BorderThickness="1.5" IsHitTestVisible="False"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
 
                     <Border Grid.Row="1" Name="GuideDefaultCard" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18" VerticalAlignment="Top">
                         <StackPanel VerticalAlignment="Top">
@@ -4101,6 +4132,7 @@ function Show-UserGuideDialog {
                     </StackPanel>
                 </Border>
             </Grid>
+            </ScrollViewer>
 
             <!-- Footer -->
             <Grid Grid.Row="2" Margin="0,12,0,0">
@@ -4163,11 +4195,11 @@ function Show-UserGuideDialog {
     $guideGithubRepoBtn = $dlg.FindName('GuideGithubRepoBtn')
     if ($guideGithubRepoBtn) {
         $guideGithubRepoBtn.Add_Click({
-            try {
-                Start-Process "https://github.com/Hamisoptimistic/Bing-Wallpaper" | Out-Null
-            }
-            catch {}
-        })
+                try {
+                    Start-Process "https://github.com/Hamisoptimistic/Bing-Wallpaper" | Out-Null
+                }
+                catch {}
+            })
     }
 
     $imgControl = $dlg.FindName('GuideLatestImage')
@@ -4176,10 +4208,17 @@ function Show-UserGuideDialog {
             $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
             $bmp.BeginInit()
             $bmp.UriSource = New-Object System.Uri($thumbPath)
-            $bmp.DecodePixelWidth = 380
+            # No DecodePixelWidth cap here on purpose: this is a single one-off hero image
+            # (not a scrolling grid of many), so the decode cost is negligible. A fixed
+            # pixel cap like the old "380" ignores monitor DPI scaling - on any display
+            # above 100% scaling that decodes fewer real pixels than the screen needs,
+            # which is why the image looked blurry while the vector text/icons next to it
+            # stayed sharp. Decoding at the source's native resolution (already ~1920px
+            # wide from Bing) lets WPF downscale cleanly for any DPI.
             $bmp.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
             $bmp.EndInit()
             $bmp.Freeze()
+            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imgControl, [System.Windows.Media.BitmapScalingMode]::HighQuality)
             $imgControl.Source = $bmp
         }
         catch {}
@@ -4229,6 +4268,7 @@ function Show-UserGuideDialog {
     }
 
     $card = $dlg.FindName('GuidePreviewCard')
+    $previewShadow = $dlg.FindName('GuidePreviewShadow')
     $defaultCard = $dlg.FindName('GuideDefaultCard')
     $featuresPanel = $dlg.FindName('GuideFeaturesPanel')
     $revealRect = $dlg.FindName('GuideRevealRect')
@@ -4245,7 +4285,8 @@ function Show-UserGuideDialog {
             $bodyHeight = [Math]::Max($featuresNatural, ($previewHeight + $defaultNatural))
             $defaultCard.MinHeight = [Math]::Max(0, $bodyHeight - $previewHeight)
             $featuresPanel.MinHeight = $bodyHeight
-        } catch {}
+        }
+        catch {}
     }
 
     if ($featuresPanel) {
@@ -4254,8 +4295,8 @@ function Show-UserGuideDialog {
     if ($card) {
         $card.Add_SizeChanged({ & $syncGuideColumns })
         $dlg.Add_Loaded({
-            $dlg.Dispatcher.BeginInvoke([Action]{ & $syncGuideColumns }, [System.Windows.Threading.DispatcherPriority]::Loaded) | Out-Null
-        })
+                $dlg.Dispatcher.BeginInvoke([Action] { & $syncGuideColumns }, [System.Windows.Threading.DispatcherPriority]::Loaded) | Out-Null
+            })
     }
 
     if ($card) {
@@ -4264,9 +4305,9 @@ function Show-UserGuideDialog {
         $cardClip.RadiusY = 12
         $card.Clip = $cardClip
         $card.Add_SizeChanged({
-            param($s, $e)
-            $s.Clip.Rect = [System.Windows.Rect]::new(0, 0, $s.ActualWidth, $s.ActualHeight)
-        })
+                param($s, $e)
+                $s.Clip.Rect = [System.Windows.Rect]::new(0, 0, $s.ActualWidth, $s.ActualHeight)
+            })
 
         $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
         $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
@@ -4290,34 +4331,34 @@ function Show-UserGuideDialog {
         $cardHover = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(255, 45, 45, 45))
 
         $card.Add_MouseEnter({
-            $card.Background = $cardHover
-            if ($card.Effect) {
-                $card.Effect.BlurRadius = 25
-                $card.Effect.ShadowDepth = 8
-            }
-            if ($revealRect) { $revealRect.Opacity = 1 }
-        })
+                $card.Background = $cardHover
+                if ($previewShadow -and $previewShadow.Effect) {
+                    $previewShadow.Effect.BlurRadius = 25
+                    $previewShadow.Effect.ShadowDepth = 8
+                }
+                if ($revealRect) { $revealRect.Opacity = 1 }
+            })
 
         $card.Add_MouseLeave({
-            $card.Background = $cardUnselected
-            if ($card.Effect) {
-                $card.Effect.BlurRadius = 10
-                $card.Effect.ShadowDepth = 2
-            }
-            if ($revealRect) { $revealRect.Opacity = 0 }
-        })
+                $card.Background = $cardUnselected
+                if ($previewShadow -and $previewShadow.Effect) {
+                    $previewShadow.Effect.BlurRadius = 10
+                    $previewShadow.Effect.ShadowDepth = 2
+                }
+                if ($revealRect) { $revealRect.Opacity = 0 }
+            })
 
         $card.Add_MouseMove({
-            param($s, $e)
-            try {
-                $pos = $e.GetPosition($card)
-                $revealBrush.Center = $pos
-                $revealBrush.GradientOrigin = $pos
-                $revealBorderBrush.Center = $pos
-                $revealBorderBrush.GradientOrigin = $pos
-            }
-            catch {}
-        })
+                param($s, $e)
+                try {
+                    $pos = $e.GetPosition($card)
+                    $revealBrush.Center = $pos
+                    $revealBrush.GradientOrigin = $pos
+                    $revealBorderBrush.Center = $pos
+                    $revealBorderBrush.GradientOrigin = $pos
+                }
+                catch {}
+            })
     }
 
     $script:activeGuideDialog = $dlg
@@ -4325,9 +4366,9 @@ function Show-UserGuideDialog {
     if ($closeButton) { $closeButton.Add_Click({ Close-UserGuideDialog }) }
 
     $dlg.Add_PreviewKeyDown({
-        param($s,$e)
-        if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled=$true; Close-UserGuideDialog }
-    })
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled = $true; Close-UserGuideDialog }
+        })
 
     Open-InWindowModal -Control $dlg -Kind 'Guide' -CloseCallback { $script:activeGuideDialog = $null }
 }
@@ -4366,63 +4407,63 @@ if ($GuideBtn) {
     catch {}
 
     $GuideBtn.Add_Click({
-        try {
-            Show-UserGuideDialog
-        }
-        catch {
-            [System.Windows.Forms.MessageBox]::Show(
-                "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
-                "Guide dialog error"
-            ) | Out-Null
-        }
-    })
+            try {
+                Show-UserGuideDialog
+            }
+            catch {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
+                    "Guide dialog error"
+                ) | Out-Null
+            }
+        })
 }
 
 $window.Add_Closed({
-    try {
-        if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
-        $script:activeGuideDialog = $null
-        [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
-    }
-    catch {}
-})
+        try {
+            if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
+            $script:activeGuideDialog = $null
+            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
+        }
+        catch {}
+    })
 
 $window.Add_PreviewKeyDown({
-    param($s, $e)
-    if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
-        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+        param($s, $e)
+        if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
+            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+                $e.Handled = $true
+                Close-UserGuideDialog
+            }
+        }
+        elseif ($e.Key -eq [System.Windows.Input.Key]::F5) {
             $e.Handled = $true
-            Close-UserGuideDialog
+            Load-Gallery
         }
-    }
-    elseif ($e.Key -eq [System.Windows.Input.Key]::F5) {
-        $e.Handled = $true
-        Load-Gallery
-    }
-    elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
-        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
-        if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
+        elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
+            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
+            if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
 
-        if ($e.Key -eq [System.Windows.Input.Key]::B) {
-            if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-                $e.Handled = $true
-                Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Desktop' -Style $StyleBox.SelectedItem
+            if ($e.Key -eq [System.Windows.Input.Key]::B) {
+                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+                    $e.Handled = $true
+                    Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Desktop' -Style $StyleBox.SelectedItem
+                }
+            }
+            elseif ($e.Key -eq [System.Windows.Input.Key]::L) {
+                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+                    $e.Handled = $true
+                    Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Lock screen' -Style $StyleBox.SelectedItem
+                }
             }
         }
-        elseif ($e.Key -eq [System.Windows.Input.Key]::L) {
-            if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-                $e.Handled = $true
-                Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Lock screen' -Style $StyleBox.SelectedItem
-            }
-        }
-    }
-})
+    })
 
 $window.Add_StateChanged({
-    if ($window.WindowState -eq [System.Windows.WindowState]::Minimized) {
-        [BingWallpaperNative]::FlushMemory()
-    }
-})
+        if ($window.WindowState -eq [System.Windows.WindowState]::Minimized) {
+            [BingWallpaperNative]::FlushMemory()
+        }
+    })
 
 $script:memTrimTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(45)
@@ -4431,16 +4472,18 @@ $script:memTrimTimer.Add_Tick({ [BingWallpaperNative]::FlushMemory() })
 $script:memTrimTimer.Start()
 
 [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
-    param($s, $e)
-    try {
-        [System.Windows.Forms.MessageBox]::Show(
-            "Unhandled error:`n`n$($e.Exception.GetType().FullName)`n$($e.Exception.Message)`n`n$($e.Exception.ScriptStackTrace)",
-            "AutoScape error"
-        ) | Out-Null
-    } catch {}
-    $e.Handled = $true
-})
+        param($s, $e)
+        try {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Unhandled error:`n`n$($e.Exception.GetType().FullName)`n$($e.Exception.Message)`n`n$($e.Exception.ScriptStackTrace)",
+                "AutoScape error"
+            ) | Out-Null
+        }
+        catch {}
+        $e.Handled = $true
+    })
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
 
