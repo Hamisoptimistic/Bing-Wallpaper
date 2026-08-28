@@ -25,6 +25,53 @@ catch {
 [void][System.Reflection.Assembly]::Load("System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")
 [void][System.Reflection.Assembly]::Load("System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")
 
+# Temporary local update-test child modes. These are inert unless explicitly
+# launched with the private test switches used by Ctrl+Shift+U.
+# They let the updater exercise the real EXE hand-off without contacting GitHub
+# or changing the installed application.
+$script:updateTestArgs = [Environment]::GetCommandLineArgs()
+if ($script:updateTestArgs -contains '--autoscape-update-test-holder') {
+    $markerArg = $script:updateTestArgs | Where-Object { $_ -like '--autoscape-update-test-marker=*' } | Select-Object -First 1
+    $markerPath = if ($markerArg) { $markerArg.Substring('--autoscape-update-test-marker='.Length) } else { $null }
+    try {
+        [System.Windows.MessageBox]::Show(
+            "AutoScape update test is holding a temporary EXE open.`n`nThe updater will now close this test process, replace the temporary EXE, and restart it. No installed files will be changed.",
+            'AutoScape — Update Test',
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Information
+        ) | Out-Null
+    } catch {}
+    if ($markerPath) {
+        $deadline = [DateTime]::UtcNow.AddSeconds(30)
+        while ([DateTime]::UtcNow -lt $deadline -and -not (Test-Path -LiteralPath $markerPath)) {
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    exit 0
+}
+elseif ($script:updateTestArgs -contains '--autoscape-update-test-child') {
+    try {
+        [System.Windows.MessageBox]::Show(
+            "Update test successful!`n`n✓ Temporary EXE was replaced`n✓ Updater waited for the old process`n✓ Replacement completed`n✓ Restart of the updated EXE worked`n`nYour installed AutoScape.exe was never modified.",
+            'AutoScape — Update Test Passed',
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Information
+        ) | Out-Null
+    } catch {}
+
+    # The temporary test EXE cannot delete itself while running. Schedule a
+    # tiny hidden cmd cleanup after this process exits.
+    try {
+        $selfPath = [Environment]::ProcessPath
+        if (-not $selfPath) { $selfPath = $script:updateTestArgs[0] }
+        if ($selfPath -and (Test-Path -LiteralPath $selfPath -PathType Leaf)) {
+            $cleanupCmd = "ping 127.0.0.1 -n 2 >nul & del /f /q `"$selfPath`""
+            Start-Process -FilePath "$env:WINDIR\System32\cmd.exe" -ArgumentList @('/c', $cleanupCmd) -WindowStyle Hidden | Out-Null
+        }
+    } catch {}
+    exit 0
+}
+
 # High-Performance Cached Native Types (DWM dark titlebar, FastDownloader, FastAccent, AppUserModel)
 $script:nativeDllPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScapeNative.dll'
 if (-not ('BingWallpaperNative' -as [type])) {
@@ -4282,6 +4329,159 @@ $DownloadBtn.Add_Click({
         $script:downloadTimer.Start()
     })
 
+
+function Start-TemporaryUpdateInstallerTest {
+    # This is intentionally a local-only test. It never contacts GitHub and it
+    # never writes to the installed AutoScape.exe. Every artifact lives under
+    # %TEMP% and is removed automatically by the test processes.
+    try {
+        $exeCandidates = @(
+            (Join-Path ([Environment]::CurrentDirectory) 'AutoScape.exe'),
+            (Join-Path (Get-Location).Path 'AutoScape.exe'),
+            (Join-Path $PSScriptRoot 'AutoScape.exe'),
+            (Join-Path (Split-Path -Parent $PSScriptRoot) 'AutoScape.exe'),
+            (Join-Path ([Environment]::CurrentDirectory) 'BingWallpaper.exe'),
+            (Join-Path (Get-Location).Path 'BingWallpaper.exe'),
+            (Join-Path $PSScriptRoot 'BingWallpaper.exe'),
+            (Join-Path (Split-Path -Parent $PSScriptRoot) 'BingWallpaper.exe')
+        )
+        $installedExe = $exeCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        if (-not $installedExe) {
+            Show-ModernDialog -Title 'AutoScape' -Header 'Update Test Cannot Run' -Message 'This temporary test requires the compiled AutoScape.exe. Please run the installed/compiled app rather than the .ps1 source file.' -Icon 'Error' -Buttons 'OK' | Out-Null
+            return
+        }
+
+        $testRoot = Join-Path $env:TEMP "AutoScape-UpdateTest-$([Guid]::NewGuid().ToString('N'))"
+        New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
+
+        $testTarget = Join-Path $testRoot 'AutoScape-TestTarget.exe'
+        $testDownloaded = Join-Path $testRoot 'AutoScape-TestDownloaded.exe'
+        $testMarker = Join-Path $testRoot 'close-holder.marker'
+        $testUpdater = Join-Path $testRoot 'AutoScape-TestUpdater.ps1'
+        $testLog = Join-Path $testRoot 'test.log'
+
+        Set-TransientStatus -Message 'Running temporary update installer test...' -Brush $statusDefaultBrush -Seconds 60
+
+        # Simulate the already-verified downloaded update by making a private
+        # copy of the currently installed executable.
+        Copy-Item -LiteralPath $installedExe -Destination $testTarget -Force -ErrorAction Stop
+        Copy-Item -LiteralPath $installedExe -Destination $testDownloaded -Force -ErrorAction Stop
+
+        $testUpdaterScript = @'
+param(
+    [int]$HolderPid,
+    [string]$Marker,
+    [string]$DownloadedExe,
+    [string]$TestTarget,
+    [string]$TestRoot,
+    [string]$LogPath
+)
+$ErrorActionPreference = 'Stop'
+
+function Log([string]$m) {
+    try { Add-Content -LiteralPath $LogPath -Value "$(Get-Date -Format 'HH:mm:ss') $m" -Encoding UTF8 } catch {}
+}
+
+try {
+    Log "Test updater started. Holder PID=$HolderPid"
+    # Tell the temporary holder to exit. This reproduces the updater's
+    # hand-off/wait/replacement sequence without touching the real EXE.
+    New-Item -ItemType File -Path $Marker -Force | Out-Null
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $alive = $false
+        try {
+            $p = Get-Process -Id $HolderPid -ErrorAction Stop
+            $alive = -not $p.HasExited
+        } catch {}
+        if (-not $alive) { break }
+        Start-Sleep -Milliseconds 150
+    }
+
+    try {
+        $p = Get-Process -Id $HolderPid -ErrorAction Stop
+        if (-not $p.HasExited) { throw 'Temporary holder process did not exit within 30 seconds.' }
+    } catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
+        # Process no longer exists: expected.
+    }
+
+    $replaced = $false
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        try {
+            Copy-Item -LiteralPath $DownloadedExe -Destination $TestTarget -Force -ErrorAction Stop
+            $replaced = $true
+            Log "Temporary replacement succeeded on attempt $attempt."
+            break
+        } catch {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    if (-not $replaced) { throw "Temporary EXE replacement failed: $lastError" }
+    if (-not (Test-Path -LiteralPath $TestTarget -PathType Leaf)) { throw 'Temporary replacement file was not found.' }
+
+    Log "Starting replaced temporary EXE."
+    Start-Process -FilePath $TestTarget -ArgumentList '--autoscape-update-test-child' -WorkingDirectory $TestRoot -ErrorAction Stop | Out-Null
+
+    Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
+    Log 'Test updater completed.'
+}
+catch {
+    Log "TEST FAILED: $($_.Exception.Message)"
+    try {
+        Add-Type -AssemblyName PresentationFramework
+        [System.Windows.MessageBox]::Show(
+            "Temporary update test failed.`n`n$($_.Exception.Message)`n`nYour installed AutoScape.exe was not modified.",
+            'AutoScape — Update Test',
+            [System.Windows.MessageBoxButton]::OK,
+            [System.Windows.MessageBoxImage]::Error
+        ) | Out-Null
+    } catch {}
+}
+finally {
+    Start-Sleep -Milliseconds 500
+    Remove-Item -LiteralPath $DownloadedExe -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $Marker -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+    # The temporary target is removed by the test child after it exits.
+}
+'@
+
+        Set-Content -LiteralPath $testUpdater -Value $testUpdaterScript -Encoding UTF8 -ErrorAction Stop
+
+        # Start the temporary EXE in holder mode. It displays a small test
+        # message and stays alive until the updater signals it via the marker.
+        $holder = Start-Process -FilePath $testTarget -ArgumentList @(
+            '--autoscape-update-test-holder',
+            "--autoscape-update-test-marker=$testMarker"
+        ) -WorkingDirectory $testRoot -PassThru -ErrorAction Stop
+
+        Start-Sleep -Milliseconds 350
+
+        $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        Start-Process -FilePath $powershellExe -ArgumentList @(
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-WindowStyle', 'Hidden',
+            '-File', $testUpdater,
+            '-HolderPid', [string]$holder.Id,
+            '-Marker', $testMarker,
+            '-DownloadedExe', $testDownloaded,
+            '-TestTarget', $testTarget,
+            '-TestRoot', $testRoot,
+            '-LogPath', $testLog
+        ) -WindowStyle Hidden | Out-Null
+
+        Set-TransientStatus -Message 'Update test is running — temporary files only.' -Brush $statusDefaultBrush -Seconds 30
+    }
+    catch {
+        Set-TransientStatus -Message "Update test could not start: $($_.Exception.Message)" -Brush $statusErrorBrush -Seconds 8
+        Show-ModernDialog -Title 'AutoScape — Update Test' -Header 'Test Could Not Start' -Message $_.Exception.Message -Icon 'Error' -Buttons 'OK' | Out-Null
+    }
+}
+
 $CheckUpdateBtn.Add_Click({
         try {
             Start-VerifiedUpdate
@@ -4943,6 +5143,12 @@ $window.Add_PreviewKeyDown({
                 $e.Handled = $true
                 Close-UserGuideDialog
             }
+        }
+        elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0 -and
+                ([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Shift) -ne 0 -and
+                $e.Key -eq [System.Windows.Input.Key]::U) {
+            $e.Handled = $true
+            Start-TemporaryUpdateInstallerTest
         }
         elseif ($e.Key -eq [System.Windows.Input.Key]::F5) {
             $e.Handled = $true
