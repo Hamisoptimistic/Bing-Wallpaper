@@ -3373,23 +3373,64 @@ finally {
             Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
 
             $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            $parentProcessId = [System.Diagnostics.Process]::GetCurrentProcess().Id
 
-            # IMPORTANT: ArgumentList receives an array. PowerShell handles quoting
-            # of paths containing spaces; no hand-built command string is used.
-            $updaterArgs = @(
+            # IMPORTANT:
+            # Windows PowerShell 5.1 does NOT reliably quote an ArgumentList string[]
+            # when paths contain spaces. The old updater passed raw paths, so an
+            # installation such as "C:\Program Files\AutoScape\AutoScape.exe"
+            # could launch the updater with truncated/broken arguments.
+            #
+            # Build one explicitly quoted command line instead.
+            function Quote-UpdaterArgument([string]$Value) {
+                if ($null -eq $Value) { return '""' }
+                return '"' + ($Value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+            }
+
+            $updaterArgumentLine = @(
                 '-NoProfile'
-                '-ExecutionPolicy'; 'Bypass'
-                '-WindowStyle'; 'Hidden'
-                '-File'; $updaterPath
-                '-ParentProcessId'; [string][System.Diagnostics.Process]::GetCurrentProcess().Id
-                '-DownloadedExe'; $downloadPath
-                '-InstalledExe'; $installedExe
-                '-WorkingDirectory'; $installDir
-            )
+                '-ExecutionPolicy Bypass'
+                '-WindowStyle Hidden'
+                ('-File ' + (Quote-UpdaterArgument $updaterPath))
+                ('-ParentProcessId ' + (Quote-UpdaterArgument ([string]$parentProcessId)))
+                ('-DownloadedExe ' + (Quote-UpdaterArgument $downloadPath))
+                ('-InstalledExe ' + (Quote-UpdaterArgument $installedExe))
+                ('-WorkingDirectory ' + (Quote-UpdaterArgument $installDir))
+            ) -join ' '
 
-            Start-Process -FilePath $powershellExe -ArgumentList $updaterArgs -WindowStyle Hidden -ErrorAction Stop | Out-Null
+            # If the installation directory is protected (for example Program Files),
+            # start the helper elevated so it can replace the running executable.
+            # For normal per-user installs no UAC prompt is shown.
+            $needsElevation = $false
+            $writeProbe = $null
+            try {
+                $writeProbe = Join-Path $installDir ('.autoscape-update-probe-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+                [System.IO.File]::WriteAllText($writeProbe, 'probe')
+                Remove-Item -LiteralPath $writeProbe -Force -ErrorAction SilentlyContinue
+            }
+            catch {
+                $needsElevation = $true
+                if ($writeProbe) { Remove-Item -LiteralPath $writeProbe -Force -ErrorAction SilentlyContinue }
+            }
 
-            # Only close AutoScape after Start-Process succeeded.
+            $startParams = @{
+                FilePath = $powershellExe
+                ArgumentList = $updaterArgumentLine
+                WindowStyle = 'Hidden'
+                ErrorAction = 'Stop'
+            }
+            if ($needsElevation) {
+                $startParams.Verb = 'RunAs'
+            }
+
+            # Do not close the app until the helper process has definitely been
+            # created. The helper owns the downloaded EXE from this point onward.
+            Start-Process @startParams | Out-Null
+
+            # The main WPF window explicitly owns dispatcher lifetime. Closing the
+            # window fires the existing Closed handler, which calls InvokeShutdown().
+            # This is essential: the updater cannot replace AutoScape.exe while this
+            # process is still alive and holding the executable open.
             $window.Close()
         }
         catch {
