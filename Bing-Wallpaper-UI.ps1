@@ -363,7 +363,7 @@ public static class BingWallpaperNative {
 }
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.189'
+$script:appVersion = [Version]'1.0.190'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1491,13 +1491,13 @@ $ModalHost = $window.FindName('ModalHost')
 $script:activeModalControl = $null
 $script:activeModalKind = $null
 $script:activeModalClosing = $false
-$script:activeModalCloseCallback = $null
+$script:activeModalCloseCallback = $null    
 
 function Set-AppDimState {
     param([bool]$Dim, [bool]$Immediate = $false)
     if (-not $ModalDimOverlay) { return }
 
-    $target = if ($Dim) { 0.55 } else { 0.0 }
+    $target = if ($Dim) { 0.22 } else { 0.0 }
     $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
 
     if ($Immediate) {
@@ -1584,10 +1584,11 @@ function Open-InWindowModal {
     $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
     $Control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
 
-    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 0.55, $duration)
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 0.22, $duration)
     $dimAnim.EasingFunction = $ease
     $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
     $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
+
 }
 
 function Close-InWindowModal {
@@ -4485,5 +4486,9 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
 
 
