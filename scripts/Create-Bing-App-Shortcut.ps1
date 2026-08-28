@@ -84,34 +84,6 @@ namespace AutoScapeLauncher
 {
     static class Program
     {
-        // PowerShell 7 (pwsh.exe) cold-starts noticeably faster than the legacy
-        // Windows PowerShell 5.1 host. Use it when present; otherwise fall back
-        // to the classic host that's guaranteed to exist on every Windows 10/11
-        // machine, so behavior is unchanged on machines without PS7 installed.
-        static string FindPwsh()
-        {
-            try
-            {
-                string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                string standardPath = Path.Combine(programFiles, "PowerShell", "7", "pwsh.exe");
-                if (File.Exists(standardPath)) return standardPath;
-
-                string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-                foreach (string dir in pathEnv.Split(Path.PathSeparator))
-                {
-                    try
-                    {
-                        if (string.IsNullOrWhiteSpace(dir)) continue;
-                        string candidate = Path.Combine(dir, "pwsh.exe");
-                        if (File.Exists(candidate)) return candidate;
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-            return null;
-        }
-
         [STAThread]
         static void Main()
         {
@@ -172,11 +144,8 @@ namespace AutoScapeLauncher
             }
             catch {}
 
-            string pwshPath = FindPwsh();
-            string hostExe = pwshPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
-
             ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = hostExe;
+            psi.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
             psi.Arguments = string.Format("-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{0}\"", psScript);
             psi.WorkingDirectory = appDir;
             psi.CreateNoWindow = true;
