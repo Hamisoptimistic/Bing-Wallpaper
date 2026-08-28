@@ -42,9 +42,10 @@ if (-not ('BingWallpaper.FastAccent' -as [type])) {
     }
 
     # 2. Try loading from CI-injected in-memory Base64 payload (Instant cold startup)
+    
     if (-not ('BingWallpaper.FastAccent' -as [type])) {
         $script:nativeAssemblyBase64 = '__AUTOSCAPE_NATIVE_DLL_BASE64__'
-        if ($script:nativeAssemblyBase64 -and $script:nativeAssemblyBase64 -ne '__AUTOSCAPE_NATIVE_DLL_BASE64__') {
+        if ($script:nativeAssemblyBase64.Length -gt 100) {
             try {
                 $rawBytes = [System.Convert]::FromBase64String($script:nativeAssemblyBase64)
                 [void][System.Reflection.Assembly]::Load($rawBytes)
@@ -388,7 +389,7 @@ public static class BingWallpaperNative {
 
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.191'
+$script:appVersion = [Version]'1.0.192'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -4510,6 +4511,9 @@ $script:memTrimTimer.Start()
 
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
 
 
 
