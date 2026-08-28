@@ -363,8 +363,8 @@ public static class BingWallpaperNative {
         catch {}
     }
 }
-# Application update metadata. Releases must publish both BingWallpaper.exe and
-# BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
+# Application update metadata. Releases must publish both AutoScape.exe and
+# AutoScape.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
 $script:appVersion = [Version]'1.0.166'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
@@ -3156,30 +3156,73 @@ function Start-VerifiedUpdateDownloadAsync {
         return
     }
 
-    # When running as a compiled EXE, use the actual executable path.
+    # Resolve the REAL installed application executable.
+    #
+    # IMPORTANT:
+    # AutoScape.exe is a zero-console launcher. It starts powershell.exe and then
+    # exits, so the PowerShell process running this UI has MainModule.FileName =
+    # powershell.exe. The old updater treated powershell.exe as the installed app
+    # and could consequently try to replace Windows PowerShell instead of
+    # AutoScape.exe. That breaks the entire update hand-off.
+    #
+    # First accept the current process only when it is NOT a PowerShell host.
+    # Otherwise resolve AutoScape.exe from the launcher's working directory
+    # (the launcher intentionally sets PowerShell's WorkingDirectory to appDir).
     $installedExe = $null
     try {
         $processPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-        if ($processPath -and (Test-Path -LiteralPath $processPath -PathType Leaf) -and
+        $processName = if ($processPath) { [IO.Path]::GetFileName($processPath) } else { '' }
+
+        if ($processPath -and
+            $processName -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and
+            (Test-Path -LiteralPath $processPath -PathType Leaf) -and
             ([IO.Path]::GetExtension($processPath) -ieq '.exe')) {
-            $installedExe = $processPath
+            $installedExe = (Resolve-Path -LiteralPath $processPath -ErrorAction Stop).Path
         }
-    } catch {}
+    }
+    catch {}
 
     if (-not $installedExe) {
+        $cwdCandidates = @()
+        try {
+            $cwdCandidates += [Environment]::CurrentDirectory
+        } catch {}
+        try {
+            $cwdCandidates += (Get-Location).Path
+        } catch {}
+
         $exeCandidates = @(
-            (Join-Path ([Environment]::CurrentDirectory) 'AutoScape.exe'),
-            (Join-Path $PSScriptRoot 'AutoScape.exe'),
-            (Join-Path ([Environment]::CurrentDirectory) 'BingWallpaper.exe'),
-            (Join-Path $PSScriptRoot 'BingWallpaper.exe')
+            foreach ($baseDir in ($cwdCandidates | Where-Object { $_ } | Select-Object -Unique)) {
+                (Join-Path $baseDir 'AutoScape.exe')
+                (Join-Path $baseDir 'BingWallpaper.exe')
+            }
+            if ($PSScriptRoot) {
+                # Keep these only as fallbacks for a script launched directly from
+                # a folder that also contains the standalone executable.
+                (Join-Path $PSScriptRoot 'AutoScape.exe')
+                (Join-Path $PSScriptRoot 'BingWallpaper.exe')
+            }
         )
+
         $installedExe = $exeCandidates |
-            Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Where-Object {
+                (Test-Path -LiteralPath $_ -PathType Leaf) -and
+                ([IO.Path]::GetFileName($_) -notmatch '^(?i:powershell|pwsh)\.exe$')
+            } |
+            ForEach-Object {
+                try { (Resolve-Path -LiteralPath $_ -ErrorAction Stop).Path } catch {}
+            } |
             Select-Object -First 1
     }
 
+    # Never allow the updater to target a PowerShell host executable.
+    if ($installedExe -and
+        ([IO.Path]::GetFileName($installedExe) -match '^(?i:powershell|pwsh)\.exe$')) {
+        $installedExe = $null
+    }
+
     if (-not $installedExe) {
-        $errMsg = 'The installed AutoScape.exe could not be found. Run the update from the installed application.'
+        $errMsg = 'The installed AutoScape.exe could not be found. Launch AutoScape.exe directly and try the update again.'
         Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
         Show-ModernDialog -Title "Update Error" -Header "Update Failed" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
         return
@@ -3279,7 +3322,14 @@ function Start-VerifiedUpdateDownloadAsync {
                 throw 'The downloaded update file could not be found.'
             }
 
-            $installedExe = $ctx.InstalledExe
+            $installedExe = [IO.Path]::GetFullPath([string]$ctx.InstalledExe)
+            if (-not (Test-Path -LiteralPath $installedExe -PathType Leaf)) {
+                throw "The installed AutoScape.exe no longer exists."
+            }
+            if ([IO.Path]::GetFileName($installedExe) -match '^(?i:powershell|pwsh)\.exe$') {
+                throw "The update target resolved to a PowerShell host executable. Update was aborted for safety."
+            }
+
             $installDir = Split-Path -Parent $installedExe
 
             Set-TransientStatus -Message "Update downloaded. Restarting AutoScape..." -Brush $statusSuccessBrush -Seconds 10
