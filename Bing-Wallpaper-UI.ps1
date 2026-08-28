@@ -4615,7 +4615,7 @@ function Show-UserGuideDialog {
                                 <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#0078D4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
                                     <TextBlock Text="Download" FontSize="14.5" FontWeight="SemiBold" Foreground="#FAFAFA"/>
-                                    <TextBlock Text="Save original 4K Ultra HD images directly to disk without any watermarks" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
+                                    <TextBlock Text="Save original 4K Ultra HD images directly to your device without any watermarks" FontSize="13" Foreground="#A0A0A0" TextWrapping="Wrap" LineHeight="18" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
