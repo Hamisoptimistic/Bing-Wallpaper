@@ -147,7 +147,7 @@ try {
 catch {}
 # Application update metadata. Releases must publish both BingWallpaper.exe and
 # BingWallpaper.exe.sha256 (a SHA-256 checksum file for the exact EXE asset).
-$script:appVersion = [Version]'1.0.159'
+$script:appVersion = [Version]'1.0.160'
 $script:updateRepository = 'Hamisoptimistic/Bing-Wallpaper'
 $script:updatePublisherThumbprint = '' # Set this when release EXEs are Authenticode-signed.
 
@@ -984,7 +984,7 @@ if ($AutoApply) {
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="AutoScape" Height="780" Width="1100"
-        Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
+        Background="Transparent" FontFamily="Inter" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
     <Window.Resources>
         <!-- Custom Button Style -->
@@ -1479,7 +1479,8 @@ if ($AutoApply) {
         </Grid>
 
         <!-- Modal Backdrop Dim Layer -->
-        <Border Name="ModalDimOverlay" Background="#000000" Opacity="0" IsHitTestVisible="False"/>
+        <Border Name="ModalDimOverlay" Background="#000000" Opacity="0" Visibility="Collapsed" IsHitTestVisible="False" Panel.ZIndex="900"/>
+        <Grid Name="ModalHost" Background="Transparent" Visibility="Collapsed" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Panel.ZIndex="1000"/>
     </Grid>
 </Window>
 "@
@@ -1692,35 +1693,213 @@ $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 $GuideBtn = $window.FindName('GuideBtn')
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
-if ($ModalDimOverlay) {
-    $ModalDimOverlay.Add_MouseLeftButtonDown({
-        if ($script:activeGuideDialog) {
-            Close-UserGuideDialog
-        }
-    })
-}
+$ModalHost = $window.FindName('ModalHost')
+$script:activeModalControl = $null
+$script:activeModalKind = $null
+$script:activeModalClosing = $false
+$script:activeModalCloseCallback = $null
 
 function Set-AppDimState {
-    param([bool]$Dim, [bool]$Force = $false)
+    param([bool]$Dim, [bool]$Immediate = $false)
     if (-not $ModalDimOverlay) { return }
-    if (-not $Dim -and -not $Force) {
-        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible -and -not $script:isClosingGuideDialog) {
-            return
-        }
-    }
-    $targetOpacity = if ($Dim) { 0.55 } else { 0.0 }
-    $ModalDimOverlay.IsHitTestVisible = $Dim
-    $currentOpacity = [double]$ModalDimOverlay.Opacity
-    if ([Math]::Abs($currentOpacity - $targetOpacity) -lt 0.005) { return }
 
-    # Snappy, fluid Fluent-style transition: 180ms on open, 160ms on close
-    $durationMs = if ($Dim) { 180 } else { 160 }
-    $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($durationMs))
-    $anim = New-Object System.Windows.Media.Animation.DoubleAnimation($currentOpacity, $targetOpacity, $dur)
+    $target = if ($Dim) { 0.55 } else { 0.0 }
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+
+    if ($Immediate) {
+        $ModalDimOverlay.Opacity = $target
+        $ModalDimOverlay.Visibility = if ($Dim) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+        $ModalDimOverlay.IsHitTestVisible = $Dim
+        return
+    }
+
+    if ($Dim) {
+        $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Visible
+        $ModalDimOverlay.IsHitTestVisible = $true
+    }
+
+    $from = [double]$ModalDimOverlay.Opacity
+    $ms = if ($Dim) { 190 } else { 150 }
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($ms))
+    $anim = New-Object System.Windows.Media.Animation.DoubleAnimation($from, $target, $duration)
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = if ($Dim) { [System.Windows.Media.Animation.EasingMode]::EaseOut } else { [System.Windows.Media.Animation.EasingMode]::EaseIn }
+    $anim.EasingFunction = $ease
+    $anim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $anim)
+
+    if (-not $Dim) {
+        $timer = New-Object System.Windows.Threading.DispatcherTimer
+        $timer.Interval = [TimeSpan]::FromMilliseconds(160)
+        $timer.Add_Tick({
+            param($sender,$e)
+            $sender.Stop()
+            $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+            $ModalDimOverlay.Opacity = 0.0
+            $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+            $ModalDimOverlay.IsHitTestVisible = $false
+        })
+        $timer.Start()
+    }
+}
+
+function Open-InWindowModal {
+    param(
+        [Parameter(Mandatory=$true)]$Control,
+        [ValidateSet('Guide','Dialog')][string]$Kind = 'Dialog',
+        [scriptblock]$CloseCallback = $null
+    )
+
+    if (-not $ModalHost) { throw 'ModalHost is unavailable.' }
+    if (-not $ModalDimOverlay) { throw 'ModalDimOverlay is unavailable.' }
+
+    if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
+
+    $script:activeModalControl = $Control
+    $script:activeModalKind = $Kind
+    $script:activeModalClosing = $false
+    $script:activeModalCloseCallback = $CloseCallback
+
+    # IMPORTANT: the modal is rendered exactly like the rest of the main window.
+    # Do not use BitmapCache, ScaleTransform, RenderAtScale, or custom text
+    # rendering options. Those create an intermediate surface/resampling path
+    # and make otherwise-native WPF text look softer or overly sharp.
+    try { $Control.CacheMode = $null } catch {}
+    try { $Control.RenderTransform = $null } catch {}
+    try { $Control.Opacity = 0.0 } catch {}
+
+    $Control.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+    $Control.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+
+    $ModalHost.Children.Clear()
+    [void]$ModalHost.Children.Add($Control)
+    $ModalHost.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Stretch
+    $ModalHost.VerticalAlignment = [System.Windows.VerticalAlignment]::Stretch
+    $ModalHost.Visibility = [System.Windows.Visibility]::Visible
+    $ModalHost.IsHitTestVisible = $true
+
+    # Force one normal WPF layout pass before starting the fade. This prevents
+    # the first animation frame from using an unmeasured modal.
+    $ModalHost.UpdateLayout()
+
+    # Backdrop and modal start together. The backdrop is a separate element, so
+    # it never participates in rendering the modal's text or controls.
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+    $ModalDimOverlay.Opacity = 0.0
+    $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Visible
+    $ModalDimOverlay.IsHitTestVisible = $true
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(190))
     $ease = New-Object System.Windows.Media.Animation.CubicEase
     $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-    $anim.EasingFunction = $ease
-    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $anim)
+
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0,1.0,$duration)
+    $fade.EasingFunction = $ease
+    $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $Control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
+
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0,0.55,$duration)
+    $dimAnim.EasingFunction = $ease
+    $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
+}
+
+function Close-InWindowModal {
+    param([bool]$Immediate = $false)
+
+    if ($script:activeModalClosing -and -not $Immediate) { return }
+
+    $control = $script:activeModalControl
+    if (-not $control) {
+        Set-AppDimState -Dim $false
+        return
+    }
+
+    if ($Immediate) {
+        $callback = $script:activeModalCloseCallback
+        $script:activeModalControl = $null
+        $script:activeModalKind = $null
+        $script:activeModalCloseCallback = $null
+        $script:activeModalClosing = $false
+
+        try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty,$null) } catch {}
+        try { $control.CacheMode = $null } catch {}
+        try { $control.RenderTransform = $null } catch {}
+
+        $ModalHost.Children.Clear()
+        $ModalHost.Visibility = [System.Windows.Visibility]::Collapsed
+        $ModalHost.IsHitTestVisible = $false
+        Set-AppDimState -Dim $false -Immediate $true
+        if ($callback) { & $callback }
+        return
+    }
+
+    $script:activeModalClosing = $true
+    $ModalHost.IsHitTestVisible = $false
+
+    # Keep the modal completely native during the exit animation as well.
+    # No bitmap cache and no scale transform are used.
+    try { $control.CacheMode = $null } catch {}
+    try { $control.RenderTransform = $null } catch {}
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseIn
+
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$control.Opacity,0.0,$duration)
+    $fade.EasingFunction = $ease
+    $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty,$fade)
+
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$ModalDimOverlay.Opacity,0.0,$duration)
+    $dimAnim.EasingFunction = $ease
+    $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty,$dimAnim)
+
+    $timer = New-Object System.Windows.Threading.DispatcherTimer
+    $timer.Interval = [TimeSpan]::FromMilliseconds(160)
+    $callback = $script:activeModalCloseCallback
+    $timer.Add_Tick({
+        param($sender,$e)
+        $sender.Stop()
+
+        $script:activeModalControl = $null
+        $script:activeModalKind = $null
+        $script:activeModalCloseCallback = $null
+        $script:activeModalClosing = $false
+
+        try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty,$null) } catch {}
+        try { $control.CacheMode = $null } catch {}
+        try { $control.RenderTransform = $null } catch {}
+
+        $ModalHost.Children.Clear()
+        $ModalHost.Visibility = [System.Windows.Visibility]::Collapsed
+        $ModalHost.IsHitTestVisible = $false
+
+        $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty,$null)
+        $ModalDimOverlay.Opacity = 0.0
+        $ModalDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+        $ModalDimOverlay.IsHitTestVisible = $false
+
+        if ($callback) { & $callback }
+    })
+    $timer.Start()
+}
+
+if ($ModalHost) {
+    $ModalHost.Add_PreviewMouseLeftButtonDown({
+        param($s,$e)
+        if (-not $script:activeModalControl -or $script:activeModalClosing) { return }
+        $source = $e.OriginalSource -as [System.Windows.DependencyObject]
+        $inside = $false
+        try {
+            if ($source) { $inside = $source.IsDescendantOf($script:activeModalControl) }
+        } catch { $inside = $false }
+        if (-not $inside) {
+            Close-InWindowModal
+            $e.Handled=$true
+        }
+    })
 }
 
 # Helper to force UI redraw during blocking network calls
@@ -2553,13 +2732,10 @@ function Show-ModernDialog {
     )
 
     $dialogXaml = @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="$Title" Width="460" SizeToContent="Height"
-        Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        ResizeMode="NoResize" WindowStyle="SingleBorderWindow">
-    <Window.Resources>
+        Width="460" Background="#181818" Foreground="#F0F0F0" FontFamily="Inter">
+    <UserControl.Resources>
         <!-- Windows 11 Fluent Dark ScrollBar Style -->
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -2623,7 +2799,7 @@ function Show-ModernDialog {
                 </Setter.Value>
             </Setter>
         </Style>
-    </Window.Resources>
+    </UserControl.Resources>
 
     <Border Name="DialogRoot" Padding="24" Background="#181818" Opacity="0">
         <Grid>
@@ -2653,7 +2829,7 @@ function Show-ModernDialog {
             <!-- Release Details (Collapsible) -->
             <Border Name="DetailsCard" Grid.Row="1" Background="#212121" BorderBrush="#333333" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,18" MaxHeight="145" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" FocusVisualStyle="{x:Null}">
-                    <TextBlock Name="DetailsContent" FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" FontFamily="Segoe UI"/>
+                    <TextBlock Name="DetailsContent" FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" LineHeight="19" FontFamily="Inter"/>
                 </ScrollViewer>
             </Border>
 
@@ -2661,47 +2837,12 @@ function Show-ModernDialog {
             <StackPanel Name="ButtonPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0"/>
         </Grid>
     </Border>
-</Window>
+</UserControl>
 "@
 
     $r = New-Object System.Xml.XmlNodeReader ([xml]$dialogXaml)
     $dlg = [Windows.Markup.XamlReader]::Load($r)
     
-    $resolvedOwner = if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
-        $script:activeGuideDialog
-    }
-    elseif ($ParentWindow -and $ParentWindow.IsVisible) {
-        $ParentWindow
-    }
-    else {
-        $window
-    }
-    if ($resolvedOwner -and $resolvedOwner.IsVisible) {
-        $dlg.Owner = $resolvedOwner
-    }
-
-    # Set authentic Bing icon for dialog titlebar
-    if ($window -and $window.Icon) {
-        $dlg.Icon = $window.Icon
-    }
-    elseif ($script:taskbarIconPath -and (Test-Path -LiteralPath $script:taskbarIconPath)) {
-        try {
-            $dlg.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create([System.Uri]::new($script:taskbarIconPath))
-        }
-        catch {}
-    }
-
-    # Enable native Windows 11 dark title bar for dialog
-    $dlg.Add_SourceInitialized({
-            try {
-                $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
-                if ($helper.Handle -ne [IntPtr]::Zero) {
-                    [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
-                }
-            }
-            catch {}
-        })
-
     $badgeBorder = $dlg.FindName('BadgeBorder')
     $badgePath = $dlg.FindName('BadgePath')
     $dialogHeader = $dlg.FindName('DialogHeader')
@@ -2749,8 +2890,7 @@ function Show-ModernDialog {
     $closeWithFade = {
         param([string]$choice)
         $script:dialogChoice = $choice
-        Set-AppDimState $false -Force $true
-        try { $dlg.Close() } catch {}
+        Close-InWindowModal
     }
 
     if ($Buttons -eq 'YesNo') {
@@ -2793,45 +2933,35 @@ function Show-ModernDialog {
         $buttonPanel.Children.Add($btnOk) | Out-Null
     }
 
-    $dlg.Add_KeyDown({
-            param($s, $e)
-            if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
-                $e.Handled = $true
-                & $closeWithFade 'Cancel'
-            }
-        })
+    $dlg.Add_PreviewKeyDown({
+        param($s,$e)
+        if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled=$true; & $closeWithFade 'Cancel' }
+    })
 
-    # Fast and smooth entrance animation
     $root = $dlg.FindName('DialogRoot')
-    if ($root) {
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(180))
-        $ease = New-Object System.Windows.Media.Animation.CubicEase
-        $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-        $fadeIn.EasingFunction = $ease
-        $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+    if ($root) { $root.Opacity = 1.0 }
+
+    $closeCallback = {
+        try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::ApplicationIdle,[Action]{ [BingWallpaperNative]::FlushMemory() }) | Out-Null } catch {}
     }
+    Open-InWindowModal -Control $dlg -Kind 'Dialog' -CloseCallback $closeCallback
 
-    $dlg.Add_Closed({
-            Set-AppDimState $false -Force $true
-            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
-                [System.Windows.Threading.DispatcherPriority]::ApplicationIdle,
-                [Action] { [BingWallpaperNative]::FlushMemory() }
-            ) | Out-Null
-        })
-
-    if ($ParentWindow -eq $window) {
-        Set-AppDimState $true
-    }
-
-    $dlg.ShowDialog() | Out-Null
+    # Preserve the original synchronous Show-ModernDialog contract without creating an OS window.
+    $frame = New-Object System.Windows.Threading.DispatcherFrame
+    $script:dialogFrame = $frame
+    $oldCallback = $script:activeModalCloseCallback
+    $script:activeModalCloseCallback = { if ($oldCallback) { & $oldCallback }; $frame.Continue = $false }
+    [System.Windows.Threading.Dispatcher]::PushFrame($frame)
+    $script:dialogFrame = $null
     return $script:dialogChoice
+
 }
 
 
 function Start-VerifiedUpdate {
     if ($script:updateContext -or $script:updateDlContext) { return }
     $CheckUpdateBtn.IsEnabled = $false
-    Set-TransientStatus -Message 'Checking for updates...' -Brush $statusDefaultBrush -Seconds 30
+    Set-TransientStatus -Message 'Checking for updates...' -Brush $statusDefaultBrush -Seconds 8
 
     $repo = $script:updateRepository
     $currentVersion = $script:appVersion
@@ -3867,7 +3997,17 @@ $DownloadBtn.Add_Click({
         $script:downloadTimer.Start()
     })
 
-$CheckUpdateBtn.Add_Click({ Start-VerifiedUpdate })
+$CheckUpdateBtn.Add_Click({
+        try {
+            Start-VerifiedUpdate
+        }
+        catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
+                "Update check error"
+            ) | Out-Null
+        }
+    })
 
 # ---- Spotlight initialisation ----
 # Populate interval dropdown
@@ -3953,23 +4093,15 @@ $script:isClosingGuideDialog = $false
 
 function Close-UserGuideDialog {
     if ($script:isClosingGuideDialog) { return }
-    $dlg = $script:activeGuideDialog
-    if ($dlg -and $dlg.IsVisible) {
+    if ($script:activeModalControl -and $script:activeModalKind -eq 'Guide') {
         $script:isClosingGuideDialog = $true
-        $script:activeGuideDialog = $null
-        Set-AppDimState $false -Force $true
-        try {
-            $dlg.Close()
-        }
-        catch {}
-        finally {
-            $script:isClosingGuideDialog = $false
-        }
+        Close-InWindowModal
+        $script:isClosingGuideDialog = $false
     }
 }
 
 function Show-UserGuideDialog {
-    if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
+    if ($script:activeModalControl -and $script:activeModalKind -eq 'Guide' -and -not $script:activeModalClosing) {
         Close-UserGuideDialog
         return
     }
@@ -4010,13 +4142,11 @@ function Show-UserGuideDialog {
     $modalHeight = [Math]::Max(680, [int]($screenHeight * 0.70))
 
     $dialogXaml = @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AutoScape Guide" Width="$modalWidth" SizeToContent="Height"
-        Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        ResizeMode="NoResize" WindowStyle="SingleBorderWindow">
-    <Window.Resources>
+        Width="$modalWidth" Height="$modalHeight"
+        Background="#181818" Foreground="#F0F0F0" FontFamily="Inter">
+    <UserControl.Resources>
         <Style x:Key="DialogBtn" TargetType="Button">
             <Setter Property="Height" Value="38"/>
             <Setter Property="MinWidth" Value="150"/>
@@ -4041,7 +4171,36 @@ function Show-UserGuideDialog {
                 </Setter.Value>
             </Setter>
         </Style>
-    </Window.Resources>
+    
+        <Style x:Key="GuideCloseButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#AFAFAF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="CloseBorder" Background="{TemplateBinding Background}" CornerRadius="7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CloseBorder" Property="Background" Value="#3A1E22"/>
+                                <Setter Property="Foreground" Value="#FF6B6B"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CloseBorder" Property="Background" Value="#55252B"/>
+                                <Setter Property="Foreground" Value="#FF8A8A"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="CloseBorder" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+</UserControl.Resources>
 
     <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" Opacity="0">
         <Grid>
@@ -4050,6 +4209,8 @@ function Show-UserGuideDialog {
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
+
+            <Button Name="GuideCloseButton" Style="{StaticResource GuideCloseButtonStyle}" Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="32" Height="32" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" Foreground="#AFAFAF" BorderThickness="0" ToolTip="Close" Panel.ZIndex="100"/>
 
             <!-- Header -->
             <Grid Grid.Row="0" Margin="0,0,0,24" HorizontalAlignment="Center">
@@ -4279,27 +4440,18 @@ function Show-UserGuideDialog {
             </Grid>
         </Grid>
     </Border>
-</Window>
+</UserControl>
 "@
     $r = New-Object System.Xml.XmlNodeReader ([xml]$dialogXaml)
     $dlg = [Windows.Markup.XamlReader]::Load($r)
-    if ($window -and $window.IsVisible) {
-        $dlg.Owner = $window
-    }
 
-    # Set icon
-    if ($window -and $window.Icon) { $dlg.Icon = $window.Icon }
-
-    # Enable native Windows 11 dark title bar
-    $dlg.Add_SourceInitialized({
-            try {
-                $helper = New-Object System.Windows.Interop.WindowInteropHelper($dlg)
-                if ($helper.Handle -ne [IntPtr]::Zero) {
-                    [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, 0x00181818)
-                }
-            }
-            catch {}
-        })
+    # The dialog's root Border is authored with Opacity="0" in XAML (so it doesn't
+    # flash unstyled content before Open-InWindowModal fades it in). Show-ModernDialog
+    # resets this back to 1.0 right after load - this dialog was missing that reset,
+    # so the outer UserControl faded in but its content stayed permanently invisible,
+    # which is why the modal looked like it wasn't popping up.
+    $guideRoot = $dlg.FindName('DialogRoot')
+    if ($guideRoot) { $guideRoot.Opacity = 1.0 }
 
     # Set wallpaper thumbnail
     $imgControl = $dlg.FindName('GuideLatestImage')
@@ -4429,43 +4581,16 @@ function Show-UserGuideDialog {
             })
     }
 
-    # Track active dialog instance
     $script:activeGuideDialog = $dlg
+    $closeButton = $dlg.FindName('GuideCloseButton')
+    if ($closeButton) { $closeButton.Add_Click({ Close-UserGuideDialog }) }
 
-    # Fast and smooth entrance animation
-    $root = $dlg.FindName('DialogRoot')
-    if ($root) {
-        $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [TimeSpan]::FromMilliseconds(180))
-        $ease = New-Object System.Windows.Media.Animation.CubicEase
-        $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-        $fadeIn.EasingFunction = $ease
-        $root.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-    }
-
-    $dlg.Add_Closed({
-            $script:activeGuideDialog = $null
-            $script:isClosingGuideDialog = $false
-            Set-AppDimState $false -Force $true
-            if ($window -and $window.IsVisible) {
-                try { $window.Activate() | Out-Null } catch {}
-            }
-            [System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
-                [System.Windows.Threading.DispatcherPriority]::ApplicationIdle,
-                [Action] { [BingWallpaperNative]::FlushMemory() }
-            ) | Out-Null
-        })
-
-    # PreviewKeyDown captures Escape reliably regardless of focused child control
     $dlg.Add_PreviewKeyDown({
-            param($s, $e)
-            if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
-                $e.Handled = $true
-                Close-UserGuideDialog
-            }
-        })
+        param($s,$e)
+        if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled=$true; Close-UserGuideDialog }
+    })
 
-    Set-AppDimState $true
-    $dlg.Show()
+    Open-InWindowModal -Control $dlg -Kind 'Guide' -CloseCallback { $script:activeGuideDialog = $null }
 }
 
 # Header Info / User Guide button opens modal dialog & ambient breathing blue glow
@@ -4504,24 +4629,22 @@ if ($GuideBtn) {
     catch {}
 
     $GuideBtn.Add_Click({
-            Show-UserGuideDialog
+            try {
+                Show-UserGuideDialog
+            }
+            catch {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
+                    "Guide dialog error"
+                ) | Out-Null
+            }
         })
 }
 
-# Dismiss guide dialog when clicking anywhere inside the main app window
-$window.Add_PreviewMouseDown({
-        param($s, $e)
-        if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
-            Close-UserGuideDialog
-            $e.Handled = $true
-        }
-    })
-
 $window.Add_Closed({
         try {
-            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) {
-                $script:activeGuideDialog.Close()
-            }
+            if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
+            $script:activeGuideDialog = $null
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
         }
         catch {}
@@ -4579,57 +4702,18 @@ $script:memTrimTimer.Add_Tick({
 $script:memTrimTimer.Start()
 
 # Show the app
+# Surface any future unhandled error on the dispatcher thread (e.g. inside async
+# DispatcherTimer.Tick callbacks like the update checker) instead of failing silently.
+[System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
+        param($s, $e)
+        try {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Unhandled error:`n`n$($e.Exception.GetType().FullName)`n$($e.Exception.Message)`n`n$($e.Exception.ScriptStackTrace)",
+                "AutoScape error"
+            ) | Out-Null
+        } catch {}
+        $e.Handled = $true
+    })
+
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
