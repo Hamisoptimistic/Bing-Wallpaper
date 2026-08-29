@@ -24,9 +24,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1')
 }
 
 $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
-$exePath = Join-Path $rootFolder 'AutoScape.exe'
-$shaPath = Join-Path $rootFolder 'AutoScape.exe.sha256'
+$vbsPath = Join-Path $rootFolder 'Launch-AutoScape.vbs'
+$setupPs1Path = Join-Path $rootFolder 'Setup.ps1'
+$setupBatPath = Join-Path $rootFolder 'Setup.bat'
 $nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
+$zipPath = Join-Path $rootFolder 'AutoScape.zip'
+$zipShaPath = Join-Path $rootFolder 'AutoScape.zip.sha256'
 
 $nativeCsCandidates = @(
     (Join-Path $rootFolder 'AutoScapeNative.cs'),
@@ -48,8 +51,17 @@ $iconPath = $iconCandidates | Where-Object { Test-Path -LiteralPath $_ } | Selec
 if (-not (Test-Path -LiteralPath $uiPath)) {
     throw "Cannot find Bing-Wallpaper-UI.ps1 at $uiPath"
 }
+if (-not (Test-Path -LiteralPath $vbsPath)) {
+    throw "Cannot find Launch-AutoScape.vbs at $vbsPath"
+}
+if (-not (Test-Path -LiteralPath $setupPs1Path)) {
+    throw "Cannot find Setup.ps1 at $setupPs1Path"
+}
+if (-not (Test-Path -LiteralPath $setupBatPath)) {
+    throw "Cannot find Setup.bat at $setupBatPath"
+}
 
-Write-Step "Resolving compiler"
+Write-Step "Resolving compiler (needed for AutoScapeNative.dll only)"
 
 $cscCandidates = @(
     "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
@@ -57,17 +69,8 @@ $cscCandidates = @(
 )
 
 $csc = $cscCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $csc) {
-    throw 'csc.exe not found.'
-}
-
-$smaPath = [psobject].Assembly.Location
-if (-not (Test-Path -LiteralPath $smaPath)) {
-    $smaPath = "$env:WINDIR\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll"
-}
-
-if (-not (Test-Path -LiteralPath $smaPath)) {
-    throw 'System.Management.Automation.dll not found.'
+if (-not $csc -and $nativeCsPath) {
+    throw 'csc.exe not found (needed to compile AutoScapeNative.dll).'
 }
 
 Write-Step "Generating version"
@@ -168,177 +171,38 @@ elseif (-not (Test-Path -LiteralPath $nativeDllPath)) {
     throw "Cannot find AutoScapeNative.cs or AutoScapeNative.dll. Add AutoScapeNative.cs to the repo root, or commit AutoScapeNative.dll."
 }
 
-Write-Step "Creating launcher source"
+Write-Step "Packaging AutoScape.zip (script-based distribution, no compiled exe)"
 
-$manifestPath = Join-Path $rootFolder 'app.manifest'
+$stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ("AutoScapePkg_" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
 
-$manifestContent = @'
-<?xml version="1.0" encoding="utf-8"?>
-<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="AutoScape.App"/>
-  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
-    <application>
-      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
-      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
-    </application>
-  </compatibility>
-</assembly>
-'@
+try {
+    Copy-Item -LiteralPath $uiPath -Destination (Join-Path $stagingDir 'Bing-Wallpaper-UI.ps1') -Force
+    Copy-Item -LiteralPath $vbsPath -Destination (Join-Path $stagingDir 'Launch-AutoScape.vbs') -Force
+    Copy-Item -LiteralPath $setupPs1Path -Destination (Join-Path $stagingDir 'Setup.ps1') -Force
+    Copy-Item -LiteralPath $setupBatPath -Destination (Join-Path $stagingDir 'Setup.bat') -Force
+    Copy-Item -LiteralPath $nativeDllPath -Destination (Join-Path $stagingDir 'AutoScapeNative.dll') -Force
 
-Set-Content -LiteralPath $manifestPath -Value $manifestContent -Encoding UTF8
-
-$csTemp = Join-Path $rootFolder 'AutoScapeLauncher_temp.cs'
-
-$launcherCode = @'
-using System;
-using System.IO;
-using System.Reflection;
-using System.Management.Automation;
-using System.Management.Automation.Runspaces;
-
-namespace AutoScapeLauncher
-{
-    static class Program
-    {
-        [STAThread]
-        static void Main(string[] args)
-        {
-            string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
-            string scriptPath = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
-            string nativeDllPath = Path.Combine(tempDir, "AutoScapeNative.dll");
-            string iconPath = Path.Combine(tempDir, "assets", "app.ico");
-            string crashLogPath = Path.Combine(tempDir, "launcher_crash.log");
-            string psErrorLogPath = Path.Combine(tempDir, "ps_errors.log");
-
-            try { Directory.CreateDirectory(tempDir); } catch {}
-            try { Directory.CreateDirectory(Path.GetDirectoryName(iconPath)); } catch {}
-
-            try
-            {
-                ExtractResource("AutoScapeLauncher.Bing-Wallpaper-UI.ps1", scriptPath, true);
-                ExtractResource("AutoScapeLauncher.AutoScapeNative.dll", nativeDllPath, true);
-                ExtractResource("AutoScapeLauncher.app.ico", iconPath, false);
-            }
-            catch (Exception ex)
-            {
-                try { File.WriteAllText(crashLogPath, "Extraction Failed:\r\n" + ex.ToString()); } catch {}
-                return;
-            }
-
-            if (!File.Exists(scriptPath)) 
-            {
-                try { File.WriteAllText(crashLogPath, "Script missing after extraction."); } catch {}
-                return;
-            }
-
-            string argString = string.Empty;
-            if (args != null && args.Length > 0)
-            {
-                foreach (string a in args)
-                {
-                    string item = a ?? string.Empty;
-                    if (item.Contains(" ")) item = "\"" + item + "\"";
-                    argString += item + " ";
-                }
-            }
-
-            try
-            {
-                using (Runspace rs = RunspaceFactory.CreateRunspace())
-                {
-                    rs.ApartmentState = System.Threading.ApartmentState.STA;
-                    rs.ThreadOptions = PSThreadOptions.UseCurrentThread;
-                    rs.Open();
-
-                    using (PowerShell ps = PowerShell.Create())
-                    {
-                        ps.Runspace = rs;
-                        ps.AddScript("& '" + scriptPath.Replace("'", "''") + "' " + argString);
-                        ps.Invoke();
-
-                        if (ps.Streams.Error.Count > 0)
-                        {
-                            string errText = "PowerShell Streams.Error:\r\n";
-                            foreach (var err in ps.Streams.Error)
-                            {
-                                errText += err.Exception.ToString() + "\r\n";
-                            }
-                            try { File.WriteAllText(psErrorLogPath, errText); } catch {}
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                try 
-                { 
-                    File.WriteAllText(crashLogPath, "Fatal Launcher Exception:\r\n" + ex.ToString()); 
-                } 
-                catch { }
-            }
-        }
-
-        private static void ExtractResource(string resourceName, string destinationPath, bool overwrite)
-        {
-            try
-            {
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
-                {
-                    if (source == null) return;
-                    if (!overwrite && File.Exists(destinationPath)) return;
-                    try { if (File.Exists(destinationPath)) File.Delete(destinationPath); } catch { return; }
-                    using (FileStream destination = File.Create(destinationPath))
-                    {
-                        source.CopyTo(destination);
-                    }
-                }
-            }
-            catch { }
-        }
+    if ($iconPath) {
+        $stagingAssets = Join-Path $stagingDir 'assets'
+        New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
+        Copy-Item -LiteralPath $iconPath -Destination (Join-Path $stagingAssets 'app.ico') -Force
     }
+
+    Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+    Compress-Archive -Path (Join-Path $stagingDir '*') -DestinationPath $zipPath -Force
 }
-'@
-
-Set-Content -LiteralPath $csTemp -Value $launcherCode -Encoding UTF8
-
-Write-Step "Compiling AutoScape.exe"
-
-Remove-Item -LiteralPath $exePath -Force -ErrorAction SilentlyContinue
-
-$cscArgs = @(
-    '/nologo',
-    '/target:winexe',
-    '/optimize+',
-    '/platform:anycpu',
-    "/reference:`"$smaPath`"",
-    "/win32manifest:`"$manifestPath`"",
-    "/resource:`"$uiPath`",AutoScapeLauncher.Bing-Wallpaper-UI.ps1"
-)
-
-if ($iconPath) {
-    $cscArgs += "/win32icon:`"$iconPath`""
-    $cscArgs += "/resource:`"$iconPath`",AutoScapeLauncher.app.ico"
+finally {
+    Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-if (Test-Path -LiteralPath $nativeDllPath) {
-    $cscArgs += "/resource:`"$nativeDllPath`",AutoScapeLauncher.AutoScapeNative.dll"
+if (-not (Test-Path -LiteralPath $zipPath)) {
+    throw "Failed to create $zipPath"
 }
 
-$cscArgs += "/out:`"$exePath`""
-$cscArgs += "`"$csTemp`""
-
-& $csc @cscArgs
-
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $exePath)) {
-    throw "Failed to compile AutoScape.exe"
-}
-
-$hash = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
-Set-Content -LiteralPath $shaPath -Value "$hash  AutoScape.exe" -Encoding ASCII
-
-Remove-Item -LiteralPath $csTemp -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
+$hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+Set-Content -LiteralPath $zipShaPath -Value "$hash  AutoScape.zip" -Encoding ASCII
 
 Write-Step "Done"
-Write-Host "Created $exePath"
-Write-Host "Created $shaPath"
+Write-Host "Created $zipPath"
+Write-Host "Created $zipShaPath"

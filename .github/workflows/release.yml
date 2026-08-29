@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Auto-Increment Version & Compile
+      - name: Auto-Increment Version & Package
         id: build_step
         shell: powershell
         run: |
@@ -39,14 +39,19 @@ jobs:
             Automatically built from commit `${{ github.sha }}` on branch `${{ github.ref_name }}`.
 
             #### 📦 Downloads
-            - **[AutoScape.exe](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.exe)** (Zero-console standalone launcher)
-            - **[AutoScape.exe.sha256](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.exe.sha256)** (SHA-256 Checksum)
+            - **[AutoScape.zip](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.zip)**
+            - **[AutoScape.zip.sha256](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.zip.sha256)** (SHA-256 Checksum)
+
+            #### ⚙️ Setup
+            1. Extract the zip anywhere (keep all files together).
+            2. Double-click `Setup.bat` (one-time only — creates your Desktop/Start Menu shortcut).
+            3. Launch AutoScape from the shortcut it creates.
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            AutoScape.exe
-            AutoScape.exe.sha256
+            AutoScape.zip
+            AutoScape.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -61,12 +66,17 @@ jobs:
             Built from commit `${{ github.sha }}` on tag `${{ github.ref_name }}`.
 
             #### 📦 Downloads
-            - **[AutoScape.exe](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.exe)**
-            - **[AutoScape.exe.sha256](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.exe.sha256)**
+            - **[AutoScape.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.zip)**
+            - **[AutoScape.zip.sha256](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.zip.sha256)**
+
+            #### ⚙️ Setup
+            1. Extract the zip anywhere (keep all files together).
+            2. Double-click `Setup.bat` (one-time only — creates your Desktop/Start Menu shortcut).
+            3. Launch AutoScape from the shortcut it creates.
           draft: false
           prerelease: false
           files: |
-            AutoScape.exe
-            AutoScape.exe.sha256
+            AutoScape.zip
+            AutoScape.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

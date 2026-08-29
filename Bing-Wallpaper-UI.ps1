@@ -94,7 +94,7 @@ if (-not ('BingWallpaper.FastAccent' -as [type])) {
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.202'
+$script:appVersion = [Version]'1.0.203'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -4118,6 +4118,10 @@ $script:memTrimTimer.Start()
 Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
 
 
 
