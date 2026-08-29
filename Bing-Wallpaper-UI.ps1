@@ -103,6 +103,15 @@ public static class BingWallpaperNative
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
+    private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    private const int DWMSBT_MAINWINDOW = 2; // Mica
+
+    public static void EnableMica(IntPtr hwnd)
+    {
+        int backdrop = DWMSBT_MAINWINDOW;
+        DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
+    }
+
     [DllImport("dwmapi.dll")]
     public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
 
@@ -322,13 +331,16 @@ namespace BingWallpaper
 
     try {
         Add-Type -TypeDefinition $script:nativeCsSource -ReferencedAssemblies @(
-        'PresentationCore', 'PresentationFramework', 'WindowsBase',
-        'System.Net.Http', 'System.Drawing', 'System.Xaml'
-    ) -Language CSharp -ErrorAction Stop
+            'PresentationCore', 'PresentationFramework', 'WindowsBase',
+            'System.Net.Http', 'System.Drawing', 'System.Xaml'
+        ) -Language CSharp -ErrorAction Stop
         Write-NativeLoadLog "OK: compiled native helpers in-memory (no DLL file written)"
     }
     catch {
         Write-NativeLoadLog "FAIL: in-memory compile failed: $($_.Exception.Message)"
+        Show-AppErrorDialog `
+            -Message "Native helper compilation failed. AutoScape will not work correctly.`n`n$($_.Exception.Message)`n`nThis is often caused by antivirus/EDR software blocking runtime C# compilation (csc.exe). Check that AutoScape / csc.exe isn't being blocked, then restart the app." `
+            -Title "AutoScape: native compile failed"
     }
 }
 
@@ -1386,6 +1398,7 @@ $applyDarkTitleBar = {
         $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
         if ($helper.Handle -ne [IntPtr]::Zero) {
             [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, -1)
+            [BingWallpaperNative]::EnableMica($helper.Handle)
             
             $margins = New-Object BingWallpaperNative+MARGINS
             $margins.cxLeftWidth = -1
@@ -1759,7 +1772,7 @@ $FolderBox.Add_PreviewMouseLeftButtonDown({
             $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
             $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
             $darkTimer.Add_Tick({
-                    $hwnd = [BingWallpaperNative]::ForegroundWindow()
+                    $hwnd = [BingWallpaperNative]::GetForegroundWindow()
                     if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNative]::IsDialogWindow($hwnd)) {
                         [BingWallpaperNative]::ForceDarkDialog($hwnd)
                     }
@@ -3134,6 +3147,12 @@ function Render-GalleryGrid {
                 $imageControl.Source = $bitmap
                 $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
                 [void]$script:galleryImageControls.Add($imageControl)
+            }
+            else {
+                # Thumbnail failed to download (parallel fetch swallows per-image
+                # errors) - still give the card a fallback accent so selecting it
+                # doesn't silently do nothing.
+                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
             }
         }
         catch {}
