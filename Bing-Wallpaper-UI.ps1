@@ -12,6 +12,18 @@ param(
 
 $script:startStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
+$script:timingLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\startup-timing.log'
+function Write-TimingLog {
+    param([string]$Message)
+    try {
+        $dir = Split-Path -Parent $script:timingLogPath
+        if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        Add-Content -LiteralPath $script:timingLogPath -Value "$(Get-Date -Format 'HH:mm:ss.fff')  $Message" -Encoding UTF8
+    }
+    catch {}
+}
+Write-TimingLog "SCRIPT: first line executing (this minus the stub's 'calling Process.Start' line = engine boot + AMSI scan time)"
+
 # Enforce modern security protocols to prevent connection blocks or downgrade attacks
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
@@ -20,12 +32,30 @@ catch {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 }
 
-# Load necessary modern UI assemblies directly via CLR for maximum startup speed
+# Load necessary modern UI assemblies directly via CLR for maximum startup speed.
+# System.Windows.Forms and System.Drawing are deliberately NOT loaded here: neither
+# is needed to get the window on screen, and eagerly loading them adds real assembly
+# manifest-parsing + (for Forms specifically) GDI+/message-subsystem init cost to
+# every single launch. System.Drawing is only referenced by AutoScapeNative.dll's own
+# code and gets resolved automatically by the CLR the moment that DLL actually needs
+# it. System.Windows.Forms is only used for error dialogs (see Show-AppErrorDialog
+# below), which lazy-loads it on the rare path where something has actually failed.
 [void][System.Reflection.Assembly]::Load("PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
 [void][System.Reflection.Assembly]::Load("PresentationCore, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
 [void][System.Reflection.Assembly]::Load("WindowsBase, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
-[void][System.Reflection.Assembly]::Load("System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")
-[void][System.Reflection.Assembly]::Load("System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a")
+Write-TimingLog "SCRIPT: PresentationFramework/Core/WindowsBase loaded ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
+
+function Show-AppErrorDialog {
+    param(
+        [string]$Message,
+        [string]$Title
+    )
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+        [System.Windows.Forms.MessageBox]::Show($Message, $Title) | Out-Null
+    }
+    catch {}
+}
 
 # High-Performance Cached Native Types (DWM dark titlebar, FastDownloader, FastAccent, AppUserModel)
 # The compiled DLL now ships as its own embedded resource in AutoScape.exe (extracted
@@ -419,7 +449,7 @@ public static class BingWallpaperNative {
 
 
 # Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.195'
+$script:appVersion = [Version]'1.0.196'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1363,6 +1393,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
+Write-TimingLog "SCRIPT: main window XAML parsed/instantiated ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 
 if (-not [System.Windows.Application]::Current) {
     $script:wpfApp = New-Object System.Windows.Application
@@ -3774,10 +3805,9 @@ $CheckUpdateBtn.Add_Click({
             Start-VerifiedUpdate
         }
         catch {
-            [System.Windows.Forms.MessageBox]::Show(
-                "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
-                "Update check error"
-            ) | Out-Null
+            Show-AppErrorDialog `
+                -Message "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+                -Title "Update check error"
         }
     })
 
@@ -4476,10 +4506,9 @@ if ($GuideBtn) {
                 Show-UserGuideDialog
             }
             catch {
-                [System.Windows.Forms.MessageBox]::Show(
-                    "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
-                    "Guide dialog error"
-                ) | Out-Null
+                Show-AppErrorDialog `
+                    -Message "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+                    -Title "Guide dialog error"
             }
         })
 }
@@ -4538,10 +4567,9 @@ $script:memTrimTimer.Start()
 [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
         param($s, $e)
         try {
-            [System.Windows.Forms.MessageBox]::Show(
-                "Unhandled error:`n`n$($e.Exception.GetType().FullName)`n$($e.Exception.Message)`n`n$($e.Exception.ScriptStackTrace)",
-                "AutoScape error"
-            ) | Out-Null
+            Show-AppErrorDialog `
+                -Message "Unhandled error:`n`n$($e.Exception.GetType().FullName)`n$($e.Exception.Message)`n`n$($e.Exception.ScriptStackTrace)" `
+                -Title "AutoScape error"
         }
         catch {}
         $e.Handled = $true
@@ -4550,5 +4578,6 @@ $script:memTrimTimer.Start()
 
 
 [System.Console]::WriteLine("Window Ready at: $($script:startStopwatch.ElapsedMilliseconds)ms")
+Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()

@@ -84,9 +84,23 @@ namespace AutoScapeLauncher
 {
     static class Program
     {
+        static void LogTiming(string message)
+        {
+            try
+            {
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BingWallpaper");
+                Directory.CreateDirectory(dir);
+                string logPath = Path.Combine(dir, "startup-timing.log");
+                string line = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + message + Environment.NewLine;
+                File.AppendAllText(logPath, line);
+            }
+            catch { }
+        }
+
         [STAThread]
         static void Main()
         {
+            LogTiming("STUB: Main() entered");
             string appDir = AppDomain.CurrentDomain.BaseDirectory;
             string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
             string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
@@ -144,6 +158,8 @@ namespace AutoScapeLauncher
             }
             catch {}
 
+            LogTiming("STUB: resource extraction done, launching host process");
+
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
             psi.Arguments = string.Format("-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{0}\"", psScript);
@@ -152,6 +168,7 @@ namespace AutoScapeLauncher
             psi.UseShellExecute = false;
             psi.WindowStyle = ProcessWindowStyle.Hidden;
 
+            LogTiming("STUB: calling Process.Start (script content will be AMSI-scanned before its first line runs)");
             Process.Start(psi);
         }
     }
