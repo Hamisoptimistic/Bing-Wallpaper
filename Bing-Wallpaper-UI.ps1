@@ -856,35 +856,6 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
             </Setter>
         </Style>
 
-        <Style x:Key="ModalCloseButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#2A2A2A"/>
-            <Setter Property="Foreground" Value="#CCCCCC"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#1FFFFFFF"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Name="CloseBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="CloseBorder" Property="Background" Value="#E81123"/>
-                                <Setter TargetName="CloseBorder" Property="BorderBrush" Value="#E81123"/>
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="CloseBorder" Property="Background" Value="#C42B1C"/>
-                                <Setter TargetName="CloseBorder" Property="BorderBrush" Value="#C42B1C"/>
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
             <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8">
                 <Grid>
@@ -1091,73 +1062,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 
             <Grid Margin="0,0,0,32">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Border Background="#141212ff" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0">
-                        <Viewbox Margin="3">
-                            <Canvas Width="760" Height="720">
-                                <Canvas Canvas.Left="-135" Canvas.Top="-135" Width="1024" Height="1024">
-                                    <Canvas.Resources>
-                                        <LinearGradientBrush x:Key="b1" StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#174BCB" Offset="0"/>
-                                            <GradientStop Color="#0B3AA5" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <LinearGradientBrush x:Key="b2" StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#1470D5" Offset="0"/>
-                                            <GradientStop Color="#0758BD" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <LinearGradientBrush x:Key="sky" StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#54A8F4" Offset="0"/>
-                                            <GradientStop Color="#8BC8F6" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <LinearGradientBrush x:Key="m1" StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#08459F" Offset="0"/>
-                                            <GradientStop Color="#0A62C2" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <LinearGradientBrush x:Key="m2" StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#2C72CB" Offset="0"/>
-                                            <GradientStop Color="#5E9FDF" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <LinearGradientBrush x:Key="m3" StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#79B5EA" Offset="0"/>
-                                            <GradientStop Color="#9CCDF0" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <LinearGradientBrush x:Key="snow" StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#E5EEFF" Offset="0"/>
-                                            <GradientStop Color="#FFFFFF" Offset="1"/>
-                                        </LinearGradientBrush>
-                                        <RectangleGeometry x:Key="clip" Rect="173,263,678,539" RadiusX="36" RadiusY="36"/>
-                                    </Canvas.Resources>
-
-                                    <Rectangle Canvas.Left="245" Canvas.Top="147" Width="534" Height="151" RadiusX="34" RadiusY="34" Fill="{StaticResource b1}">
-                                        <Rectangle.Effect>
-                                            <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
-                                        </Rectangle.Effect>
-                                    </Rectangle>
-
-                                    <Rectangle Canvas.Left="209" Canvas.Top="205" Width="606" Height="168" RadiusX="36" RadiusY="36" Fill="{StaticResource b2}"/>
-
-                                    <Rectangle Canvas.Left="173" Canvas.Top="263" Width="678" Height="539" RadiusX="36" RadiusY="36" Fill="{StaticResource sky}">
-                                        <Rectangle.Effect>
-                                            <DropShadowEffect BlurRadius="24" Direction="270" ShadowDepth="10" Opacity="0.18" Color="Black"/>
-                                        </Rectangle.Effect>
-                                    </Rectangle>
-
-                                    <Canvas Clip="{StaticResource clip}">
-                                        <Ellipse Canvas.Left="80" Canvas.Top="175" Width="820" Height="380" Fill="#B9DEFA" Opacity="0.18"/>
-                                        <Ellipse Canvas.Left="642" Canvas.Top="295" Width="110" Height="110" Fill="#FFE995"/>
-                                        <Path Data="M235 625L360 510L425 558L495 424L570 505L635 450L810 616L880 690V830H205V830Z" Fill="{StaticResource m3}"/>
-                                        <Path Data="M360 510L495 424L570 505L532 485L500 535L468 501L430 552L403 531Z" Fill="{StaticResource snow}"/>
-                                        <Path Data="M175 657L302 544L376 600L458 516L553 625L610 561L720 671L858 760V830H175Z" Fill="{StaticResource m2}"/>
-                                        <Path Data="M302 544L376 600L346 584L325 608L302 590L275 613Z" Fill="#BBDCF5" Opacity="0.9"/>
-                                        <Path Data="M458 516L553 625L514 601L486 630L458 602L432 625Z" Fill="#CDE5FA" Opacity="0.85"/>
-                                        <Path Data="M150 671L268 590L337 632L420 695L505 751L590 793L655 838H150Z" Fill="{StaticResource m1}"/>
-                                        <Path Data="M268 590L337 632L420 695L505 751L590 793L458 741L382 699L320 653Z" Fill="#165DB8" Opacity="0.82"/>
-                                        <Path Data="M515 830L590 760L675 700L760 747L880 683L900 830Z" Fill="#3984D4" Opacity="0.78"/>
-                                        <Path Data="M675 700L760 747L720 735L690 759L654 730Z" Fill="#79B6E9" Opacity="0.62"/>
-                                    </Canvas>
-                                </Canvas>
-                            </Canvas>
-                        </Viewbox>
-                    </Border>
+                    <Border Name="LogoBorder" Background="Transparent" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="AutoScape" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,2"/>
                         <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
@@ -1418,6 +1323,31 @@ $applyDarkTitleBar = {
 }
 
 $window.Add_SourceInitialized($applyDarkTitleBar)
+
+# Header logo: loaded from a PNG instead of being built from inline XAML
+# gradients/paths. A BitmapImage load is cheap and synchronous, so this can
+# run immediately - no deferral, no pop-in, and no risk of the vector
+# recreation being subtly wrong since it's just displaying the real artwork.
+try {
+    $logoPath = Join-Path $scriptDir 'assets\logo.png'
+    if (Test-Path -LiteralPath $logoPath) {
+        $logoBitmap = New-Object System.Windows.Media.Imaging.BitmapImage
+        $logoBitmap.BeginInit()
+        $logoBitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $logoPath).Path)
+        $logoBitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+        $logoBitmap.EndInit()
+        $logoBitmap.Freeze()
+
+        $logoImage = New-Object System.Windows.Controls.Image
+        $logoImage.Source = $logoBitmap
+        $logoImage.Stretch = [System.Windows.Media.Stretch]::Uniform
+        $logoImage.Margin = New-Object System.Windows.Thickness(0)
+
+        $logoBorder = $window.FindName('LogoBorder')
+        if ($logoBorder) { $logoBorder.Child = $logoImage }
+    }
+}
+catch {}
 
 $window.Add_StateChanged({
         if ($script:activeModalControl) {
