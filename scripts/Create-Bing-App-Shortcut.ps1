@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Compiles the zero-console standalone Windows GUI launcher (BingWallpaper.exe)
-    and generates the Desktop application shortcut.
+    Compiles the zero-console standalone Windows GUI launcher (AutoScape.exe)
+    with embedded Windows 11 Mica manifest and STA PowerShell hosting.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -43,9 +43,7 @@ $nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
 $hasNativeDll = Test-Path -LiteralPath $nativeDllPath
 if (-not $hasNativeDll) {
     Write-Output "--> WARNING: AutoScapeNative.dll not found at $nativeDllPath."
-    Write-Output "    AutoScape.exe will still work, but it will fall back to compiling the"
-    Write-Output "    native helper at runtime (slower first launch). Run Build-Release.ps1"
-    Write-Output "    first to produce AutoScapeNative.dll before packaging a real release."
+    Write-Output "    Make sure AutoScapeNative.dll is in the project root."
 }
 
 Add-Type -AssemblyName System.Drawing
@@ -64,67 +62,59 @@ try {
     }
 } catch {}
 
-# 1. Compile standalone Windows GUI executable (AutoScape.exe) with embedded icon
-Write-Output "--> Compiling AutoScape.exe (zero-console launcher)..."
+# 1. Compile standalone in-process GUI executable (AutoScape.exe)
+Write-Output "--> Compiling AutoScape.exe (in-process PowerShell host + Mica manifest)..."
 $cscCandidates = @(
     "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
     "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
 )
 $csc = $cscCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
+# Locate System.Management.Automation.dll
+$smaPath = [psobject].Assembly.Location
+if (-not (Test-Path -LiteralPath $smaPath)) {
+    $smaPath = "$env:WINDIR\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll"
+}
+
+# Create Windows 11 compatibility manifest for Mica & Dark Mode
+$manifestPath = Join-Path $rootFolder 'app.manifest'
+$manifestContent = @'
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="AutoScape.App"/>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
+    </application>
+  </compatibility>
+</assembly>
+'@
+Set-Content -Path $manifestPath -Value $manifestContent -Encoding UTF8
+
 $hasExe = $false
 if ($csc) {
-    $csSource = @"
+    $csSource = @'
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 
 namespace AutoScapeLauncher
 {
     static class Program
     {
-        static void LogTiming(string message)
-        {
-            try
-            {
-                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BingWallpaper");
-                Directory.CreateDirectory(dir);
-                string logPath = Path.Combine(dir, "startup-timing.log");
-                string line = DateTime.Now.ToString("HH:mm:ss.fff") + "  " + message + Environment.NewLine;
-                File.AppendAllText(logPath, line);
-            }
-            catch { }
-        }
-
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            LogTiming("STUB: Main() entered");
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
             string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
-            string psScript = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
             string iconPath = Path.Combine(tempDir, "assets", "app.ico");
             string nativeDll = Path.Combine(tempDir, "AutoScapeNative.dll");
 
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(iconPath));
-
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.Bing-Wallpaper-UI.ps1"))
-                {
-                    if (source != null)
-                    {
-                        bool needsExtract = !File.Exists(psScript) || new FileInfo(psScript).Length != source.Length;
-                        if (needsExtract)
-                        {
-                            using (FileStream destination = File.Create(psScript))
-                            {
-                                source.CopyTo(destination);
-                            }
-                        }
-                    }
-                }
 
                 using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.app.ico"))
                 {
@@ -137,10 +127,6 @@ namespace AutoScapeLauncher
                     }
                 }
 
-                // Native helper DLL: extracted as a real file next to the script instead
-                // of being pasted into the script as a Base64 string. Keeping it out of the
-                // .ps1's text avoids the AMSI/Defender scan overhead a large Base64 blob in
-                // script content triggers on every launch.
                 using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.AutoScapeNative.dll"))
                 {
                     if (source != null)
@@ -155,25 +141,61 @@ namespace AutoScapeLauncher
                         }
                     }
                 }
+
+                if (File.Exists(nativeDll))
+                {
+                    try { Assembly.LoadFrom(nativeDll); } catch { }
+                }
             }
-            catch {}
+            catch { }
 
-            LogTiming("STUB: resource extraction done, launching host process");
+            string scriptContent = string.Empty;
+            using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.Bing-Wallpaper-UI.ps1"))
+            {
+                if (source != null)
+                {
+                    using (StreamReader reader = new StreamReader(source))
+                    {
+                        scriptContent = reader.ReadToEnd();
+                    }
+                }
+            }
 
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe");
-            psi.Arguments = string.Format("-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{0}\"", psScript);
-            psi.WorkingDirectory = appDir;
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
-            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            if (string.IsNullOrEmpty(scriptContent)) return;
 
-            LogTiming("STUB: calling Process.Start (script content will be AMSI-scanned before its first line runs)");
-            Process.Start(psi);
+            using (Runspace rs = RunspaceFactory.CreateRunspace())
+            {
+                rs.ApartmentState = System.Threading.ApartmentState.STA;
+                rs.ThreadOptions = PSThreadOptions.UseCurrentThread;
+                rs.Open();
+
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = rs;
+
+                    string argString = string.Empty;
+                    if (args != null && args.Length > 0)
+                    {
+                        for (int i = 0; i < args.Length; i++)
+                        {
+                            string a = args[i];
+                            if (a.Contains(" ")) a = "\"" + a + "\"";
+                            argString += a + " ";
+                        }
+                    }
+
+                    string escapedTemp = tempDir.Replace("'", "''");
+                    string initScript = "$script:nativeDllExtractedPath = '" + escapedTemp + "\\AutoScapeNative.dll';\n" +
+                                        "$script:injectedScriptRoot = '" + escapedTemp + "';\n";
+
+                    ps.AddScript(initScript + "& {\n" + scriptContent + "\n} " + argString);
+                    ps.Invoke();
+                }
+            }
         }
     }
 }
-"@
+'@
     $csTemp = Join-Path $rootFolder 'AppLauncher_temp.cs'
     Set-Content -Path $csTemp -Value $csSource -Encoding UTF8
 
@@ -181,7 +203,9 @@ namespace AutoScapeLauncher
         "/target:winexe",
         "/optimize+",
         "/platform:anycpu",
+        "/reference:`"$smaPath`"",
         "/win32icon:`"$icoPath`"",
+        "/win32manifest:`"$manifestPath`"",
         "/resource:`"$uiPath`",AutoScapeLauncher.Bing-Wallpaper-UI.ps1",
         "/resource:`"$icoPath`",AutoScapeLauncher.app.ico"
     )
@@ -195,10 +219,10 @@ namespace AutoScapeLauncher
 
     $proc = Start-Process -FilePath $csc -ArgumentList $compileArgs -NoNewWindow -Wait -PassThru
     Remove-Item -Path $csTemp -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $manifestPath -Force -ErrorAction SilentlyContinue
 
     if ($proc.ExitCode -eq 0 -and (Test-Path $exePath)) {
         $hasExe = $true
-        # Clean up legacy executable and checksum if present
         $legacyExe = Join-Path $rootFolder 'BingWallpaper.exe'
         $legacySha = Join-Path $rootFolder 'BingWallpaper.exe.sha256'
         if (Test-Path $legacyExe) { Remove-Item $legacyExe -Force -ErrorAction SilentlyContinue }
@@ -207,13 +231,8 @@ namespace AutoScapeLauncher
         $checksumPath = Join-Path $rootFolder 'AutoScape.exe.sha256'
         $checksum = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
         Set-Content -LiteralPath $checksumPath -Value "$checksum  AutoScape.exe" -Encoding ASCII
-        Write-Output "    Created $exePath (with embedded authentic icon)"
+        Write-Output "    Created $exePath (in-process host with authentic icon & Mica support)"
         Write-Output "    Created $checksumPath"
-        if ($hasNativeDll) {
-            Write-Output "    Embedded AutoScapeNative.dll as a resource (no runtime compile needed)"
-        } else {
-            Write-Output "    NOTE: AutoScapeNative.dll was NOT embedded - app will compile it at first run"
-        }
     }
 }
 
@@ -234,7 +253,6 @@ function Create-Shortcut($targetPath, $outLnkPath, $iconLocation, $args = '') {
 $targetExe = if ($hasExe) { $exePath } else { "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" }
 $targetArgs = if ($hasExe) { "" } else { "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$uiPath`"" }
 
-# Clean up legacy shortcut name if present
 $oldDesktopLnk = Join-Path $desktopPath 'Bing Wallpaper.lnk'
 if (Test-Path $oldDesktopLnk) { Remove-Item $oldDesktopLnk -Force -ErrorAction SilentlyContinue }
 
@@ -256,8 +274,5 @@ if ($startMenuPrograms -and (Test-Path $startMenuPrograms)) {
 Write-Output ""
 Write-Output "========================================================="
 Write-Output " Setup Complete!"
-Write-Output " You can launch the app directly from:"
-Write-Output "   1. Desktop shortcut:    'AutoScape'"
-Write-Output "   2. Start Menu shortcut: 'AutoScape'"
-Write-Output "   3. Project root:        'AutoScape.exe'"
+Write-Output " Launcher: $exePath"
 Write-Output "========================================================="

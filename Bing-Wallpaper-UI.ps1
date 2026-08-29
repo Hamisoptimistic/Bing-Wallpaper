@@ -22,9 +22,9 @@ function Write-TimingLog {
     }
     catch {}
 }
-Write-TimingLog "SCRIPT: first line executing (this minus the stub's 'calling Process.Start' line = engine boot + AMSI scan time)"
+Write-TimingLog "SCRIPT: first line executing (in-process launch)"
 
-# Enforce modern security protocols to prevent connection blocks or downgrade attacks
+# Enforce modern security protocols
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
 }
@@ -32,14 +32,7 @@ catch {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 }
 
-# Load necessary modern UI assemblies directly via CLR for maximum startup speed.
-# System.Windows.Forms and System.Drawing are deliberately NOT loaded here: neither
-# is needed to get the window on screen, and eagerly loading them adds real assembly
-# manifest-parsing + (for Forms specifically) GDI+/message-subsystem init cost to
-# every single launch. System.Drawing is only referenced by AutoScapeNative.dll's own
-# code and gets resolved automatically by the CLR the moment that DLL actually needs
-# it. System.Windows.Forms is only used for error dialogs (see Show-AppErrorDialog
-# below), which lazy-loads it on the rare path where something has actually failed.
+# Load UI assemblies
 [void][System.Reflection.Assembly]::Load("PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
 [void][System.Reflection.Assembly]::Load("PresentationCore, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
 [void][System.Reflection.Assembly]::Load("WindowsBase, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
@@ -57,12 +50,7 @@ function Show-AppErrorDialog {
     catch {}
 }
 
-# High-Performance Cached Native Types (DWM dark titlebar, FastDownloader, FastAccent, AppUserModel)
-# The compiled DLL now ships as its own embedded resource in AutoScape.exe (extracted
-# next to this script by the launcher stub) instead of a Base64 blob pasted into this
-# file. A giant Base64-encoded-assembly literal sitting in script text is one of the
-# heaviest triggers for AMSI/Defender's static-analysis heuristics, and re-extracting a
-# real DLL to disk avoids that scan cost on every launch.
+# Load Cached Native Types from extracted DLL
 $script:nativeDllPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScapeNative.dll'
 $script:nativeDllExtractedPath = Join-Path $PSScriptRoot 'AutoScapeNative.dll'
 $script:nativeLoadLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\native-load.log'
@@ -80,376 +68,33 @@ function Write-NativeLoadLog {
 }
 
 if (-not ('BingWallpaper.FastAccent' -as [type])) {
-    # 1. Fastest path: DLL sitting right next to this script, extracted from
-    #    AutoScape.exe's embedded resources by the launcher stub on this run.
     if (Test-Path -LiteralPath $script:nativeDllExtractedPath) {
         try {
             [void][System.Reflection.Assembly]::LoadFile($script:nativeDllExtractedPath)
             Write-NativeLoadLog "OK: loaded native DLL from extracted path ($script:nativeDllExtractedPath)"
-
-            # Mirror into %LOCALAPPDATA% too, since a background runspace elsewhere
-            # in this script loads the native DLL again by path from $script:nativeDllPath.
             try {
                 $nativeDir = Split-Path -Parent $script:nativeDllPath
-                if (-not (Test-Path -LiteralPath $nativeDir)) {
-                    New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
-                }
-                if (-not (Test-Path -LiteralPath $script:nativeDllPath)) {
-                    Copy-Item -LiteralPath $script:nativeDllExtractedPath -Destination $script:nativeDllPath -Force
-                }
-            }
-            catch {
-                Write-NativeLoadLog "WARN: could not mirror extracted DLL into LOCALAPPDATA cache: $($_.Exception.Message)"
-            }
+                if (-not (Test-Path -LiteralPath $nativeDir)) { New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null }
+                if (-not (Test-Path -LiteralPath $script:nativeDllPath)) { Copy-Item -LiteralPath $script:nativeDllExtractedPath -Destination $script:nativeDllPath -Force }
+            } catch {}
         }
         catch {
-            Write-NativeLoadLog "FAIL: could not load extracted DLL ($script:nativeDllExtractedPath): $($_.Exception.Message)"
+            Write-NativeLoadLog "FAIL: could not load extracted DLL: $($_.Exception.Message)"
         }
     }
-
-    # 2. Try loading from an existing physical DLL already cached in %LOCALAPPDATA%
-    #    (covers running this script directly during development, without the exe wrapper).
-    if (-not ('BingWallpaper.FastAccent' -as [type]) -and (Test-Path -LiteralPath $script:nativeDllPath)) {
+    elseif (Test-Path -LiteralPath $script:nativeDllPath) {
         try {
             [void][System.Reflection.Assembly]::LoadFile($script:nativeDllPath)
             Write-NativeLoadLog "OK: loaded native DLL from LOCALAPPDATA cache ($script:nativeDllPath)"
         }
         catch {
-            Write-NativeLoadLog "FAIL: could not load cached DLL ($script:nativeDllPath): $($_.Exception.Message)"
-        }
-    }
-
-    # 3. Fallback for Local Dev only (runs when executing raw .ps1 prior to CI compilation).
-    #    This should NEVER fire in a shipped build - if it does, AutoScapeNative.dll
-    #    failed to get embedded/extracted correctly and the build needs fixing.
-    if (-not ('BingWallpaper.FastAccent' -as [type])) {
-        Write-NativeLoadLog "WARNING: falling back to runtime Add-Type compile (this should not happen in a release build)"
-        try {
-            $nativeHelperCode = @'
-using System;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Net;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Media;
-
-public static class AppUserModel {
-    [DllImport("shell32.dll", SetLastError = true)]
-    public static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
-}
-
-namespace BingWallpaper
-{
-    public static class FastAccent
-    {
-        public static SolidColorBrush ExtractBrush(string path)
-        {
-            try
-            {
-                if (!File.Exists(path))
-                {
-                    var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
-                    fallback.Freeze();
-                    return fallback;
-                }
-                using (var bmp = new Bitmap(path))
-                {
-                    using (var small = new Bitmap(bmp, new Size(24, 24)))
-                    {
-                        BitmapData data = small.LockBits(new Rectangle(0, 0, 24, 24), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                        int bytes = Math.Abs(data.Stride) * 24;
-                        byte[] rgb = new byte[bytes];
-                        Marshal.Copy(data.Scan0, rgb, 0, bytes);
-                        small.UnlockBits(data);
-
-                        int redTotal = 0, greenTotal = 0, blueTotal = 0, weightTotal = 0;
-                        for (int i = 0; i < rgb.Length; i += 4)
-                        {
-                            byte b = rgb[i];
-                            byte g = rgb[i + 1];
-                            byte r = rgb[i + 2];
-
-                            int max = Math.Max(r, Math.Max(g, b));
-                            int min = Math.Min(r, Math.Min(g, b));
-                            int weight = 1 + (((max - min) * 2) / 255);
-
-                            redTotal += r * weight;
-                            greenTotal += g * weight;
-                            blueTotal += b * weight;
-                            weightTotal += weight;
-                        }
-
-                        if (weightTotal == 0) weightTotal = 1;
-                        byte finalR = (byte)Math.Min(190, (redTotal / weightTotal) * 1.35);
-                        byte finalG = (byte)Math.Min(190, (greenTotal / weightTotal) * 1.35);
-                        byte finalB = (byte)Math.Min(190, (blueTotal / weightTotal) * 1.35);
-                        var brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, finalR, finalG, finalB));
-                        brush.Freeze();
-                        return brush;
-                    }
-                }
-            }
-            catch
-            {
-                var fallback = new SolidColorBrush(System.Windows.Media.Color.FromArgb(235, 70, 70, 70));
-                fallback.Freeze();
-                return fallback;
-            }
-        }
-    }
-
-    public static class FastDownloader
-    {
-        public static void DownloadThumbnailsParallel(string[] urlBases, string cacheDir)
-        {
-            try
-            {
-                if (!Directory.Exists(cacheDir))
-                {
-                    Directory.CreateDirectory(cacheDir);
-                }
-
-                Parallel.ForEach(urlBases, new ParallelOptions { MaxDegreeOfParallelism = 8 }, urlBase =>
-                {
-                    try
-                    {
-                        string safeName = System.Text.RegularExpressions.Regex.Replace(urlBase, @"[^a-zA-Z0-9]", "");
-                        string targetFile = Path.Combine(cacheDir, safeName + "_thumb.jpg");
-                        if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 1024)
-                        {
-                            return;
-                        }
-
-                        string tempFile = targetFile + ".tmp" + Guid.NewGuid().ToString("N");
-                        string downloadUrl = "https://www.bing.com" + urlBase + "_1920x1080.jpg";
-
-                        using (var client = new WebClient())
-                        {
-                            client.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-                            client.DownloadFile(downloadUrl, tempFile);
-                        }
-
-                        if (File.Exists(tempFile))
-                        {
-                            if (File.Exists(targetFile)) File.Delete(targetFile);
-                            File.Move(tempFile, targetFile);
-                        }
-                    }
-                    catch {}
-                });
-            }
-            catch {}
+            Write-NativeLoadLog "FAIL: could not load cached DLL: $($_.Exception.Message)"
         }
     }
 }
 
-public static class BingWallpaperNative {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct MARGINS {
-        public int cxLeftWidth;
-        public int cxRightWidth;
-        public int cyTopHeight;
-        public int cyBottomHeight;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern bool SystemParametersInfo(int action, int parameter, string path, int flags);
-
-    [DllImport("dwmapi.dll", PreserveSig = true)]
-    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-    [DllImport("dwmapi.dll")]
-    public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
-
-    public const int DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19;
-    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-    public const int DWMWA_CAPTION_COLOR = 35;
-    public const int DWMWA_TEXT_COLOR = 36;
-    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
-
-    public static void EnableDarkTitleBar(IntPtr hwnd, int captionColorBgr = 0x00121212) {
-        try {
-            int trueVal = 1;
-            int res = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref trueVal, sizeof(int));
-            if (res != 0) {
-                DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref trueVal, sizeof(int));
-            }
-            int roundCorner = 2;
-            DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref roundCorner, sizeof(int));
-            
-            int backdrop = 2;
-            DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
-            
-            int trueValMica = 1;
-            DwmSetWindowAttribute(hwnd, 1029, ref trueValMica, sizeof(int));
-            
-            if (captionColorBgr >= 0) {
-                DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref captionColorBgr, sizeof(int));
-                int textColor = 0x00FFFFFF;
-                DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, ref textColor, sizeof(int));
-            }
-        } catch { }
-    }
-
-    [DllImport("uxtheme.dll", EntryPoint = "#131")]
-    private static extern int SetPreferredAppMode(int mode);
-
-    [DllImport("uxtheme.dll", EntryPoint = "#135")]
-    private static extern bool AllowDarkModeForApp(bool allow);
-
-    [DllImport("uxtheme.dll", EntryPoint = "#104")]
-    private static extern void RefreshImmersiveColorPolicyState();
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-
-    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
-    private static extern int SetWindowTheme(IntPtr hwnd, string pszSubAppName, string pszSubIdList);
-
-    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
-
-    public static void EnableDarkDialogs() {
-        try {
-            SetPreferredAppMode(2);
-            AllowDarkModeForApp(true);
-            RefreshImmersiveColorPolicyState();
-        } catch { }
-    }
-
-    public static IntPtr ForegroundWindow() {
-        return GetForegroundWindow();
-    }
-
-    public static bool IsDialogWindow(IntPtr hwnd) {
-        try {
-            StringBuilder sb = new StringBuilder(64);
-            GetClassName(hwnd, sb, 64);
-            return sb.ToString() == "#32770";
-        } catch { return false; }
-    }
-
-    public static void ForceDarkDialog(IntPtr hwnd) {
-        try {
-            int trueVal = 1;
-            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref trueVal, sizeof(int));
-            SetWindowTheme(hwnd, "DarkMode_Explorer", null);
-            EnumChildWindows(hwnd, delegate (IntPtr child, IntPtr param) {
-                SetWindowTheme(child, "DarkMode_Explorer", null);
-                return true;
-            }, IntPtr.Zero);
-        } catch { }
-    }
-
-    [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IShellItem {
-        void BindToHandler();
-        void GetParent();
-        void GetDisplayName([In] uint sigdnName, [Out, MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
-        void GetAttributes();
-        void Compare();
-    }
-
-    [ComImport, Guid("42f85136-db7e-439c-85f1-e4075d135fc8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IFileOpenDialog {
-        [PreserveSig] int Show([In] IntPtr parent);
-        void SetFileTypes();
-        void SetFileTypeIndex();
-        void GetFileTypeIndex();
-        void Advise();
-        void Unadvise();
-        void SetOptions([In] uint fos);
-        void GetOptions([Out] out uint fos);
-        void SetDefaultFolder();
-        void SetFolder();
-        void GetFolder();
-        void GetCurrentSelection();
-        void SetFileName();
-        void GetFileName();
-        void SetTitle([In, MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
-        void SetOkButtonLabel();
-        void SetFileNameLabel();
-        void GetResult([Out, MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
-        void AddPlace();
-        void SetDefaultExtension();
-        void Close();
-        void SetClientGuid();
-        void ClearClientData();
-        void SetFilter();
-        void GetResults();
-        void GetSelectedItems();
-    }
-
-    [ComImport, Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
-    private class FileOpenDialog { }
-
-    [DllImport("kernel32.dll")]
-    public static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr min, IntPtr max);
-
-    [DllImport("psapi.dll")]
-    public static extern int EmptyWorkingSet(IntPtr hwProc);
-
-    public static void FlushMemory() {
-        try {
-            GC.Collect(2, GCCollectionMode.Forced, true, true);
-            GC.WaitForPendingFinalizers();
-            GC.Collect(2, GCCollectionMode.Forced, true, true);
-            SetProcessWorkingSetSize(System.Diagnostics.Process.GetCurrentProcess().Handle, (IntPtr)(-1), (IntPtr)(-1));
-            EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle);
-        } catch { }
-    }
-
-    public static string PickFolder(IntPtr parent, string title) {
-        try {
-            IFileOpenDialog dialog = (IFileOpenDialog)new FileOpenDialog();
-            uint options;
-            dialog.GetOptions(out options);
-            dialog.SetOptions(options | 0x20);
-            dialog.SetTitle(title);
-            
-            if (dialog.Show(parent) == 0) {
-                IShellItem item;
-                dialog.GetResult(out item);
-                string path;
-                item.GetDisplayName(0x80058000, out path);
-                return path;
-            }
-        } catch { }
-        return null;
-    }
-}
-'@
-            $nativeDir = Split-Path -Parent $script:nativeDllPath
-            if (-not (Test-Path -LiteralPath $nativeDir)) {
-                New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
-            }
-            Add-Type -TypeDefinition $nativeHelperCode `
-                     -ReferencedAssemblies 'System.Drawing', 'PresentationCore', 'WindowsBase' `
-                     -OutputAssembly $script:nativeDllPath `
-                     -OutputType Library `
-                     -IgnoreWarnings | Out-Null
-            Write-NativeLoadLog "Runtime compile fallback SUCCEEDED, cached at $script:nativeDllPath"
-        }
-        catch {
-            Write-NativeLoadLog "Runtime compile fallback FAILED: $($_.Exception.Message)"
-        }
-    }
-}
-
-
-
-
-# Dynamically detect the installed executable's version; fallback to script version
-$script:appVersion = [Version]'1.0.196'
+# Dynamically detect executable version
+$script:appVersion = [Version]'1.0.200'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -474,7 +119,7 @@ function Set-LockScreenImageIsolated {
     }
 
     if (-not [Environment]::Is64BitProcess) {
-        throw "The lock screen requires 64-bit PowerShell on 64-bit Windows. Run the script with 64-bit powershell.exe."
+        throw "The lock screen requires 64-bit PowerShell on 64-bit Windows."
     }
 
     $cacheDir = Split-Path -Parent $ImagePath
@@ -892,15 +537,14 @@ if ($AutoApply) {
         $title = Get-CleanImageTitle $targetImage
         $appliedPath = Set-BingImage -Image $targetImage -Resolution $Resolution -Target $Target -Style $Style
         Write-Output "Successfully applied AutoScape wallpaper: $title ($appliedPath)"
-        exit 0
+        [Environment]::Exit(0)
     }
     catch {
         Write-Error "Failed to apply AutoScape wallpaper: $($_.Exception.Message)"
-        exit 1
+        [Environment]::Exit(1)
     }
 }
 
-# Set the application identity before creating any WPF window so Windows groups the taskbar entry under AutoScape, not PowerShell.
 try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") } catch {}
 
 [xml]$xaml = @"
@@ -1267,8 +911,6 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
                         <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
-                
-
             </Grid>
 
             <Grid Grid.Row="1" Margin="0,0,0,24">
@@ -1470,7 +1112,6 @@ function Set-AutoScapeIcon {
         }
     }
 
-    # No external icon required: render a tiny AutoScape-style icon as the WPF fallback.
     try {
         $dv = New-Object System.Windows.Media.DrawingVisual
         $dc = $dv.RenderOpen()
@@ -1675,7 +1316,6 @@ function Open-InWindowModal {
     $dimAnim.EasingFunction = $ease
     $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
     $ModalDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
-
 }
 
 function Close-InWindowModal {
@@ -2261,42 +1901,13 @@ function Update-SpotlightScheduledTaskAsync {
                         New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
                     }
 
-                    $isExe = ($ScriptPath -match '\.exe$')
-
-                    if ($isExe) {
-                        $persistentScriptPath = Join-Path $appDataDir 'BingWallpaper.exe'
-                        if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                            try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
-                        }
-                    
-                        $actionArgs = "-AutoApply -Target `"$Target`""
-                        $action = New-ScheduledTaskAction -Execute $persistentScriptPath -Argument $actionArgs
+                    $persistentExePath = Join-Path $appDataDir 'AutoScape.exe'
+                    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
+                        try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentExePath -Force } catch {}
                     }
-                    else {
-                        $persistentScriptPath = Join-Path $appDataDir 'Bing-Wallpaper-UI.ps1'
-                        if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                            try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentScriptPath -Force } catch {}
-                        }
-
-                        $legacyCmd = Join-Path $appDataDir 'run_spotlight.cmd'
-                        if (Test-Path -LiteralPath $legacyCmd) {
-                            Remove-Item -LiteralPath $legacyCmd -Force -ErrorAction SilentlyContinue
-                        }
-
-                        $vbsPath = Join-Path $appDataDir 'RunHidden.vbs'
-                        $vbsCode = @"
-Set objShell = WScript.CreateObject("WScript.Shell")
-scriptPath = WScript.Arguments(0)
-target = WScript.Arguments(1)
-cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & scriptPath & """ -AutoApply -Target """ & target & """"
-objShell.Run cmd, 0, False
-"@
-                        Set-Content -Path $vbsPath -Value $vbsCode -Encoding ASCII -Force
-
-                        $actionArgs = "//B `"$vbsPath`" `"$persistentScriptPath`" `"$Target`""
-                        $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument $actionArgs
-                    }
-
+                
+                    $actionArgs = "-AutoApply -Target `"$Target`""
+                    $action = New-ScheduledTaskAction -Execute $persistentExePath -Argument $actionArgs
                     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
                     if ($Minutes -eq 0) {
@@ -2638,7 +2249,6 @@ function Show-ModernDialog {
 
     $script:dialogChoice = 'Cancel'
     $btnStyle = $dlg.FindResource('DialogBtn')
-
     $frame = New-Object System.Windows.Threading.DispatcherFrame
 
     $closeWithFade = {
@@ -2878,19 +2488,11 @@ function Start-VerifiedUpdateDownloadAsync {
         return
     }
 
-    # Explicitly determine the AutoScape/BingWallpaper executable location
     $installedExe = $null
-    
     $candidates = @()
-    if ($PSScriptRoot) {
-        $candidates += (Join-Path $PSScriptRoot 'AutoScape.exe')
-        $candidates += (Join-Path $PSScriptRoot 'BingWallpaper.exe')
-    }
+    if ($PSScriptRoot) { $candidates += (Join-Path $PSScriptRoot 'AutoScape.exe') }
     $candidates += (Join-Path (Get-Location).Path 'AutoScape.exe')
-    $candidates += (Join-Path (Get-Location).Path 'BingWallpaper.exe')
-    $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\BingWallpaper.exe')
     $candidates += (Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScape.exe')
-    $candidates += (Join-Path $env:PROGRAMFILES 'AutoScape\AutoScape.exe')
 
     foreach ($c in $candidates) {
         if ($c -and (Test-Path -LiteralPath $c -PathType Leaf)) {
@@ -2972,12 +2574,7 @@ function Start-VerifiedUpdateDownloadAsync {
 
     $script:updateDlTimer.Add_Tick({
             param($timerSender, $timerArgs)
-
-            if (-not $script:updateDlContext) {
-                $timerSender.Stop()
-                return
-            }
-
+            if (-not $script:updateDlContext) { $timerSender.Stop(); return }
             if (-not $script:updateDlContext.AsyncOp.IsCompleted) { return }
 
             $timerSender.Stop()
@@ -3011,9 +2608,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 try {
-    # Give the parent application window time to exit cleanly
     Start-Sleep -Seconds 1
-
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     while ([DateTime]::UtcNow -lt $deadline) {
         $running = $false
@@ -3045,10 +2640,7 @@ try {
         }
     }
 
-    if (-not $done) {
-        throw "Could not replace $InstalledExe. $lastError"
-    }
-
+    if (-not $done) { throw "Could not replace $InstalledExe. $lastError" }
     if (Test-Path -LiteralPath $InstalledExe) {
         Start-Process -FilePath $InstalledExe -WorkingDirectory $WorkingDirectory -ErrorAction Stop | Out-Null
     }
@@ -3072,7 +2664,6 @@ finally {
 '@
 
                 Set-Content -LiteralPath $updaterPath -Value $updaterScript -Encoding UTF8 -ErrorAction Stop
-
                 $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
                 function Quote-UpdaterArgument([string]$Value) {
@@ -3090,14 +2681,7 @@ finally {
                     ('-WorkingDirectory ' + (Quote-UpdaterArgument $installDir))
                 ) -join ' '
 
-                $startParams = @{
-                    FilePath     = $powershellExe
-                    ArgumentList = $updaterArgumentLine
-                    WindowStyle  = 'Hidden'
-                    ErrorAction  = 'Stop'
-                }
-
-                Start-Process @startParams | Out-Null
+                Start-Process -FilePath $powershellExe -ArgumentList $updaterArgumentLine -WindowStyle Hidden -ErrorAction Stop | Out-Null
             
                 [System.Windows.Application]::Current.Shutdown()
                 [Environment]::Exit(0)
@@ -3255,7 +2839,6 @@ function Render-GalleryGrid {
                 if ($evtSender -ne $script:selectedCard) {
                     $evtSender.Background = $cardHoverBg
                 }
-
                 $grid = $evtSender.Child
                 if ($grid -and $grid.Children.Count -gt 1) {
                     $grid.Children[1].Opacity = 1
@@ -3270,7 +2853,6 @@ function Render-GalleryGrid {
                 else {
                     Set-CardAccent $evtSender $evtSender.Resources['ImageAccentBrush']
                 }
-
                 $grid = $evtSender.Child
                 if ($grid -and $grid.Children.Count -gt 1) {
                     $grid.Children[1].Opacity = 0
@@ -3295,7 +2877,6 @@ function Render-GalleryGrid {
         $imageControl = New-Object System.Windows.Controls.Image
         $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
         $imgBorder.Child = $imageControl
-
         $stack.Children.Add($imgBorder)
 
         try {
@@ -3313,7 +2894,6 @@ function Render-GalleryGrid {
                 [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::LowQuality)
                 $imageControl.Source = $bitmap
                 $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
-
                 [void]$script:galleryImageControls.Add($imageControl)
             }
         }
@@ -3449,11 +3029,6 @@ function Load-Gallery {
     $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
 
-    # Always start from a clean slate: no gallery-metadata cache file is read or written
-    # anymore, and any previously downloaded thumbnails are purged so every launch and
-    # every refresh re-downloads everything fresh from Bing. $thumbCacheDir is still used
-    # as scratch space to hold the just-downloaded bytes (WPF's Image control needs a
-    # file/URI source), not as a persistent cache.
     if (Test-Path -LiteralPath $thumbCacheDir) {
         try { Remove-Item -LiteralPath $thumbCacheDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}
     }
@@ -3476,8 +3051,8 @@ function Load-Gallery {
             param([string]$Region, [string]$CacheDir, [string]$NativeDllPath)
             try {
                 if (-not ('BingWallpaper.FastDownloader' -as [type]) -and (Test-Path -LiteralPath $NativeDllPath)) {
-    try { Add-Type -Path $NativeDllPath } catch {}
-}
+                    try { Add-Type -Path $NativeDllPath } catch {}
+                }
 
                 $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
                 $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
@@ -3863,7 +3438,6 @@ if ($detectedItem) {
     $RegionBox.SelectedItem = $detectedItem 
 }
 
-# Attach selection handler and trigger Load-Gallery only AFTER window renders
 $window.Add_ContentRendered({
     $RegionBox.Add_SelectionChanged({ Load-Gallery })
     Load-Gallery
@@ -3879,8 +3453,6 @@ $RefreshBtn.Add_Click({
     $RefreshBtn.IsEnabled = $false
     Start-RefreshAnimation
 })
-
-
 
 $window.Add_SizeChanged({ Update-GalleryViewportHeight })
 $GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
@@ -3934,11 +3506,6 @@ function Show-UserGuideDialog {
         $screenWidth = $window.ActualWidth
         $screenHeight = $window.ActualHeight
     }
-    # The dialog must never be forced bigger than the space actually available (window,
-    # or screen if the window itself is small/not maximized) - a fixed floor here is what
-    # was causing content to render off the visible window on small monitors. Leave a
-    # small margin (48px) so the dialog doesn't touch the window edges, and scale the
-    # preferred size with the available space instead of a flat pixel minimum.
     $maxModalWidth = [Math]::Max(320, [int]$screenWidth - 48)
     $maxModalHeight = [Math]::Max(320, [int]$screenHeight - 48)
     $modalWidth = [Math]::Min($maxModalWidth, [Math]::Max(700, [int]($screenWidth * 0.72)))
@@ -4076,17 +3643,14 @@ function Show-UserGuideDialog {
                 </StackPanel>
             </Grid>
 
-            <!-- Two-Column Body (scrolls instead of clipping if the dialog is ever
-                 too small to fit everything at once) -->
             <ScrollViewer Grid.Row="1" Margin="0,0,0,18" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <Grid>
-                                <Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.35*" MinWidth="260" MaxWidth="380"/>
                     <ColumnDefinition Width="24"/>
                     <ColumnDefinition Width="2*" MinWidth="320"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Column -->
                 <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -4094,14 +3658,6 @@ function Show-UserGuideDialog {
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <!-- Shadow-only layer: WPF rasterizes anything under an Effect
-                             (like DropShadowEffect) into an offscreen bitmap that isn't
-                             DPI-aware, which is why the title/date text under the image
-                             was blurry even after the image itself was fixed - the whole
-                             card, image AND text, was being drawn through the shadow's
-                             low-res render pass. Keeping the shadow on its own effect-only
-                             layer behind the real (effect-free) card keeps the content
-                             crisp at any DPI. -->
                         <Border Name="GuidePreviewShadow" Background="#212121" CornerRadius="12" BorderThickness="0" IsHitTestVisible="False">
                             <Border.Effect>
                                 <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.3" Direction="270"/>
@@ -4136,7 +3692,6 @@ function Show-UserGuideDialog {
                     </Border>
                 </Grid>
 
-                <!-- Right Column -->
                 <Border Grid.Column="2" Name="GuideFeaturesPanel" Background="#212121" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="12" Padding="20,18" VerticalAlignment="Top">
                     <StackPanel>
                         <TextBlock Text="Essential Features" FontSize="18" FontWeight="Bold" Foreground="#0078D4" Margin="0,0,0,16"/>
@@ -4229,10 +3784,8 @@ function Show-UserGuideDialog {
             </Grid>
             </ScrollViewer>
 
-            <!-- Footer -->
             <Grid Grid.Row="2" Margin="0,12,0,0">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- GitHub button: self-contained so the dynamically created modal does not depend on homepage resources -->
                     <Button Name="GuideGithubRepoBtn"
                             Width="38" Height="38"
                             HorizontalAlignment="Center"
@@ -4285,8 +3838,6 @@ function Show-UserGuideDialog {
     $guideRoot = $dlg.FindName('DialogRoot')
     if ($guideRoot) { $guideRoot.Opacity = 1.0 }
 
-    # The GitHub button belongs to this dynamically created guide dialog.
-    # It is found only after XAML loading succeeds, so it cannot interfere with modal creation.
     $guideGithubRepoBtn = $dlg.FindName('GuideGithubRepoBtn')
     if ($guideGithubRepoBtn) {
         $guideGithubRepoBtn.Add_Click({
@@ -4303,13 +3854,6 @@ function Show-UserGuideDialog {
             $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
             $bmp.BeginInit()
             $bmp.UriSource = New-Object System.Uri($thumbPath)
-            # No DecodePixelWidth cap here on purpose: this is a single one-off hero image
-            # (not a scrolling grid of many), so the decode cost is negligible. A fixed
-            # pixel cap like the old "380" ignores monitor DPI scaling - on any display
-            # above 100% scaling that decodes fewer real pixels than the screen needs,
-            # which is why the image looked blurry while the vector text/icons next to it
-            # stayed sharp. Decoding at the source's native resolution (already ~1920px
-            # wide from Bing) lets WPF downscale cleanly for any DPI.
             $bmp.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
             $bmp.EndInit()
             $bmp.Freeze()
@@ -4369,8 +3913,6 @@ function Show-UserGuideDialog {
     $revealRect = $dlg.FindName('GuideRevealRect')
     $revealBorder = $dlg.FindName('GuideRevealBorder')
 
-    # Keep the Default Behavior card bottom aligned with the Essential Features panel
-    # while preserving natural sizing when its text changes or wraps.
     $syncGuideColumns = {
         try {
             if (-not $defaultCard -or -not $featuresPanel -or -not $card) { return }
@@ -4384,9 +3926,7 @@ function Show-UserGuideDialog {
         catch {}
     }
 
-    if ($featuresPanel) {
-        $featuresPanel.Add_SizeChanged({ & $syncGuideColumns })
-    }
+    if ($featuresPanel) { $featuresPanel.Add_SizeChanged({ & $syncGuideColumns }) }
     if ($card) {
         $card.Add_SizeChanged({ & $syncGuideColumns })
         $dlg.Add_Loaded({
@@ -4575,9 +4115,16 @@ $script:memTrimTimer.Start()
         $e.Handled = $true
     })
 
-
-
-[System.Console]::WriteLine("Window Ready at: $($script:startStopwatch.ElapsedMilliseconds)ms")
 Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
+
+
+
+
+
+
+
+
