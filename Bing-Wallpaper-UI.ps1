@@ -342,6 +342,7 @@ namespace BingWallpaper
             -Message "Native helper compilation failed. AutoScape will not work correctly.`n`n$($_.Exception.Message)`n`nThis is often caused by antivirus/EDR software blocking runtime C# compilation (csc.exe). Check that AutoScape / csc.exe isn't being blocked, then restart the app." `
             -Title "AutoScape: native compile failed"
     }
+    Write-TimingLog "SCRIPT: native C# helpers compiled ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 }
 
 # Dynamically detect executable version
