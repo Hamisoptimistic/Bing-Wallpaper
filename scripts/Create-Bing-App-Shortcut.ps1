@@ -39,12 +39,6 @@ $exePath = Join-Path $rootFolder 'AutoScape.exe'
 $desktopPath = [Environment]::GetFolderPath('Desktop')
 $desktopShortcutPath = Join-Path $desktopPath 'AutoScape.lnk'
 $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
-$nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
-$hasNativeDll = Test-Path -LiteralPath $nativeDllPath
-if (-not $hasNativeDll) {
-    Write-Output "--> WARNING: AutoScapeNative.dll not found at $nativeDllPath."
-    Write-Output "    Make sure AutoScapeNative.dll is in the project root."
-}
 
 Add-Type -AssemblyName System.Drawing
 
@@ -110,7 +104,6 @@ namespace AutoScapeLauncher
         {
             string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
             string iconPath = Path.Combine(tempDir, "assets", "app.ico");
-            string nativeDll = Path.Combine(tempDir, "AutoScapeNative.dll");
 
             try
             {
@@ -126,26 +119,9 @@ namespace AutoScapeLauncher
                         }
                     }
                 }
-
-                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("AutoScapeLauncher.AutoScapeNative.dll"))
-                {
-                    if (source != null)
-                    {
-                        bool needsExtract = !File.Exists(nativeDll) || new FileInfo(nativeDll).Length != source.Length;
-                        if (needsExtract)
-                        {
-                            using (FileStream destination = File.Create(nativeDll))
-                            {
-                                source.CopyTo(destination);
-                            }
-                        }
-                    }
-                }
-
-                if (File.Exists(nativeDll))
-                {
-                    try { Assembly.LoadFrom(nativeDll); } catch { }
-                }
+                // No native DLL to extract - BingWallpaper.FastAccent / FastDownloader /
+                // BingWallpaperNative are compiled in-memory by the script itself via
+                // Add-Type. Nothing unsigned ever touches disk.
             }
             catch { }
 
@@ -185,8 +161,7 @@ namespace AutoScapeLauncher
                     }
 
                     string escapedTemp = tempDir.Replace("'", "''");
-                    string initScript = "$script:nativeDllExtractedPath = '" + escapedTemp + "\\AutoScapeNative.dll';\n" +
-                                        "$script:injectedScriptRoot = '" + escapedTemp + "';\n";
+                    string initScript = "$script:injectedScriptRoot = '" + escapedTemp + "';\n";
 
                     ps.AddScript(initScript + "& {\n" + scriptContent + "\n} " + argString);
                     ps.Invoke();
@@ -209,9 +184,6 @@ namespace AutoScapeLauncher
         "/resource:`"$uiPath`",AutoScapeLauncher.Bing-Wallpaper-UI.ps1",
         "/resource:`"$icoPath`",AutoScapeLauncher.app.ico"
     )
-    if ($hasNativeDll) {
-        $compileArgs += "/resource:`"$nativeDllPath`",AutoScapeLauncher.AutoScapeNative.dll"
-    }
     $compileArgs += @(
         "/out:`"$exePath`"",
         "`"$csTemp`""

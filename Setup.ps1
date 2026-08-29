@@ -32,7 +32,6 @@ if (-not $icoPath) {
 }
 
 $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
-$nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
 
 if (-not (Test-Path -LiteralPath $uiPath)) { throw "Bing-Wallpaper-UI.ps1 not found at $uiPath" }
 

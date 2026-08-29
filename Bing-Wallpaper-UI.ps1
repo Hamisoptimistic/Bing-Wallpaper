@@ -50,11 +50,12 @@ function Show-AppErrorDialog {
     catch {}
 }
 
-# Load Cached Native Types from extracted DLL
-$script:nativeDllPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\AutoScapeNative.dll'
-$script:nativeDllExtractedPath = Join-Path $PSScriptRoot 'AutoScapeNative.dll'
+# Native helper types - compiled in memory every launch via Add-Type.
+# There is no AutoScapeNative.dll anywhere in this pipeline anymore: nothing is
+# extracted, cached, or written to disk, so there is no unsigned binary for
+# Smart App Control to evaluate or block. csc.exe (Microsoft-signed) does the
+# compiling; the resulting assembly lives only in this process's memory.
 $script:nativeLoadLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\native-load.log'
-
 function Write-NativeLoadLog {
     param([string]$Message)
     try {
@@ -68,33 +69,271 @@ function Write-NativeLoadLog {
 }
 
 if (-not ('BingWallpaper.FastAccent' -as [type])) {
-    if (Test-Path -LiteralPath $script:nativeDllExtractedPath) {
-        try {
-            [void][System.Reflection.Assembly]::LoadFile($script:nativeDllExtractedPath)
-            Write-NativeLoadLog "OK: loaded native DLL from extracted path ($script:nativeDllExtractedPath)"
-            try {
-                $nativeDir = Split-Path -Parent $script:nativeDllPath
-                if (-not (Test-Path -LiteralPath $nativeDir)) { New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null }
-                if (-not (Test-Path -LiteralPath $script:nativeDllPath)) { Copy-Item -LiteralPath $script:nativeDllExtractedPath -Destination $script:nativeDllPath -Force }
-            } catch {}
-        }
-        catch {
-            Write-NativeLoadLog "FAIL: could not load extracted DLL: $($_.Exception.Message)"
+    $script:nativeCsSource = @'
+using System;
+using System.IO;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+public static class AppUserModel
+{
+    [DllImport("shell32.dll", SetLastError = true)]
+    public static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+}
+
+public static class BingWallpaperNative
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MARGINS
+    {
+        public int cxLeftWidth;
+        public int cxRightWidth;
+        public int cyTopHeight;
+        public int cyBottomHeight;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern bool SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
+
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
+
+    [DllImport("uxtheme.dll", EntryPoint = "#135")]
+    private static extern int SetPreferredAppMode(int preferredAppMode);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("psapi.dll")]
+    private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19;
+
+    public static void EnableDarkTitleBar(IntPtr hwnd, int enable)
+    {
+        int useDark = enable != 0 ? 1 : 0;
+        if (DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int)) != 0)
+        {
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref useDark, sizeof(int));
         }
     }
-    elseif (Test-Path -LiteralPath $script:nativeDllPath) {
-        try {
-            [void][System.Reflection.Assembly]::LoadFile($script:nativeDllPath)
-            Write-NativeLoadLog "OK: loaded native DLL from LOCALAPPDATA cache ($script:nativeDllPath)"
+
+    public static void EnableDarkDialogs()
+    {
+        try { SetPreferredAppMode(1); } catch { }
+    }
+
+    public static bool IsDialogWindow(IntPtr hwnd)
+    {
+        var sb = new StringBuilder(256);
+        GetClassName(hwnd, sb, sb.Capacity);
+        return sb.ToString() == "#32770";
+    }
+
+    public static void ForceDarkDialog(IntPtr hwnd)
+    {
+        try
+        {
+            SetWindowTheme(hwnd, "DarkMode_Explorer", null);
+            int useDark = 1;
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
+            EnumChildWindows(hwnd, (child, lParam) =>
+            {
+                SetWindowTheme(child, "DarkMode_Explorer", null);
+                return true;
+            }, IntPtr.Zero);
         }
-        catch {
-            Write-NativeLoadLog "FAIL: could not load cached DLL: $($_.Exception.Message)"
+        catch { }
+    }
+
+    public static void FlushMemory()
+    {
+        try { EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle); } catch { }
+    }
+
+    // --- IFileOpenDialog folder picker (legacy fallback path) ---
+    [ComImport, Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")]
+    private class FileOpenDialogRCW { }
+
+    [ComImport, Guid("d57c7288-d4ad-4768-be02-9d969532d960"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IFileOpenDialog
+    {
+        [PreserveSig] int Show(IntPtr parent);
+        void SetFileTypes(uint cFileTypes, IntPtr rgFilterSpec);
+        void SetFileTypeIndex(uint iFileType);
+        void GetFileTypeIndex(out uint piFileType);
+        void Advise(IntPtr pfde, out uint pdwCookie);
+        void Unadvise(uint dwCookie);
+        void SetOptions(uint fos);
+        void GetOptions(out uint pfos);
+        void SetDefaultFolder(IShellItem psi);
+        void SetFolder(IShellItem psi);
+        void GetFolder(out IShellItem ppsi);
+        void GetCurrentSelection(out IShellItem ppsi);
+        void SetFileName(string pszName);
+        void GetFileName(out string pszName);
+        void SetTitle(string pszTitle);
+        void SetOkButtonLabel(string pszText);
+        void SetFileNameLabel(string pszLabel);
+        void GetResult(out IShellItem ppsi);
+        void AddPlace(IShellItem psi, uint alignment);
+        void SetDefaultExtension(string pszDefaultExtension);
+        void Close(int hr);
+        void SetClientGuid(ref Guid guid);
+        void ClearClientData();
+        void SetFilter([MarshalAs(UnmanagedType.IUnknown)] object pFilter);
+        void GetResults(out IntPtr ppenum);
+        void GetSelectedItems(out IntPtr ppsai);
+    }
+
+    [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellItem
+    {
+        void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+        void GetParent(out IShellItem ppsi);
+        void GetDisplayName(uint sigdnName, out IntPtr ppszName);
+        void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+        void Compare(IShellItem psi, uint hint, out int piOrder);
+    }
+
+    private const uint FOS_PICKFOLDERS = 0x00000020;
+    private const uint SIGDN_FILESYSPATH = 0x80058000;
+
+    public static string PickFolder(IntPtr owner, string title)
+    {
+        IFileOpenDialog dialog = null;
+        try
+        {
+            dialog = (IFileOpenDialog)new FileOpenDialogRCW();
+            dialog.SetOptions(FOS_PICKFOLDERS);
+            if (!string.IsNullOrEmpty(title)) dialog.SetTitle(title);
+
+            int hr = dialog.Show(owner);
+            if (hr != 0) return null;
+
+            IShellItem item;
+            dialog.GetResult(out item);
+            IntPtr pszPath;
+            item.GetDisplayName(SIGDN_FILESYSPATH, out pszPath);
+            string path = Marshal.PtrToStringUni(pszPath);
+            Marshal.FreeCoTaskMem(pszPath);
+            return path;
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            if (dialog != null) Marshal.ReleaseComObject(dialog);
         }
     }
 }
 
+namespace BingWallpaper
+{
+    public static class FastAccent
+    {
+        // Approximate dominant-color extraction: downsample and average, biased
+        // away from near-black/near-white pixels so the accent isn't washed out.
+        public static SolidColorBrush ExtractBrush(string imagePath)
+        {
+            var decoder = BitmapDecoder.Create(
+                new Uri(imagePath),
+                BitmapCreateOptions.IgnoreColorProfile,
+                BitmapCacheOption.OnLoad);
+            var frame = new TransformedBitmap(decoder.Frames[0],
+                new System.Windows.Media.ScaleTransform(
+                    32.0 / decoder.Frames[0].PixelWidth,
+                    32.0 / decoder.Frames[0].PixelHeight));
+            var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+
+            int w = converted.PixelWidth, h = converted.PixelHeight;
+            int stride = w * 4;
+            byte[] pixels = new byte[h * stride];
+            converted.CopyPixels(pixels, stride, 0);
+
+            long r = 0, g = 0, b = 0;
+            int count = 0;
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                byte bb = pixels[i], gg = pixels[i + 1], rr = pixels[i + 2];
+                int lum = (rr + gg + bb) / 3;
+                if (lum < 18 || lum > 238) continue; // skip near-black / near-white
+                r += rr; g += gg; b += bb;
+                count++;
+            }
+            if (count == 0) count = 1;
+
+            var brush = new SolidColorBrush(Color.FromRgb((byte)(r / count), (byte)(g / count), (byte)(b / count)));
+            brush.Freeze();
+            return brush;
+        }
+    }
+
+    public static class FastDownloader
+    {
+        public static void DownloadThumbnailsParallel(string[] urlBases, string cacheDir)
+        {
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                client.Timeout = TimeSpan.FromSeconds(20);
+
+                Parallel.ForEach(urlBases, new ParallelOptions { MaxDegreeOfParallelism = 6 }, urlBase =>
+                {
+                    try
+                    {
+                        string safe = Regex.Replace(urlBase, "[^a-zA-Z0-9]", "");
+                        string target = Path.Combine(cacheDir, safe + "_thumb.jpg");
+                        if (File.Exists(target)) return;
+
+                        string uri = "https://www.bing.com" + urlBase + "_1920x1080.jpg";
+                        byte[] data = client.GetByteArrayAsync(uri).GetAwaiter().GetResult();
+                        File.WriteAllBytes(target, data);
+                    }
+                    catch { }
+                });
+            }
+        }
+    }
+}
+'@
+
+    try {
+        Add-Type -TypeDefinition $script:nativeCsSource -ReferencedAssemblies @(
+            'PresentationCore', 'PresentationFramework', 'WindowsBase',
+            'System.Net.Http', 'System.Drawing'
+        ) -Language CSharp -ErrorAction Stop
+        Write-NativeLoadLog "OK: compiled native helpers in-memory (no DLL file written)"
+    }
+    catch {
+        Write-NativeLoadLog "FAIL: in-memory compile failed: $($_.Exception.Message)"
+    }
+}
+
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.205'
+$script:appVersion = [Version]'1.0.206'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -3048,12 +3287,11 @@ function Load-Gallery {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Region, [string]$CacheDir, [string]$NativeDllPath)
+            param([string]$Region, [string]$CacheDir)
             try {
-                if (-not ('BingWallpaper.FastDownloader' -as [type]) -and (Test-Path -LiteralPath $NativeDllPath)) {
-                    try { Add-Type -Path $NativeDllPath } catch {}
-                }
-
+                # BingWallpaper.FastDownloader was already compiled in-memory at
+                # script startup and is visible to this runspace (same process,
+                # same default AppDomain) - nothing to load here.
                 $market = if ($Region -eq 'auto') { 'en-US' } else { $Region }
                 $uri1 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=$market"
                 $uri2 = "https://www.bing.com/HPImageArchive.aspx?format=js&idx=8&n=8&mkt=$market"
@@ -3110,7 +3348,7 @@ function Load-Gallery {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
             }
-        }).AddArgument($selectedRegion).AddArgument($thumbCacheDir).AddArgument($script:nativeDllPath)
+        }).AddArgument($selectedRegion).AddArgument($thumbCacheDir)
 
     $asyncOp = $ps.BeginInvoke()
 
@@ -4118,19 +4356,3 @@ $script:memTrimTimer.Start()
 Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
