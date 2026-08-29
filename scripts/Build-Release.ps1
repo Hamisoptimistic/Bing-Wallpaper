@@ -207,41 +207,74 @@ namespace AutoScapeLauncher
             string scriptPath = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
             string nativeDllPath = Path.Combine(tempDir, "AutoScapeNative.dll");
             string iconPath = Path.Combine(tempDir, "assets", "app.ico");
+            string crashLogPath = Path.Combine(tempDir, "launcher_crash.log");
+            string psErrorLogPath = Path.Combine(tempDir, "ps_errors.log");
 
-            ExtractResource("AutoScapeLauncher.Bing-Wallpaper-UI.ps1", scriptPath, true);
-            ExtractResource("AutoScapeLauncher.AutoScapeNative.dll", nativeDllPath, true);
-            ExtractResource("AutoScapeLauncher.app.ico", iconPath, false);
+            try { Directory.CreateDirectory(tempDir); } catch {}
+            try { Directory.CreateDirectory(Path.GetDirectoryName(iconPath)); } catch {}
 
-            if (!File.Exists(scriptPath)) return;
+            try
+            {
+                ExtractResource("AutoScapeLauncher.Bing-Wallpaper-UI.ps1", scriptPath, true);
+                ExtractResource("AutoScapeLauncher.AutoScapeNative.dll", nativeDllPath, true);
+                ExtractResource("AutoScapeLauncher.app.ico", iconPath, false);
+            }
+            catch (Exception ex)
+            {
+                try { File.WriteAllText(crashLogPath, "Extraction Failed:\r\n" + ex.ToString()); } catch {}
+                return;
+            }
+
+            if (!File.Exists(scriptPath)) 
+            {
+                try { File.WriteAllText(crashLogPath, "Script missing after extraction."); } catch {}
+                return;
+            }
 
             string argString = string.Empty;
-
             if (args != null && args.Length > 0)
             {
                 foreach (string a in args)
                 {
                     string item = a ?? string.Empty;
-
-                    if (item.Contains(" ")) {
-                        item = "\"" + item + "\"";
-                    }
-
+                    if (item.Contains(" ")) item = "\"" + item + "\"";
                     argString += item + " ";
                 }
             }
 
-            using (Runspace rs = RunspaceFactory.CreateRunspace())
+            try
             {
-                rs.ApartmentState = System.Threading.ApartmentState.STA;
-                rs.ThreadOptions = PSThreadOptions.UseCurrentThread;
-                rs.Open();
-
-                using (PowerShell ps = PowerShell.Create())
+                using (Runspace rs = RunspaceFactory.CreateRunspace())
                 {
-                    ps.Runspace = rs;
-                    ps.AddScript("& '" + scriptPath.Replace("'", "''") + "' " + argString);
-                    ps.Invoke();
+                    rs.ApartmentState = System.Threading.ApartmentState.STA;
+                    rs.ThreadOptions = PSThreadOptions.UseCurrentThread;
+                    rs.Open();
+
+                    using (PowerShell ps = PowerShell.Create())
+                    {
+                        ps.Runspace = rs;
+                        ps.AddScript("& '" + scriptPath.Replace("'", "''") + "' " + argString);
+                        ps.Invoke();
+
+                        if (ps.Streams.Error.Count > 0)
+                        {
+                            string errText = "PowerShell Streams.Error:\r\n";
+                            foreach (var err in ps.Streams.Error)
+                            {
+                                errText += err.Exception.ToString() + "\r\n";
+                            }
+                            try { File.WriteAllText(psErrorLogPath, errText); } catch {}
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                try 
+                { 
+                    File.WriteAllText(crashLogPath, "Fatal Launcher Exception:\r\n" + ex.ToString()); 
+                } 
+                catch { }
             }
         }
 
@@ -252,23 +285,8 @@ namespace AutoScapeLauncher
                 using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
                 {
                     if (source == null) return;
-
-                    string dir = Path.GetDirectoryName(destinationPath);
-                    if (!string.IsNullOrEmpty(dir)) {
-                        Directory.CreateDirectory(dir);
-                    }
-
                     if (!overwrite && File.Exists(destinationPath)) return;
-
-                    if (File.Exists(destinationPath))
-                    {
-                        try {
-                            File.Delete(destinationPath);
-                        } catch {
-                            return;
-                        }
-                    }
-
+                    try { if (File.Exists(destinationPath)) File.Delete(destinationPath); } catch { return; }
                     using (FileStream destination = File.Create(destinationPath))
                     {
                         source.CopyTo(destination);
