@@ -3,7 +3,7 @@
     Creates Desktop & Start Menu shortcuts for AutoScape WITHOUT compiling a
     custom .exe host. This avoids Smart App Control / SmartScreen blocking
     unsigned unknown binaries, because the process actually launched is
-    wscript.exe -> powershell.exe, both Microsoft-signed and trusted.
+    powershell.exe, which is Microsoft-signed and trusted.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -32,11 +32,9 @@ if (-not $icoPath) {
 }
 
 $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
-$vbsPath = Join-Path $rootFolder 'Launch-AutoScape.vbs'
 $nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
 
 if (-not (Test-Path -LiteralPath $uiPath)) { throw "Bing-Wallpaper-UI.ps1 not found at $uiPath" }
-if (-not (Test-Path -LiteralPath $vbsPath)) { throw "Launch-AutoScape.vbs not found at $vbsPath (copy it next to Bing-Wallpaper-UI.ps1)" }
 
 $desktopPath = [Environment]::GetFolderPath('Desktop')
 $desktopShortcutPath = Join-Path $desktopPath 'AutoScape.lnk'
@@ -53,16 +51,18 @@ function Create-Shortcut($targetPath, $outLnkPath, $iconLocation, $workingDir, $
     $sc.Save()
 }
 
-# Clean up old exe-based shortcuts/files if present
+# Clean up old shortcuts if present
 $oldDesktopLnk = Join-Path $desktopPath 'Bing Wallpaper.lnk'
 if (Test-Path $oldDesktopLnk) { Remove-Item $oldDesktopLnk -Force -ErrorAction SilentlyContinue }
 
-# wscript.exe is the Microsoft-signed, trusted host that runs the .vbs,
-# which in turn silently launches powershell.exe (also trusted) with the UI script.
-$wscriptExe = Join-Path $env:WINDIR 'System32\wscript.exe'
+# powershell.exe is Microsoft-signed and trusted. -WindowStyle Hidden suppresses
+# the console window, so no VBScript wrapper is needed (VBScript is being
+# deprecated/disabled by default on newer Windows builds).
+$powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$psArgString = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$uiPath`""
 
 if (Test-Path $desktopPath) {
-    Create-Shortcut -targetPath $wscriptExe -outLnkPath $desktopShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString "`"$vbsPath`""
+    Create-Shortcut -targetPath $powershellExe -outLnkPath $desktopShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString $psArgString
     Write-Output "    Created Desktop shortcut: $desktopShortcutPath"
 }
 
@@ -72,11 +72,11 @@ if ($startMenuPrograms -and (Test-Path $startMenuPrograms)) {
     if (Test-Path $oldStartMenuLnk) { Remove-Item $oldStartMenuLnk -Force -ErrorAction SilentlyContinue }
 
     $startMenuShortcutPath = Join-Path $startMenuPrograms 'AutoScape.lnk'
-    Create-Shortcut -targetPath $wscriptExe -outLnkPath $startMenuShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString "`"$vbsPath`""
+    Create-Shortcut -targetPath $powershellExe -outLnkPath $startMenuShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString $psArgString
     Write-Output "    Created Start Menu shortcut: $startMenuShortcutPath"
 }
 
 Write-Output ""
 Write-Output "========================================================="
-Write-Output " Setup Complete! (No compiled exe - launches via wscript.exe -> powershell.exe)"
+Write-Output " Setup Complete! (No compiled exe, no VBScript - launches via powershell.exe directly)"
 Write-Output "========================================================="
