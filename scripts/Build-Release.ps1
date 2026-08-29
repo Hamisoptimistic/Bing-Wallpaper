@@ -1,73 +1,326 @@
-[CmdletBinding()]
-param()
-
 $ErrorActionPreference = 'Stop'
 
-# 1. Determine Version
-$commitCount = (git rev-list --count HEAD).Trim()
-if (-not ($commitCount -match '^\d+$')) { $commitCount = '1' }
-$ver = "1.0.$commitCount"
-Write-Host "Generated Auto-Version: $ver"
-
-# 2. Extract Native C# Code from Bing-Wallpaper-UI.ps1
-$uiScriptPath = ".\Bing-Wallpaper-UI.ps1"
-$uiContent = Get-Content -LiteralPath $uiScriptPath -Raw
-
-$nativePattern = '(?s)\$nativeHelperCode\s*=\s*@''\r?\n(.*?)\r?\n''@'
-if ($uiContent -match $nativePattern) {
-    $nativeSource = $Matches[1]
-} else {
-    throw "Could not extract `$nativeHelperCode block from $uiScriptPath"
+function Write-Step {
+    param([string]$Message)
+    Write-Host "==> $Message"
 }
 
-# 3. Pre-compile AutoScapeNative.dll on the CI runner as a REAL file sitting next
-#    to the script - not a Base64 blob pasted into the .ps1. Embedding a large
-#    Base64-encoded assembly literal directly in PowerShell script text is one of
-#    the heaviest triggers for AMSI/Defender's static-analysis heuristics, and it
-#    materially slows down every launch on a machine that hasn't seen the script
-#    before (i.e. every end user's machine). Create-Bing-App-Shortcut.ps1 embeds
-#    this DLL as its own resource inside AutoScape.exe, alongside the script and
-#    the icon, and extracts it back to a real .dll file at runtime.
-$nativeDllOutPath = Join-Path (Get-Location) "AutoScapeNative.dll"
-if (Test-Path -LiteralPath $nativeDllOutPath) {
-    Remove-Item -LiteralPath $nativeDllOutPath -Force -ErrorAction SilentlyContinue
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+} catch {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 }
 
-$compileParams = @{
-    TypeDefinition       = $nativeSource
-    ReferencedAssemblies = @('System.Drawing', 'PresentationCore', 'WindowsBase')
-    OutputAssembly       = $nativeDllOutPath
-    OutputType           = 'Library'
-    IgnoreWarnings       = $true
-}
-Add-Type @compileParams | Out-Null
-
-if (-not (Test-Path -LiteralPath $nativeDllOutPath)) {
-    throw "AutoScapeNative.dll failed to compile"
-}
-Write-Host "Compiled native helper DLL: $nativeDllOutPath"
-
-# 4. Inject Version into Bing-Wallpaper-UI.ps1. No Base64 payload injection
-#    anymore - the native DLL now travels as a real file / embedded resource.
-$uiContent = $uiContent -replace '\$script:appVersion\s*=\s*\[Version\][''"][^''"]+[''"]', "`$script:appVersion = [Version]'$ver'"
-Set-Content -LiteralPath $uiScriptPath -Value $uiContent -Encoding UTF8
-
-# 5. Compile Executable (embeds Bing-Wallpaper-UI.ps1, AutoScapeNative.dll and
-#    the icon as resources inside AutoScape.exe)
-powershell.exe -ExecutionPolicy Bypass -File .\scripts\Create-Bing-App-Shortcut.ps1
-
-if (-not (Test-Path .\AutoScape.exe)) {
-    throw "AutoScape.exe failed to compile"
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) {
+    $scriptDir = (Get-Location).Path
 }
 
-# 6. Generate Checksum
-$hash = (Get-FileHash -LiteralPath .\AutoScape.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-Set-Content -LiteralPath .\AutoScape.exe.sha256 -Value "$hash  AutoScape.exe" -Encoding ASCII
+$rootFolder = Split-Path -Parent $scriptDir
 
-# 7. Clean up the loose build-time DLL now that it's embedded in AutoScape.exe
-Remove-Item -LiteralPath $nativeDllOutPath -Force -ErrorAction SilentlyContinue
+# Fallback if someone runs the script from repo root instead of scripts folder
+if (-not (Test-Path -LiteralPath (Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'))) {
+    $rootFolder = $scriptDir
+}
 
-# Output version to GitHub Environment if running under CI
+$uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
+$exePath = Join-Path $rootFolder 'AutoScape.exe'
+$shaPath = Join-Path $rootFolder 'AutoScape.exe.sha256'
+$nativeDllPath = Join-Path $rootFolder 'AutoScapeNative.dll'
+
+$nativeCsCandidates = @(
+    (Join-Path $rootFolder 'AutoScapeNative.cs'),
+    (Join-Path $rootFolder 'src\AutoScapeNative.cs'),
+    (Join-Path $rootFolder 'scripts\AutoScapeNative.cs')
+)
+
+$nativeCsPath = $nativeCsCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+$iconCandidates = @(
+    (Join-Path $rootFolder 'assets\app.ico'),
+    (Join-Path $rootFolder 'app.ico'),
+    (Join-Path $rootFolder 'assets\bing.ico'),
+    (Join-Path $rootFolder 'bing.ico')
+)
+
+$iconPath = $iconCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+if (-not (Test-Path -LiteralPath $uiPath)) {
+    throw "Cannot find Bing-Wallpaper-UI.ps1 at $uiPath"
+}
+
+Write-Step "Resolving compiler"
+
+$cscCandidates = @(
+    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+)
+
+$csc = $cscCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $csc) {
+    throw 'csc.exe not found.'
+}
+
+$smaPath = [psobject].Assembly.Location
+if (-not (Test-Path -LiteralPath $smaPath)) {
+    $smaPath = "$env:WINDIR\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll"
+}
+
+if (-not (Test-Path -LiteralPath $smaPath)) {
+    throw 'System.Management.Automation.dll not found.'
+}
+
+Write-Step "Generating version"
+
+$appVersion = '1.0.0'
+
+try {
+    Push-Location $rootFolder
+    $commitCount = (git rev-list --count HEAD 2>$null)
+
+    if ($commitCount -and ($commitCount.Trim() -match '^\d+$')) {
+        $appVersion = "1.0.$($commitCount.Trim())"
+    }
+
+    Pop-Location
+} catch {
+    Pop-Location -ErrorAction SilentlyContinue
+}
+
+Write-Host "Generated Auto-Version: $appVersion"
+
+Write-Step "Stamping version into UI script"
+
+$uiRaw = Get-Content -LiteralPath $uiPath -Raw
+$versionPattern = "\`$script:appVersion\s*=\s*\[Version\]'[^']*'"
+
+if ($uiRaw -match $versionPattern) {
+    $replacement = '$script:appVersion = [Version]''' + $appVersion + ''''
+    $uiRaw = $uiRaw -replace $versionPattern, $replacement
+    Set-Content -LiteralPath $uiPath -Value $uiRaw -Encoding UTF8
+}
+
 if ($env:GITHUB_OUTPUT) {
-    "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+    "version=$appVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
+} else {
+    Write-Host "version=$appVersion"
 }
+
+Write-Step "Building AutoScapeNative.dll"
+
+if ($nativeCsPath) {
+    Remove-Item -LiteralPath $nativeDllPath -Force -ErrorAction SilentlyContinue
+
+    $nativeRefs = @()
+
+    foreach ($asmName in @('System.Drawing', 'PresentationCore', 'WindowsBase')) {
+        try {
+            Add-Type -AssemblyName $asmName -ErrorAction Stop
+
+            $loaded = [AppDomain]::CurrentDomain.GetAssemblies() |
+                Where-Object { $_.GetName().Name -eq $asmName } |
+                Select-Object -First 1
+
+            if ($loaded -and $loaded.Location) {
+                $nativeRefs += $loaded.Location
+            }
+        } catch {}
+    }
+
+    $compiledNative = $false
+
+    if ($nativeRefs.Count -ge 3) {
+        $nativeArgs = @(
+            '/nologo',
+            '/target:library',
+            '/optimize+',
+            '/nowarn:CS0618'
+        )
+
+        foreach ($ref in $nativeRefs) {
+            $nativeArgs += "/reference:`"$ref`""
+        }
+
+        $nativeArgs += "/out:`"$nativeDllPath`""
+        $nativeArgs += "`"$nativeCsPath`""
+
+        & $csc @nativeArgs
+
+        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $nativeDllPath)) {
+            $compiledNative = $true
+        }
+    }
+
+    if (-not $compiledNative) {
+        Add-Type -Path $nativeCsPath `
+            -ReferencedAssemblies @('System.Drawing', 'PresentationCore', 'WindowsBase') `
+            -OutputAssembly $nativeDllPath `
+            -OutputType Library `
+            -IgnoreWarnings `
+            -ErrorAction Stop
+    }
+
+    if (-not (Test-Path -LiteralPath $nativeDllPath)) {
+        throw "Failed to compile AutoScapeNative.dll from $nativeCsPath"
+    }
+}
+elseif (-not (Test-Path -LiteralPath $nativeDllPath)) {
+    throw "Cannot find AutoScapeNative.cs or AutoScapeNative.dll. Add AutoScapeNative.cs to the repo root, or commit AutoScapeNative.dll."
+}
+
+Write-Step "Creating launcher source"
+
+$manifestPath = Join-Path $rootFolder 'app.manifest'
+
+$manifestContent = @'
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="AutoScape.App"/>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+      <supportedOS Id="{4a2f28e3-53b9-4441-ba9c-d69d4a4a6e38}"/>
+    </application>
+  </compatibility>
+</assembly>
+'@
+
+Set-Content -LiteralPath $manifestPath -Value $manifestContent -Encoding UTF8
+
+$csTemp = Join-Path $rootFolder 'AutoScapeLauncher_temp.cs'
+
+$launcherCode = @'
+using System;
+using System.IO;
+using System.Reflection;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
+
+namespace AutoScapeLauncher
+{
+    static class Program
+    {
+        [STAThread]
+        static void Main(string[] args)
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "AutoScape");
+            string scriptPath = Path.Combine(tempDir, "Bing-Wallpaper-UI.ps1");
+            string nativeDllPath = Path.Combine(tempDir, "AutoScapeNative.dll");
+            string iconPath = Path.Combine(tempDir, "assets", "app.ico");
+
+            ExtractResource("AutoScapeLauncher.Bing-Wallpaper-UI.ps1", scriptPath, true);
+            ExtractResource("AutoScapeLauncher.AutoScapeNative.dll", nativeDllPath, true);
+            ExtractResource("AutoScapeLauncher.app.ico", iconPath, false);
+
+            if (!File.Exists(scriptPath)) return;
+
+            string argString = string.Empty;
+
+            if (args != null && args.Length > 0)
+            {
+                foreach (string a in args)
+                {
+                    string item = a ?? string.Empty;
+
+                    if (item.Contains(" ")) {
+                        item = "\"" + item + "\"";
+                    }
+
+                    argString += item + " ";
+                }
+            }
+
+            using (Runspace rs = RunspaceFactory.CreateRunspace())
+            {
+                rs.ApartmentState = System.Threading.ApartmentState.STA;
+                rs.ThreadOptions = PSThreadOptions.UseCurrentThread;
+                rs.Open();
+
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = rs;
+                    ps.AddScript("& '" + scriptPath.Replace("'", "''") + "' " + argString);
+                    ps.Invoke();
+                }
+            }
+        }
+
+        private static void ExtractResource(string resourceName, string destinationPath, bool overwrite)
+        {
+            try
+            {
+                using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
+                {
+                    if (source == null) return;
+
+                    string dir = Path.GetDirectoryName(destinationPath);
+                    if (!string.IsNullOrEmpty(dir)) {
+                        Directory.CreateDirectory(dir);
+                    }
+
+                    if (!overwrite && File.Exists(destinationPath)) return;
+
+                    if (File.Exists(destinationPath))
+                    {
+                        try {
+                            File.Delete(destinationPath);
+                        } catch {
+                            return;
+                        }
+                    }
+
+                    using (FileStream destination = File.Create(destinationPath))
+                    {
+                        source.CopyTo(destination);
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+}
+'@
+
+Set-Content -LiteralPath $csTemp -Value $launcherCode -Encoding UTF8
+
+Write-Step "Compiling AutoScape.exe"
+
+Remove-Item -LiteralPath $exePath -Force -ErrorAction SilentlyContinue
+
+$cscArgs = @(
+    '/nologo',
+    '/target:winexe',
+    '/optimize+',
+    '/platform:anycpu',
+    "/reference:`"$smaPath`"",
+    "/win32manifest:`"$manifestPath`"",
+    "/resource:`"$uiPath`",AutoScapeLauncher.Bing-Wallpaper-UI.ps1"
+)
+
+if ($iconPath) {
+    $cscArgs += "/win32icon:`"$iconPath`""
+    $cscArgs += "/resource:`"$iconPath`",AutoScapeLauncher.app.ico"
+}
+
+if (Test-Path -LiteralPath $nativeDllPath) {
+    $cscArgs += "/resource:`"$nativeDllPath`",AutoScapeLauncher.AutoScapeNative.dll"
+}
+
+$cscArgs += "/out:`"$exePath`""
+$cscArgs += "`"$csTemp`""
+
+& $csc @cscArgs
+
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $exePath)) {
+    throw "Failed to compile AutoScape.exe"
+}
+
+$hash = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
+Set-Content -LiteralPath $shaPath -Value "$hash  AutoScape.exe" -Encoding ASCII
+
+Remove-Item -LiteralPath $csTemp -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
+
+Write-Step "Done"
+Write-Host "Created $exePath"
+Write-Host "Created $shaPath"
