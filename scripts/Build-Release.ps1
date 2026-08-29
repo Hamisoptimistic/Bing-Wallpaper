@@ -48,6 +48,15 @@ $iconCandidates = @(
 
 $iconPath = $iconCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 
+$logoCandidates = @(
+    (Join-Path $rootFolder 'assets\logo.png'),
+    (Join-Path $rootFolder 'logo.png'),
+    (Join-Path $rootFolder 'assets\logo.svg'),
+    (Join-Path $rootFolder 'logo.svg')
+)
+
+$logoPath = $logoCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
 if (-not (Test-Path -LiteralPath $uiPath)) {
     throw "Cannot find Bing-Wallpaper-UI.ps1 at $uiPath"
 }
@@ -187,6 +196,13 @@ try {
         $stagingAssets = Join-Path $stagingDir 'assets'
         New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
         Copy-Item -LiteralPath $iconPath -Destination (Join-Path $stagingAssets 'app.ico') -Force
+    }
+
+    if ($logoPath) {
+        $stagingAssets = Join-Path $stagingDir 'assets'
+        New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
+        $logoExt = [System.IO.Path]::GetExtension($logoPath)
+        Copy-Item -LiteralPath $logoPath -Destination (Join-Path $stagingAssets "logo$logoExt") -Force
     }
 
     Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
