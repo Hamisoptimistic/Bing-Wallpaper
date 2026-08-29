@@ -1062,7 +1062,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 
             <Grid Margin="0,0,0,32">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Border Name="LogoBorder" Background="Transparent" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0"/>
+                    <Border Name="LogoBorder" Background="#1E1E1E" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0"/>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="AutoScape" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,2"/>
                         <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
@@ -3218,10 +3218,9 @@ function Load-Gallery {
     $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
 
-    if (Test-Path -LiteralPath $thumbCacheDir) {
-        try { Remove-Item -LiteralPath $thumbCacheDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+    if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
+        try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
     }
-    try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
 
     $GalleryPanel.Children.Clear()
     $script:selectedCard = $null
@@ -3266,6 +3265,22 @@ function Load-Gallery {
                 }
 
                 $urlBases = [string[]]($uniqueImages | ForEach-Object { [string]$_.urlbase })
+
+                # Prune thumbnails for images that have rotated out of Bing's
+                # current set, so the cache stays bounded instead of growing
+                # forever. Anything still current is left alone (and skipped
+                # below if already on disk).
+                try {
+                    $keepNames = [System.Collections.Generic.HashSet[string]]::new()
+                    foreach ($ub in $urlBases) {
+                        [void]$keepNames.Add(($ub -replace '[^a-zA-Z0-9]', '') + '_thumb.jpg')
+                    }
+                    Get-ChildItem -LiteralPath $CacheDir -Filter '*_thumb.jpg' -File -ErrorAction SilentlyContinue |
+                    Where-Object { -not $keepNames.Contains($_.Name) } |
+                    Remove-Item -Force -ErrorAction SilentlyContinue
+                }
+                catch {}
+
                 if ('BingWallpaper.FastDownloader' -as [type]) {
                     [BingWallpaper.FastDownloader]::DownloadThumbnailsParallel($urlBases, $CacheDir)
                 }
