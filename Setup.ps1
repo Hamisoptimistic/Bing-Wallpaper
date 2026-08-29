@@ -55,15 +55,24 @@ function Create-Shortcut($targetPath, $outLnkPath, $iconLocation, $workingDir, $
 $oldDesktopLnk = Join-Path $desktopPath 'Bing Wallpaper.lnk'
 if (Test-Path $oldDesktopLnk) { Remove-Item $oldDesktopLnk -Force -ErrorAction SilentlyContinue }
 
-# powershell.exe is Microsoft-signed and trusted. -WindowStyle Hidden suppresses
-# the console window, so no VBScript wrapper is needed (VBScript is being
-# deprecated/disabled by default on newer Windows builds).
+# Launch through Windows Console Host in headless mode.
+# On Windows 11, Windows Terminal may be configured as the default terminal
+# application. Launching powershell.exe directly can therefore create a
+# visible Windows Terminal window even when -WindowStyle Hidden is supplied.
+#
+# conhost.exe is a Microsoft-signed Windows component. --headless gives
+# PowerShell a console host without creating a visible console window.
+$conhostExe = Join-Path $env:WINDIR 'System32\conhost.exe'
+if (-not (Test-Path -LiteralPath $conhostExe)) {
+    throw "Windows Console Host was not found at $conhostExe"
+}
+
 $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$psArgString = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$uiPath`""
+$psArgString = "--headless `"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$uiPath`""
 
 if (Test-Path $desktopPath) {
-    Create-Shortcut -targetPath $powershellExe -outLnkPath $desktopShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString $psArgString
-    Write-Output "    Created Desktop shortcut: $desktopShortcutPath"
+    Create-Shortcut -targetPath $conhostExe -outLnkPath $desktopShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString $psArgString
+    Write-Host "    [OK] Desktop shortcut created" -ForegroundColor Green
 }
 
 $startMenuPrograms = [Environment]::GetFolderPath('Programs')
@@ -72,11 +81,17 @@ if ($startMenuPrograms -and (Test-Path $startMenuPrograms)) {
     if (Test-Path $oldStartMenuLnk) { Remove-Item $oldStartMenuLnk -Force -ErrorAction SilentlyContinue }
 
     $startMenuShortcutPath = Join-Path $startMenuPrograms 'AutoScape.lnk'
-    Create-Shortcut -targetPath $powershellExe -outLnkPath $startMenuShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString $psArgString
-    Write-Output "    Created Start Menu shortcut: $startMenuShortcutPath"
+    Create-Shortcut -targetPath $conhostExe -outLnkPath $startMenuShortcutPath -iconLocation $icoPath -workingDir $rootFolder -argString $psArgString
+    Write-Host "    [OK] Start Menu shortcut created" -ForegroundColor Green
 }
 
-Write-Output ""
-Write-Output "========================================================="
-Write-Output " Setup Complete! (No compiled exe, no VBScript - launches via powershell.exe directly)"
-Write-Output "========================================================="
+Write-Host ""
+Write-Host "============================================================" -ForegroundColor DarkCyan
+Write-Host " AutoScape installation complete" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor DarkCyan
+Write-Host ""
+Write-Host " AutoScape is installed and ready to use." -ForegroundColor White
+Write-Host " Desktop and Start Menu shortcuts have been created." -ForegroundColor White
+Write-Host ""
+Write-Host " Launch AutoScape from either shortcut." -ForegroundColor Gray
+Write-Host ""
