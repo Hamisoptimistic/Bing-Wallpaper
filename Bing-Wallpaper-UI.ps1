@@ -346,7 +346,7 @@ namespace BingWallpaper
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.206'
+$script:appVersion = [Version]'1.0.213'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -799,7 +799,7 @@ if ($AutoApply) {
 
 try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") } catch {}
 
-[xml]$xaml = @"
+$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="AutoScape" Height="780" Width="1100"
@@ -1190,8 +1190,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 </Window>
 "@
 
-$reader = (New-Object System.Xml.XmlNodeReader $xaml)
-$window = [Windows.Markup.XamlReader]::Load($reader)
+$window = [Windows.Markup.XamlReader]::Parse($xaml)
 Write-TimingLog "SCRIPT: main window XAML parsed/instantiated ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 
 if (-not [System.Windows.Application]::Current) {
@@ -1304,18 +1303,32 @@ $applyDarkTitleBar = {
         $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
         if ($helper.Handle -ne [IntPtr]::Zero) {
             [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, -1)
-            [BingWallpaperNative]::EnableMica($helper.Handle)
-            
-            $margins = New-Object BingWallpaperNative+MARGINS
-            $margins.cxLeftWidth = -1
-            $margins.cxRightWidth = -1
-            $margins.cyTopHeight = -1
-            $margins.cyBottomHeight = -1
-            $null = [BingWallpaperNative]::DwmExtendFrameIntoClientArea($helper.Handle, [ref]$margins)
 
-            $hwndSource = [System.Windows.Interop.HwndSource]::FromHwnd($helper.Handle)
-            if ($hwndSource -and $hwndSource.CompositionTarget) {
-                $hwndSource.CompositionTarget.BackgroundColor = [System.Windows.Media.Colors]::Transparent
+            $isMicaCapable = [Environment]::OSVersion.Version.Build -ge 22621
+            if ($isMicaCapable) {
+                [BingWallpaperNative]::EnableMica($helper.Handle)
+
+                $margins = New-Object BingWallpaperNative+MARGINS
+                $margins.cxLeftWidth = -1
+                $margins.cxRightWidth = -1
+                $margins.cyTopHeight = -1
+                $margins.cyBottomHeight = -1
+                $null = [BingWallpaperNative]::DwmExtendFrameIntoClientArea($helper.Handle, [ref]$margins)
+            }
+            else {
+                # Windows 10 (and pre-22H2 Win11) has no Mica backdrop, so a
+                # Transparent window background renders as flat black with no
+                # compositor surface behind it. Fall back to a solid dark
+                # background so the window has an actual visible surface and
+                # card overlays keep contrast against it.
+                $window.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20))
+            }
+
+            if ($isMicaCapable) {
+                $hwndSource = [System.Windows.Interop.HwndSource]::FromHwnd($helper.Handle)
+                if ($hwndSource -and $hwndSource.CompositionTarget) {
+                    $hwndSource.CompositionTarget.BackgroundColor = [System.Windows.Media.Colors]::Transparent
+                }
             }
         }
     }
