@@ -106,10 +106,10 @@ public static class BingWallpaperNative
     private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
     private const int DWMSBT_MAINWINDOW = 2; // Mica
 
-    public static void EnableMica(IntPtr hwnd)
+    public static int EnableMica(IntPtr hwnd)
     {
         int backdrop = DWMSBT_MAINWINDOW;
-        DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
+        return DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
     }
 
     [DllImport("dwmapi.dll")]
@@ -346,7 +346,7 @@ namespace BingWallpaper
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.213'
+$script:appVersion = [Version]'1.0.214'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1304,10 +1304,17 @@ $applyDarkTitleBar = {
         if ($helper.Handle -ne [IntPtr]::Zero) {
             [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, -1)
 
-            $isMicaCapable = [Environment]::OSVersion.Version.Build -ge 22621
-            if ($isMicaCapable) {
-                [BingWallpaperNative]::EnableMica($helper.Handle)
+            # Explicitly require Windows 11 (Build 22000+) to prevent the pitch-black Transparent bug on Win10
+            $os = [System.Environment]::OSVersion.Version
+            $isWin11 = ($os.Major -ge 10 -and $os.Build -ge 22000)
+            
+            $isMicaCapable = $false
+            if ($isWin11) {
+                $micaResult = [BingWallpaperNative]::EnableMica($helper.Handle)
+                $isMicaCapable = ($micaResult -eq 0)
+            }
 
+            if ($isMicaCapable) {
                 $margins = New-Object BingWallpaperNative+MARGINS
                 $margins.cxLeftWidth = -1
                 $margins.cxRightWidth = -1
@@ -1316,12 +1323,8 @@ $applyDarkTitleBar = {
                 $null = [BingWallpaperNative]::DwmExtendFrameIntoClientArea($helper.Handle, [ref]$margins)
             }
             else {
-                # Windows 10 (and pre-22H2 Win11) has no Mica backdrop, so a
-                # Transparent window background renders as flat black with no
-                # compositor surface behind it. Fall back to a solid dark
-                # background so the window has an actual visible surface and
-                # card overlays keep contrast against it.
-                $window.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(20, 20, 20))
+                # Provide a nice dark gray fallback so cards maintain contrast on Windows 10
+                $window.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(32, 32, 32))
             }
 
             if ($isMicaCapable) {
@@ -1334,7 +1337,6 @@ $applyDarkTitleBar = {
     }
     catch {}
 }
-
 $window.Add_SourceInitialized($applyDarkTitleBar)
 
 # Header logo: loaded from a PNG instead of being built from inline XAML
@@ -4334,3 +4336,5 @@ $script:memTrimTimer.Start()
 Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+
+
