@@ -322,9 +322,9 @@ namespace BingWallpaper
 
     try {
         Add-Type -TypeDefinition $script:nativeCsSource -ReferencedAssemblies @(
-            'PresentationCore', 'PresentationFramework', 'WindowsBase',
-            'System.Net.Http', 'System.Drawing'
-        ) -Language CSharp -ErrorAction Stop
+        'PresentationCore', 'PresentationFramework', 'WindowsBase',
+        'System.Net.Http', 'System.Drawing', 'System.Xaml'
+    ) -Language CSharp -ErrorAction Stop
         Write-NativeLoadLog "OK: compiled native helpers in-memory (no DLL file written)"
     }
     catch {
