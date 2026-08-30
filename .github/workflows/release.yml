@@ -28,6 +28,13 @@ jobs:
         run: |
           .\scripts\Build-Release.ps1
 
+      - name: Delete Previous Latest Release
+        shell: bash
+        run: |
+          gh release delete latest --yes --cleanup-tag || echo "No existing 'latest' release to delete."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish Latest Release
         uses: softprops/action-gh-release@v2
         with:
