@@ -497,7 +497,24 @@ function Set-LockScreenImageIsolated {
         $output = @($worker.EndInvoke($async))
         $result = if ($output.Count -gt 0) { [string]$output[0] } else { '' }
 
-        if ($result -like 'SUCCESS|*') { return $true }
+        if ($result -like 'SUCCESS|*') {
+            # A brand-new file per apply is required (Windows' lock-screen
+            # WinRT APIs sometimes won't refresh if given a StorageFile at a
+            # path it's seen before, even with new content) - but nothing
+            # was ever removing the older generations, so this folder grew
+            # by one file per apply, forever. Now that Windows has accepted
+            # the new one, remove every other BingLockScreen-*.jpg here.
+            # Best-effort: a delete failing (e.g. OS still briefly holding a
+            # handle on the just-replaced one) is not fatal, it'll just be
+            # cleaned up on the next successful apply.
+            try {
+                Get-ChildItem -LiteralPath $cacheDir -Filter 'BingLockScreen-*.jpg' -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -ne $resolvedPath } |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+            catch {}
+            return $true
+        }
         if ($result -eq 'ERROR|32BIT') { throw "The lock-screen API was invoked from 32-bit PowerShell." }
         throw "Windows rejected the lock-screen image. WinRT result: $result"
     }

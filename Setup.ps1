@@ -29,6 +29,107 @@ function Write-SetupLog {
 
 Write-SetupLog "SETUP: started."
 
+# Stamps System.AppUserModel.ID onto a .lnk file. WScript.Shell (used below
+# to actually create the shortcuts) has no way to set this property itself.
+# Bing-Wallpaper-UI.ps1 calls SetCurrentProcessExplicitAppUserModelID with
+# this same ID at startup, to group the taskbar button correctly since it's
+# really launched via conhost.exe/powershell.exe, not its own exe. Without a
+# shortcut declaring the same ID, Windows has no cached icon association for
+# it on a fresh profile, and the taskbar button shows blank on first launch
+# (it self-heals on later launches once Windows learns the association from
+# use - this makes that immediate instead of eventual).
+try {
+    Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class AutoScapeShortcutAppId
+{
+    [ComImport, Guid("0000010b-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IPersistFile
+    {
+        void GetClassID(out Guid pClassID);
+        [PreserveSig] int IsDirty();
+        void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, int dwMode);
+        void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, [MarshalAs(UnmanagedType.Bool)] bool fRemember);
+        void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
+        void GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROPERTYKEY
+    {
+        public Guid fmtid;
+        public int pid;
+        public PROPERTYKEY(Guid fmtid, int pid) { this.fmtid = fmtid; this.pid = pid; }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROPVARIANT
+    {
+        public ushort vt;
+        public ushort wReserved1, wReserved2, wReserved3;
+        public IntPtr p;
+        public int p2;
+    }
+
+    [ComImport, Guid("886d8eeb-8cf2-4446-8d02-cdba1dbdcf99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IPropertyStore
+    {
+        int GetCount(out uint cProps);
+        int GetAt(uint iProp, out PROPERTYKEY pkey);
+        int GetValue(ref PROPERTYKEY key, out PROPVARIANT pv);
+        int SetValue(ref PROPERTYKEY key, ref PROPVARIANT pv);
+        int Commit();
+    }
+
+    [ComImport, Guid("00021401-0000-0000-C000-000000000046")]
+    class ShellLinkCoClass { }
+
+    public static void SetAppId(string shortcutPath, string appId)
+    {
+        var link = (IPersistFile)new ShellLinkCoClass();
+        try
+        {
+            link.Load(shortcutPath, 0); // STGM_READWRITE
+            var store = (IPropertyStore)link;
+            try
+            {
+                var pkeyAppUserModelId = new PROPERTYKEY(new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), 5);
+                var pv = new PROPVARIANT();
+                pv.vt = 31; // VT_LPWSTR
+                pv.p = Marshal.StringToCoTaskMemUni(appId);
+                try
+                {
+                    int hr = store.SetValue(ref pkeyAppUserModelId, ref pv);
+                    if (hr == 0) { store.Commit(); }
+                }
+                finally
+                {
+                    Marshal.FreeCoTaskMem(pv.p);
+                }
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(store);
+            }
+            link.Save(shortcutPath, true);
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(link);
+        }
+    }
+}
+'@ -ErrorAction Stop
+    $script:appUserModelIdHelperAvailable = $true
+}
+catch {
+    Write-SetupLog "SETUP: AppUserModel.ID helper failed to compile - $($_.Exception.Message)"
+    $script:appUserModelIdHelperAvailable = $false
+}
+
+
 $scriptDir = $PSScriptRoot
 if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
@@ -84,6 +185,16 @@ function Create-Shortcut($targetPath, $outLnkPath, $iconLocation, $workingDir, $
     if ($iconLocation) { $sc.IconLocation = "$iconLocation,0" }
     $sc.Description = 'AutoScape - Bing wallpapers, delivered daily'
     $sc.Save()
+
+    if ($script:appUserModelIdHelperAvailable) {
+        try {
+            [AutoScapeShortcutAppId]::SetAppId($outLnkPath, 'AutoScape.App')
+            Write-SetupLog "SETUP: stamped AppUserModel.ID on $outLnkPath"
+        }
+        catch {
+            Write-SetupLog "SETUP: could not stamp AppUserModel.ID on $outLnkPath - $($_.Exception.Message)"
+        }
+    }
 }
 
 # Clean up old shortcuts if present (older naming scheme)
