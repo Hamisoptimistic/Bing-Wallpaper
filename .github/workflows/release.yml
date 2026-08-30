@@ -42,6 +42,8 @@ jobs:
             - **[AutoScape.zip](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.zip)**
             - **[AutoScape.zip.sha256](https://github.com/${{ github.repository }}/releases/download/latest/AutoScape.zip.sha256)** (SHA-256 Checksum)
 
+            SHA256: ${{ steps.build_step.outputs.hash }}
+
             #### ⚙️ Setup
             1. Extract the zip anywhere (keep all files together).
             2. Double-click `Setup.bat` (one-time only — creates your Desktop/Start Menu shortcut).
@@ -68,6 +70,8 @@ jobs:
             #### 📦 Downloads
             - **[AutoScape.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.zip)**
             - **[AutoScape.zip.sha256](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AutoScape.zip.sha256)**
+
+            SHA256: ${{ steps.build_step.outputs.hash }}
 
             #### ⚙️ Setup
             1. Extract the zip anywhere (keep all files together).

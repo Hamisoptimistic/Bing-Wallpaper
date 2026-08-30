@@ -219,6 +219,11 @@ if (-not (Test-Path -LiteralPath $zipPath)) {
 $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 Set-Content -LiteralPath $zipShaPath -Value "$hash  AutoScape.zip" -Encoding ASCII
 
+if ($env:GITHUB_OUTPUT) {
+    "hash=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding ascii -Append
+}
+Write-Host "hash=$hash"
+
 Write-Step "Done"
 Write-Host "Created $zipPath"
 Write-Host "Created $zipShaPath"

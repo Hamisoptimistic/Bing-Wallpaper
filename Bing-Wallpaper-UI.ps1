@@ -364,7 +364,7 @@ namespace BingWallpaper
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.217'
+$script:appVersion = [Version]'1.0.214'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1151,7 +1151,7 @@ $xaml = @"
                                 Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                 Cursor="Hand" VerticalAlignment="Center">
                             <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.5" Opacity="0"/>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
                             </Border.Effect>
                             <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
@@ -2716,6 +2716,19 @@ function Start-VerifiedUpdateDownloadAsync {
     $uiScriptPath = Join-Path $installDir 'Bing-Wallpaper-UI.ps1'
     Write-UpdateLog "INSTALL: starting. version=$LatestVersionStr installDir=$installDir zipAsset=$($zipAsset.name)"
 
+    # Prefer the hash embedded in the release body/notes text: that comes
+    # from the same Releases API JSON call that already correctly reported
+    # each new version instantly, so it's proven fresh. The separate
+    # AutoScape.zip.sha256 *asset* has been observed serving the exact same
+    # stale hash across multiple different releases (likely never actually
+    # replaced by the publish action / stuck behind a CDN cache) - so it's
+    # now only a fallback, not the primary source of truth.
+    $expectedHashFromBody = $null
+    if ($Release.body -and ($Release.body -match '(?im)^SHA256:\s*([a-fA-F0-9]{64})\s*$')) {
+        $expectedHashFromBody = $Matches[1].ToUpperInvariant()
+    }
+    Write-UpdateLog "INSTALL: hash source=$(if ($expectedHashFromBody) { 'release-body' } elseif ($checksumAsset) { 'checksum-asset (fallback, may be stale)' } else { 'none' })"
+
     $CheckUpdateBtn.IsEnabled = $false
     Set-TransientStatus -Message "Downloading version $LatestVersionStr..." -Brush $statusDefaultBrush -Seconds 60
 
@@ -2725,7 +2738,7 @@ function Start-VerifiedUpdateDownloadAsync {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$LogPath)
+            param([string]$DownloadUrl, [string]$ChecksumUrl, [string]$ExpectedHashFromBody, [string]$LogPath)
 
             function Write-JobLog([string]$Message) {
                 try {
@@ -2744,30 +2757,38 @@ function Start-VerifiedUpdateDownloadAsync {
                 $client.DownloadFile($DownloadUrl, $downloadPath)
                 Write-JobLog "DOWNLOAD: complete ($((Get-Item -LiteralPath $downloadPath).Length) bytes)"
 
-                if ($ChecksumUrl) {
+                $expectedHash = $null
+                if ($ExpectedHashFromBody) {
+                    $expectedHash = $ExpectedHashFromBody
+                    Write-JobLog "HASH: using expected hash from release body ($expectedHash)"
+                }
+                elseif ($ChecksumUrl) {
                     try {
                         $checksumText = $client.DownloadString($ChecksumUrl)
                         $match = [regex]::Match($checksumText, '(?im)\b[a-f0-9]{64}\b')
                         if ($match.Success) {
                             $expectedHash = $match.Value.ToUpperInvariant()
-                            $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
-                            if ($actualHash -ne $expectedHash) {
-                                Write-JobLog "HASH: MISMATCH expected=$expectedHash actual=$actualHash"
-                                throw 'The downloaded update failed SHA-256 verification.'
-                            }
-                            Write-JobLog "HASH: verified OK ($actualHash)"
+                            Write-JobLog "HASH: using expected hash from checksum asset ($expectedHash)"
                         }
                         else {
-                            Write-JobLog "HASH: no hash found in checksum file, skipping verification."
+                            Write-JobLog "HASH: no hash found in checksum asset, skipping verification."
                         }
                     }
                     catch {
-                        if ($_ -like "*failed SHA-256*") { throw $_ }
-                        Write-JobLog "HASH: could not fetch/parse checksum file - $($_.Exception.Message)"
+                        Write-JobLog "HASH: could not fetch/parse checksum asset - $($_.Exception.Message)"
                     }
                 }
                 else {
-                    Write-JobLog "HASH: no checksum asset in release, skipping verification."
+                    Write-JobLog "HASH: no hash source available, skipping verification."
+                }
+
+                if ($expectedHash) {
+                    $actualHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
+                    if ($actualHash -ne $expectedHash) {
+                        Write-JobLog "HASH: MISMATCH expected=$expectedHash actual=$actualHash"
+                        throw 'The downloaded update failed SHA-256 verification.'
+                    }
+                    Write-JobLog "HASH: verified OK ($actualHash)"
                 }
 
                 return @{ Success = $true; DownloadPath = $downloadPath; Error = $null }
@@ -2780,7 +2801,7 @@ function Start-VerifiedUpdateDownloadAsync {
             finally {
                 if ($client) { $client.Dispose() }
             }
-        }).AddArgument($downloadUrl).AddArgument($checksumUrl).AddArgument($updateLogPathForJob)
+        }).AddArgument($downloadUrl).AddArgument($checksumUrl).AddArgument($expectedHashFromBody).AddArgument($updateLogPathForJob)
 
     $asyncOp = $ps.BeginInvoke()
     $script:updateDlContext = @{
