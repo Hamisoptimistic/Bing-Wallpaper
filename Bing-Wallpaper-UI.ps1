@@ -1078,15 +1078,15 @@ $xaml = @"
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Margin="0,0,0,32">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Border Name="LogoBorder" Background="#1E1E1E" Width="52" Height="52" CornerRadius="14" Margin="0,0,20,0"/>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="AutoScape" FontSize="28" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,2"/>
-                        <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" Margin="0,0,0,0"/>
-                    </StackPanel>
-                </StackPanel>
-            </Grid>
+           <Grid Margin="0,0,0,32">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+        <Border Name="LogoBorder" Background="Transparent" Width="50" Height="50" Margin="0,0,14,0" VerticalAlignment="Top"/>
+        <StackPanel VerticalAlignment="Top">
+            <TextBlock Text="AutoScape" FontSize="27" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="30" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,3"/>
+            <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="17" LineStackingStrategy="BlockLineHeight"/>
+        </StackPanel>
+    </StackPanel>
+</Grid>
 
             <Grid Grid.Row="1" Margin="0,0,0,24">
                 <Grid.ColumnDefinitions>
@@ -1151,7 +1151,7 @@ $xaml = @"
                                 Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                 Cursor="Hand" VerticalAlignment="Center">
                             <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.5" Opacity="0"/>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
                             </Border.Effect>
                             <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
@@ -2112,18 +2112,29 @@ function Update-SpotlightScheduledTaskAsync {
             param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
             try {
                 if ($Enable) {
-                    $appDataDir = Join-Path $AppDataRoot 'BingWallpaper'
-                    if (-not (Test-Path -LiteralPath $appDataDir)) {
-                        New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
+                    if (-not ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath))) {
+                        return
                     }
 
-                    $persistentExePath = Join-Path $appDataDir 'AutoScape.exe'
-                    if ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath)) {
-                        try { Copy-Item -LiteralPath $ScriptPath -Destination $persistentExePath -Force } catch {}
-                    }
-                
                     $actionArgs = "-AutoApply -Target `"$Target`""
-                    $action = New-ScheduledTaskAction -Execute $persistentExePath -Argument $actionArgs
+
+                    # Previously this copied the raw .ps1 script text onto a
+                    # file literally named "AutoScape.exe" and pointed the
+                    # task at that - but a .ps1's text saved with a .exe
+                    # extension is not a valid Windows executable, so the
+                    # task silently failed to launch every single time it
+                    # fired. Now that the app always installs to a fixed,
+                    # stable path, we can point the task straight at the
+                    # real script through the same conhost/powershell
+                    # pattern used for the app's own shortcuts and the
+                    # updater - conhost.exe is Microsoft-signed, so this
+                    # keeps the "no unsigned exe" property too.
+                    $conhostExe = Join-Path $env:WINDIR 'System32\conhost.exe'
+                    $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                    $fullArgs = "--headless `"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" $actionArgs"
+                    $workingDir = Split-Path -Parent $ScriptPath
+
+                    $action = New-ScheduledTaskAction -Execute $conhostExe -Argument $fullArgs -WorkingDirectory $workingDir
                     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
                     if ($Minutes -eq 0) {
@@ -4374,6 +4385,19 @@ $window.Add_PreviewKeyDown({
             $e.Handled = $true
             Load-Gallery
         }
+
+elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
+    if ($e.Key -eq [System.Windows.Input.Key]::S) {
+        if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+            $e.Handled = $true
+            # Call your download button click logic here
+            $DownloadBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+        }
+    }
+    # ... your existing Ctrl+B and Ctrl+L code ...
+}
+
+
         elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
             if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
             if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
