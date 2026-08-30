@@ -1151,7 +1151,7 @@ $xaml = @"
                                 Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                 Cursor="Hand" VerticalAlignment="Center">
                             <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.5" Opacity="0"/>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
                             </Border.Effect>
                             <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
@@ -2859,6 +2859,7 @@ function Write-UpdaterLog([string]$Message) {
 }
 
 try {
+    Set-Location -LiteralPath $env:TEMP
     Write-UpdaterLog "UPDATER: started. zip=$DownloadedZip installDir=$InstallDir"
     Start-Sleep -Seconds 1
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
@@ -2954,7 +2955,12 @@ finally {
                     ('-LogPath ' + (Quote-UpdaterArgument $script:updateLogPath))
                 ) -join ' '
 
-                Start-Process -FilePath $powershellExe -ArgumentList $updaterArgumentLine -WindowStyle Hidden -ErrorAction Stop | Out-Null
+                # WorkingDirectory is deliberately outside $installDir: a
+                # process's current directory is locked by Windows for its
+                # entire lifetime, and this helper's whole job is to delete
+                # and recreate $installDir - it can't do that while standing
+                # inside it.
+                Start-Process -FilePath $powershellExe -ArgumentList $updaterArgumentLine -WorkingDirectory $env:TEMP -WindowStyle Hidden -ErrorAction Stop | Out-Null
             
                 [System.Windows.Application]::Current.Shutdown()
                 [Environment]::Exit(0)
