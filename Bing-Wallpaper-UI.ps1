@@ -837,7 +837,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 $xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AutoScape" Height="780" Width="1100"
+        Title="AutoScape" Height="780" Width="1100" MinWidth="540" MinHeight="480"
         Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
     <Window.Resources>
@@ -1107,181 +1107,199 @@ $xaml = @"
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-           <Grid Margin="0,0,0,32">
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
-        <Border Name="LogoBorder" Background="Transparent" Width="50" Height="50" Margin="0,0,14,0" VerticalAlignment="Top"/>
-        <StackPanel VerticalAlignment="Top">
-            <TextBlock Text="AutoScape" FontSize="27" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="30" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,3"/>
-            <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="17" LineStackingStrategy="BlockLineHeight"/>
-        </StackPanel>
-    </StackPanel>
-</Grid>
+            <Grid Margin="0,0,0,32">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Border Name="LogoBorder" Background="Transparent" Width="50" Height="50" Margin="0,0,14,0" VerticalAlignment="Top"/>
+                    <StackPanel VerticalAlignment="Top">
+                        <TextBlock Text="AutoScape" FontSize="27" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="30" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,3"/>
+                        <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="17" LineStackingStrategy="BlockLineHeight"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
 
+            <!-- 2-Column Grid keeps main inputs wrapping, while Guide is pinned to the right -->
             <Grid Grid.Row="1" Margin="0,0,0,24">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="322"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                    <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Ellipse Canvas.Left="6" Canvas.Top="1" Width="8" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Line X1="1" Y1="10" X2="19" Y2="10" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                <WrapPanel Grid.Column="0" Name="ToolbarWrap" Orientation="Horizontal">
+
+                    <StackPanel Name="ColRegion" Margin="0,0,16,16">
+                        <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
+                            <ComboBox.Tag>
+                                <Viewbox Width="16.5" Height="16.5">
+                                    <Canvas Width="20" Height="20">
+                                        <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                        <Ellipse Canvas.Left="6" Canvas.Top="1" Width="8" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                        <Line X1="1" Y1="10" X2="19" Y2="10" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </ComboBox.Tag>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Name="ColRefresh" Margin="0,0,16,16" VerticalAlignment="Bottom">
+                        <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
+                            <Viewbox Width="19" Height="19" Margin="0,2,0,0">
+                                <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+                                    <Canvas.RenderTransform>
+                                    <RotateTransform/>
+                                    </Canvas.RenderTransform>
+                                    <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    <Path Data="M18.5,5 V10 H13.5"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
                                 </Canvas>
                             </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
+                        </Button>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="1" Margin="0,0,16,0" VerticalAlignment="Bottom">
-                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
-                        <Viewbox Width="19" Height="19" Margin="0,2,0,0">
-                            <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
-                                <Canvas.RenderTransform>
-                                <RotateTransform/>
-                                </Canvas.RenderTransform>
-                                <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                <Path Data="M18.5,5 V10 H13.5"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                            </Canvas>
-                        </Viewbox>
-                    </Button>
-                </StackPanel>
-                
-                <StackPanel Grid.Column="2" Margin="0,0,16,0">
-                    <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="ResolutionBox" Width="110" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Rectangle Canvas.Left="2" Canvas.Top="2" Width="16" Height="16" RadiusX="5" RadiusY="5" Stroke="#9E9E9E" StrokeThickness="1.7"/>
-                                    <Path Data="M6,8.4 L6,6 L8.4,6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M11.6,6 L14,6 L14,8.4" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M6,11.6 L6,14 L8.4,14" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M11.6,14 L14,14 L14,11.6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
+                    <StackPanel Name="ColResolution" Margin="0,0,16,16">
+                        <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <ComboBox Name="ResolutionBox" Width="110" FontSize="13.5" Height="38">
+                            <ComboBox.Tag>
+                                <Viewbox Width="16.5" Height="16.5">
+                                    <Canvas Width="20" Height="20">
+                                        <Rectangle Canvas.Left="2" Canvas.Top="2" Width="16" Height="16" RadiusX="5" RadiusY="5" Stroke="#9E9E9E" StrokeThickness="1.7"/>
+                                        <Path Data="M6,8.4 L6,6 L8.4,6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        <Path Data="M11.6,6 L14,6 L14,8.4" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        <Path Data="M6,11.6 L6,14 L8.4,14" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        <Path Data="M11.6,14 L14,14 L14,11.6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </ComboBox.Tag>
+                        </ComboBox>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="3" Margin="0,0,16,0">
-                    <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="TargetBox" Width="155" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
+                    <StackPanel Name="ColApplyTo" Margin="0,0,16,16">
+                        <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <ComboBox Name="TargetBox" Width="155" FontSize="13.5" Height="38">
+                            <ComboBox.Tag>
+                                <Viewbox Width="16.5" Height="16.5">
+                                    <Canvas Width="20" Height="20">
+                                        <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                        <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                        <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </ComboBox.Tag>
+                        </ComboBox>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="4" Margin="0,0,16,0">
-                    <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="StyleBox" Width="125" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Path Data="M2,7 V2 H7" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M18,13 V18 H13" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
+                    <StackPanel Name="ColStyle" Margin="0,0,16,16">
+                        <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <ComboBox Name="StyleBox" Width="125" FontSize="13.5" Height="38">
+                            <ComboBox.Tag>
+                                <Viewbox Width="16.5" Height="16.5">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="M2,7 V2 H7" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        <Path Data="M18,13 V18 H13" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </ComboBox.Tag>
+                        </ComboBox>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="5" Margin="0,0,16,0" MinWidth="220">
-                    <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder">
-                        <TextBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Path Data="M2,6 L2,15 L18,15 L18,7 L9,7 L7,5 L2,5 Z" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeLineJoin="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </TextBox.Tag>
-                    </TextBox>
-                </StackPanel>
+                    <StackPanel Name="ColDownloadTo" Margin="0,0,16,16" Width="300">
+                        <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder">
+                            <TextBox.Tag>
+                                <Viewbox Width="16.5" Height="16.5">
+                                    <Canvas Width="20" Height="20">
+                                        <Path Data="M2,6 L2,15 L18,15 L18,7 L9,7 L7,5 L2,5 Z" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </TextBox.Tag>
+                        </TextBox>
+                    </StackPanel>
 
-                <StackPanel Grid.Column="6" Margin="0,0,16,0">
-                    <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <Grid Height="38" VerticalAlignment="Center">
-                        <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
-                                Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
-                                Cursor="Hand" VerticalAlignment="Center">
-                            <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
-                            </Border.Effect>
-                            <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
-                                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
-                                <Ellipse.RenderTransform>
-                                    <TranslateTransform X="0" Y="0"/>
-                                </Ellipse.RenderTransform>
-                            </Ellipse>
-                        </Border>
-                    </Grid>
-                </StackPanel>
+                    <!-- Auto Section with Popup Menu Fix -->
+                    <StackPanel Name="ColAuto" Margin="0,0,16,16">
+                        <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                        <StackPanel Orientation="Horizontal" Height="38" VerticalAlignment="Center">
+                            
+                            <!-- Main Toggle Pill -->
+                            <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16" Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5" Cursor="Hand" VerticalAlignment="Center" Margin="0,0,8,0">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
+                                </Border.Effect>
+                                <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
+                                    <Ellipse.RenderTransform>
+                                        <TranslateTransform X="0" Y="0"/>
+                                    </Ellipse.RenderTransform>
+                                </Ellipse>
+                            </Border>
 
-                <Border Name="SpotlightOptionsClip" Grid.Column="7" Width="306" Margin="0,0,16,0" HorizontalAlignment="Left">
-                    <Border.Clip>
-                        <RectangleGeometry x:Name="SpotlightRevealGeometry" Rect="0,0,0,64"/>
-                    </Border.Clip>
-                    <StackPanel Name="SpotlightOptionsContainer" Orientation="Horizontal" Width="306">
-                        <StackPanel Width="135" Margin="0,0,16,0">
-                            <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                            <ComboBox Name="SpotlightIntervalBox" Width="135" FontSize="13.5" Height="38">
-                                <ComboBox.Tag>
-                                    <Viewbox Width="16.5" Height="16.5">
-                                        <Canvas Width="20" Height="20">
-                                            <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                            <Line X1="10" Y1="10" X2="10" Y2="4" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                            <Line X1="10" Y1="10" X2="14" Y2="12" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                        </Canvas>
-                                    </Viewbox>
-                                </ComboBox.Tag>
-                            </ComboBox>
-                        </StackPanel>
-                        <StackPanel Width="155">
-                            <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                            <ComboBox Name="SpotlightTargetBox" Width="155" FontSize="13.5" Height="38">
-                                <ComboBox.Tag>
-                                    <Viewbox Width="16.5" Height="16.5">
-                                        <Canvas Width="20" Height="20">
-                                            <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                            <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                            <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                        </Canvas>
-                                    </Viewbox>
-                                </ComboBox.Tag>
-                            </ComboBox>
+                            <!-- Settings Button -->
+                            <ToggleButton Name="AutoSettingsBtn" Width="32" Height="32" Background="Transparent" BorderThickness="0" Cursor="Hand" ToolTip="Auto Options">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Name="BtnBorder" Background="{TemplateBinding Background}" CornerRadius="6">
+                                            <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#A0A0A0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="BtnBorder" Property="Background" Value="#333333"/>
+                                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="BtnBorder" Property="Background" Value="#242424"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <!-- Options Context Popup -->
+                            <Popup Name="AutoSettingsPopup" IsOpen="{Binding IsChecked, ElementName=AutoSettingsBtn, Mode=TwoWay}" StaysOpen="False" AllowsTransparency="True" PlacementTarget="{Binding ElementName=AutoSettingsBtn}" Placement="Bottom" VerticalOffset="8" HorizontalOffset="-140" PopupAnimation="Fade">
+                                <Border Background="#1C1C1C" BorderBrush="#3D3D3D" BorderThickness="1" CornerRadius="8" Padding="16" Width="200">
+                                    <Border.Effect>
+                                        <DropShadowEffect BlurRadius="20" ShadowDepth="6" Opacity="0.5" Direction="270" Color="Black"/>
+                                    </Border.Effect>
+                                    <StackPanel>
+                                        <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                        <ComboBox Name="SpotlightIntervalBox" Width="166" FontSize="13.5" Height="38" Margin="0,0,0,16">
+                                            <ComboBox.Tag>
+                                                <Viewbox Width="16.5" Height="16.5">
+                                                    <Canvas Width="20" Height="20">
+                                                        <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                        <Line X1="10" Y1="10" X2="10" Y2="4" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
+                                                        <Line X1="10" Y1="10" X2="14" Y2="12" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
+                                                    </Canvas>
+                                                </Viewbox>
+                                            </ComboBox.Tag>
+                                        </ComboBox>
+                                        
+                                        <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                        <ComboBox Name="SpotlightTargetBox" Width="166" FontSize="13.5" Height="38">
+                                            <ComboBox.Tag>
+                                                <Viewbox Width="16.5" Height="16.5">
+                                                    <Canvas Width="20" Height="20">
+                                                        <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                        <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                        <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                                    </Canvas>
+                                                </Viewbox>
+                                            </ComboBox.Tag>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
                         </StackPanel>
                     </StackPanel>
-                </Border>
+                </WrapPanel>
 
-                <StackPanel Grid.Column="8" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <StackPanel Name="ColGuide" Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="16,0,0,16">
                     <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="User Guide">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#60CDFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
                 </StackPanel>
+
             </Grid>
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
@@ -1529,12 +1547,10 @@ $UpdateBtn = $window.FindName('UpdateBtn')
 $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
 $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
-$SpotlightOptionsContainer = $window.FindName('SpotlightOptionsContainer')
-$SpotlightOptionsClip = $window.FindName('SpotlightOptionsClip')
-$SpotlightRevealGeometry = $window.FindName('SpotlightRevealGeometry')
 $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 $GuideBtn = $window.FindName('GuideBtn')
+
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
 $script:activeModalControl = $null
@@ -2279,16 +2295,6 @@ function Set-SpotlightState {
     $targetBorderColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(61, 61, 61) }
     $targetGlowOpacity = if ($Enabled) { 0.65 } else { 0.0 }
 
-    # The reveal column ("Every" / "Apply To") never resizes. Only the visible
-    # window into it (a Clip rect on SpotlightOptionsClip) changes: it wipes
-    # left-to-right (0 -> full width) when turning on, and right-to-left
-    # (full width -> 0) when turning off. The column width, "Download Image
-    # To", the Auto pill, and the Guide icon's gap are never touched.
-    $revealWidth = 306.0
-    $revealHeight = 64.0
-    $targetWidth = if ($Enabled) { $revealWidth } else { 0.0 }
-    $targetRect = New-Object System.Windows.Rect(0, 0, $targetWidth, $revealHeight)
-
     if ($Animate) {
         $dur = [TimeSpan]::FromMilliseconds(200)
         $easing = New-Object System.Windows.Media.Animation.CubicEase
@@ -2311,13 +2317,6 @@ function Set-SpotlightState {
             $glowAnim.EasingFunction = $easing
             $SpotlightGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowAnim)
         }
-
-        if ($SpotlightRevealGeometry) {
-            $revealDurMs = if ($Enabled) { 260 } else { 220 }
-            $revealAnim = New-Object System.Windows.Media.Animation.RectAnimation -ArgumentList $targetRect, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($revealDurMs)))
-            $revealAnim.EasingFunction = $easing
-            $SpotlightRevealGeometry.BeginAnimation([System.Windows.Media.RectangleGeometry]::RectProperty, $revealAnim)
-        }
     }
     else {
         $SpotlightThumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
@@ -2332,11 +2331,6 @@ function Set-SpotlightState {
         if ($SpotlightGlow) {
             $SpotlightGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $null)
             $SpotlightGlow.Opacity = $targetGlowOpacity
-        }
-
-        if ($SpotlightRevealGeometry) {
-            $SpotlightRevealGeometry.BeginAnimation([System.Windows.Media.RectangleGeometry]::RectProperty, $null)
-            $SpotlightRevealGeometry.Rect = $targetRect
         }
     }
 
