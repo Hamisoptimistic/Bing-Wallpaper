@@ -364,7 +364,7 @@ namespace BingWallpaper
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.214'
+$script:appVersion = [Version]'1.0.217'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -1151,7 +1151,7 @@ $xaml = @"
                                 Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                 Cursor="Hand" VerticalAlignment="Center">
                             <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.5" Opacity="0"/>
                             </Border.Effect>
                             <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
