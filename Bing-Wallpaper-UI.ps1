@@ -919,6 +919,8 @@ $xaml = @"
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Height" Value="38"/>
+            <Setter Property="MinWidth" Value="90"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -930,14 +932,21 @@ $xaml = @"
                                           Focusable="False"
                                           ClickMode="Press"
                                           IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <ContentPresenter Name="IconSite"
+                                              Content="{TemplateBinding Tag}"
+                                              IsHitTestVisible="False"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              Margin="13,0,0,0"/>
                             <ContentPresenter Name="ContentSite"
                                               IsHitTestVisible="False"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                               TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontSize="{TemplateBinding FontSize}"
                                               VerticalAlignment="Center"
-                                              Margin="14,0,34,0"/>
+                                              Margin="40,0,34,0"/>
                             <Popup Name="PART_Popup"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
@@ -994,14 +1003,17 @@ $xaml = @"
             <Setter Property="Foreground" Value="#FFFFFF"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Height" Value="38"/>
-            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Padding" Value="40,0,14,0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="CaretBrush" Value="#0078D4"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8">
-                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            <Grid>
+                                <ContentPresenter Content="{TemplateBinding Tag}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,0"/>
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -1107,20 +1119,30 @@ $xaml = @"
 
             <Grid Grid.Row="1" Margin="0,0,0,24">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="150"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="130"/>
-                    <ColumnDefinition Width="150"/>
-                    <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="310"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="248"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <StackPanel Grid.Column="0" Margin="0,0,16,0">
                     <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="RegionBox" FontSize="13.5" Height="38"/>
+                    <ComboBox Name="RegionBox" FontSize="13.5" Height="38">
+                        <ComboBox.Tag>
+                            <Viewbox Width="16.5" Height="16.5">
+                                <Canvas Width="20" Height="20">
+                                    <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                    <Ellipse Canvas.Left="6" Canvas.Top="1" Width="8" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                    <Line X1="1" Y1="10" X2="19" Y2="10" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                </Canvas>
+                            </Viewbox>
+                        </ComboBox.Tag>
+                    </ComboBox>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Margin="0,0,16,0" VerticalAlignment="Bottom">
@@ -1143,22 +1165,61 @@ $xaml = @"
                 
                 <StackPanel Grid.Column="2" Margin="0,0,16,0">
                     <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38"/>
+                    <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38">
+                        <ComboBox.Tag>
+                            <Viewbox Width="16.5" Height="16.5">
+                                <Canvas Width="20" Height="20">
+                                    <Rectangle Canvas.Left="2" Canvas.Top="2" Width="16" Height="16" RadiusX="5" RadiusY="5" Stroke="#9E9E9E" StrokeThickness="1.7"/>
+                                    <Path Data="M6,8.4 L6,6 L8.4,6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    <Path Data="M11.6,6 L14,6 L14,8.4" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    <Path Data="M6,11.6 L6,14 L8.4,14" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    <Path Data="M11.6,14 L14,14 L14,11.6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                        </ComboBox.Tag>
+                    </ComboBox>
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Margin="0,0,16,0">
                     <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="TargetBox" FontSize="13.5" Height="38"/>
+                    <ComboBox Name="TargetBox" FontSize="13.5" Height="38">
+                        <ComboBox.Tag>
+                            <Viewbox Width="16.5" Height="16.5">
+                                <Canvas Width="20" Height="20">
+                                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                    <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                    <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                        </ComboBox.Tag>
+                    </ComboBox>
                 </StackPanel>
 
                 <StackPanel Grid.Column="4" Margin="0,0,16,0">
                     <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="StyleBox" FontSize="13.5" Height="38"/>
+                    <ComboBox Name="StyleBox" FontSize="13.5" Height="38">
+                        <ComboBox.Tag>
+                            <Viewbox Width="16.5" Height="16.5">
+                                <Canvas Width="20" Height="20">
+                                    <Path Data="M2,7 V2 H7" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                    <Path Data="M18,13 V18 H13" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                        </ComboBox.Tag>
+                    </ComboBox>
                 </StackPanel>
 
-                <StackPanel Grid.Column="5" Margin="0,0,16,0">
+                <StackPanel Grid.Column="5" Margin="0,0,16,0" MinWidth="220">
                     <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder" />
+                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder">
+                        <TextBox.Tag>
+                            <Viewbox Width="16.5" Height="16.5">
+                                <Canvas Width="20" Height="20">
+                                    <Path Data="M2,6 L2,15 L18,15 L18,7 L9,7 L7,5 L2,5 Z" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                        </TextBox.Tag>
+                    </TextBox>
                 </StackPanel>
 
                 <StackPanel Grid.Column="6" Margin="0,0,16,0">
@@ -1168,7 +1229,7 @@ $xaml = @"
                                 Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                 Cursor="Hand" VerticalAlignment="Center">
                             <Border.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.2" Opacity="0"/>
+                                <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
                             </Border.Effect>
                             <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
@@ -1180,16 +1241,41 @@ $xaml = @"
                     </Grid>
                 </StackPanel>
 
-                <StackPanel Name="SpotlightOptionsContainer" Grid.Column="7" Orientation="Horizontal" Visibility="Collapsed" Opacity="0">
-                    <StackPanel Margin="0,0,16,0">
-                        <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightIntervalBox" FontSize="13.5" Width="110" Height="38"/>
+                <Border Name="SpotlightOptionsClip" Grid.Column="7" Width="232" Margin="0,0,16,0" HorizontalAlignment="Left">
+                    <Border.Clip>
+                        <RectangleGeometry x:Name="SpotlightRevealGeometry" Rect="0,0,0,64"/>
+                    </Border.Clip>
+                    <StackPanel Name="SpotlightOptionsContainer" Orientation="Horizontal" Width="232">
+                        <StackPanel Width="108" Margin="0,0,16,0">
+                            <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                            <ComboBox Name="SpotlightIntervalBox" Width="108" FontSize="13.5" Height="38">
+                                <ComboBox.Tag>
+                                    <Viewbox Width="16.5" Height="16.5">
+                                        <Canvas Width="20" Height="20">
+                                            <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                            <Line X1="10" Y1="10" X2="10" Y2="4" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
+                                            <Line X1="10" Y1="10" X2="14" Y2="12" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </ComboBox.Tag>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Width="108">
+                            <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                            <ComboBox Name="SpotlightTargetBox" Width="108" FontSize="13.5" Height="38">
+                                <ComboBox.Tag>
+                                    <Viewbox Width="16.5" Height="16.5">
+                                        <Canvas Width="20" Height="20">
+                                            <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                            <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                            <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </ComboBox.Tag>
+                            </ComboBox>
+                        </StackPanel>
                     </StackPanel>
-                    <StackPanel Margin="0,0,0,0">
-                        <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                        <ComboBox Name="SpotlightTargetBox" FontSize="13.5" Width="145" Height="38"/>
-                    </StackPanel>
-                </StackPanel>
+                </Border>
 
                 <StackPanel Grid.Column="8" HorizontalAlignment="Right" VerticalAlignment="Bottom">
                     <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="User Guide">
@@ -1444,6 +1530,8 @@ $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
 $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
 $SpotlightOptionsContainer = $window.FindName('SpotlightOptionsContainer')
+$SpotlightOptionsClip = $window.FindName('SpotlightOptionsClip')
+$SpotlightRevealGeometry = $window.FindName('SpotlightRevealGeometry')
 $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 $GuideBtn = $window.FindName('GuideBtn')
@@ -2092,7 +2180,6 @@ function Get-UserFriendlyNetworkError {
 $script:SpotlightTaskName = 'BingWallpaperSpotlight'
 $script:SpotlightScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
 $script:SpotlightEnabled = $false
-$script:SpotlightHideTimer = $null
 
 $script:pillBgBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(38, 38, 38))
 $script:pillBorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(61, 61, 61))
@@ -2187,15 +2274,20 @@ function Set-SpotlightState {
     param([bool]$Enabled, [bool]$Animate = $true, [bool]$UpdateTask = $true)
     $script:SpotlightEnabled = $Enabled
 
-    if ($script:SpotlightHideTimer) {
-        $script:SpotlightHideTimer.Stop()
-        $script:SpotlightHideTimer = $null
-    }
-
     $targetX = if ($Enabled) { 26.0 } else { 0.0 }
     $targetBgColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(38, 38, 38) }
     $targetBorderColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(61, 61, 61) }
     $targetGlowOpacity = if ($Enabled) { 0.65 } else { 0.0 }
+
+    # The reveal column ("Every" / "Apply To") never resizes. Only the visible
+    # window into it (a Clip rect on SpotlightOptionsClip) changes: it wipes
+    # left-to-right (0 -> full width) when turning on, and right-to-left
+    # (full width -> 0) when turning off. The column width, "Download Image
+    # To", the Auto pill, and the Guide icon's gap are never touched.
+    $revealWidth = 232.0
+    $revealHeight = 64.0
+    $targetWidth = if ($Enabled) { $revealWidth } else { 0.0 }
+    $targetRect = New-Object System.Windows.Rect(0, 0, $targetWidth, $revealHeight)
 
     if ($Animate) {
         $dur = [TimeSpan]::FromMilliseconds(200)
@@ -2220,32 +2312,11 @@ function Set-SpotlightState {
             $SpotlightGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowAnim)
         }
 
-        if ($Enabled) {
-            $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-            $SpotlightOptionsContainer.Opacity = 0
-            $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Visible
-
-            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.0, 1.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220)))
-            $fadeAnim.EasingFunction = $easing
-            $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
-        }
-        else {
-            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, 0.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180)))
-            $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
-
-            $script:SpotlightHideTimer = New-Object System.Windows.Threading.DispatcherTimer
-            $script:SpotlightHideTimer.Interval = [TimeSpan]::FromMilliseconds(190)
-            $script:SpotlightHideTimer.Add_Tick({
-                    if ($script:SpotlightHideTimer) {
-                        $script:SpotlightHideTimer.Stop()
-                        $script:SpotlightHideTimer = $null
-                    }
-                    if (-not $script:SpotlightEnabled) {
-                        $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                        $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
-                    }
-                })
-            $script:SpotlightHideTimer.Start()
+        if ($SpotlightRevealGeometry) {
+            $revealDurMs = if ($Enabled) { 260 } else { 220 }
+            $revealAnim = New-Object System.Windows.Media.Animation.RectAnimation -ArgumentList $targetRect, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds($revealDurMs)))
+            $revealAnim.EasingFunction = $easing
+            $SpotlightRevealGeometry.BeginAnimation([System.Windows.Media.RectangleGeometry]::RectProperty, $revealAnim)
         }
     }
     else {
@@ -2263,14 +2334,9 @@ function Set-SpotlightState {
             $SpotlightGlow.Opacity = $targetGlowOpacity
         }
 
-        $SpotlightOptionsContainer.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        if ($Enabled) {
-            $SpotlightOptionsContainer.Opacity = 1
-            $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Visible
-        }
-        else {
-            $SpotlightOptionsContainer.Opacity = 0
-            $SpotlightOptionsContainer.Visibility = [System.Windows.Visibility]::Collapsed
+        if ($SpotlightRevealGeometry) {
+            $SpotlightRevealGeometry.BeginAnimation([System.Windows.Media.RectangleGeometry]::RectProperty, $null)
+            $SpotlightRevealGeometry.Rect = $targetRect
         }
     }
 
