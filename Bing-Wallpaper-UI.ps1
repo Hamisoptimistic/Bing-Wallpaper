@@ -2808,7 +2808,8 @@ function Start-VerifiedUpdateDownloadAsync {
                 $res = if ($results -and $results.Count) { $results[0] } else { $null }
 
                 if (-not $res -or $res.Success -ne $true) {
-                    throw (if ($res -and $res.Error) { [string]$res.Error } else { 'The update could not be downloaded.' })
+                    $failMsg = if ($res -and $res.Error) { [string]$res.Error } else { 'The update could not be downloaded.' }
+                    throw $failMsg
                 }
 
                 $downloadedZip = [string]$res.DownloadPath
