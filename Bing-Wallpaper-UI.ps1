@@ -1126,13 +1126,13 @@ $xaml = @"
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="248"/>
+                    <ColumnDefinition Width="322"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Margin="0,0,16,0">
                     <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="RegionBox" FontSize="13.5" Height="38">
+                    <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
                                 <Canvas Width="20" Height="20">
@@ -1165,7 +1165,7 @@ $xaml = @"
                 
                 <StackPanel Grid.Column="2" Margin="0,0,16,0">
                     <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="ResolutionBox" FontSize="13.5" Height="38">
+                    <ComboBox Name="ResolutionBox" Width="110" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
                                 <Canvas Width="20" Height="20">
@@ -1182,7 +1182,7 @@ $xaml = @"
 
                 <StackPanel Grid.Column="3" Margin="0,0,16,0">
                     <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="TargetBox" FontSize="13.5" Height="38">
+                    <ComboBox Name="TargetBox" Width="155" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
                                 <Canvas Width="20" Height="20">
@@ -1197,7 +1197,7 @@ $xaml = @"
 
                 <StackPanel Grid.Column="4" Margin="0,0,16,0">
                     <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="StyleBox" FontSize="13.5" Height="38">
+                    <ComboBox Name="StyleBox" Width="125" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
                                 <Canvas Width="20" Height="20">
@@ -1241,14 +1241,14 @@ $xaml = @"
                     </Grid>
                 </StackPanel>
 
-                <Border Name="SpotlightOptionsClip" Grid.Column="7" Width="232" Margin="0,0,16,0" HorizontalAlignment="Left">
+                <Border Name="SpotlightOptionsClip" Grid.Column="7" Width="306" Margin="0,0,16,0" HorizontalAlignment="Left">
                     <Border.Clip>
                         <RectangleGeometry x:Name="SpotlightRevealGeometry" Rect="0,0,0,64"/>
                     </Border.Clip>
-                    <StackPanel Name="SpotlightOptionsContainer" Orientation="Horizontal" Width="232">
-                        <StackPanel Width="108" Margin="0,0,16,0">
+                    <StackPanel Name="SpotlightOptionsContainer" Orientation="Horizontal" Width="306">
+                        <StackPanel Width="135" Margin="0,0,16,0">
                             <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                            <ComboBox Name="SpotlightIntervalBox" Width="108" FontSize="13.5" Height="38">
+                            <ComboBox Name="SpotlightIntervalBox" Width="135" FontSize="13.5" Height="38">
                                 <ComboBox.Tag>
                                     <Viewbox Width="16.5" Height="16.5">
                                         <Canvas Width="20" Height="20">
@@ -1260,9 +1260,9 @@ $xaml = @"
                                 </ComboBox.Tag>
                             </ComboBox>
                         </StackPanel>
-                        <StackPanel Width="108">
+                        <StackPanel Width="155">
                             <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                            <ComboBox Name="SpotlightTargetBox" Width="108" FontSize="13.5" Height="38">
+                            <ComboBox Name="SpotlightTargetBox" Width="155" FontSize="13.5" Height="38">
                                 <ComboBox.Tag>
                                     <Viewbox Width="16.5" Height="16.5">
                                         <Canvas Width="20" Height="20">
@@ -2284,7 +2284,7 @@ function Set-SpotlightState {
     # left-to-right (0 -> full width) when turning on, and right-to-left
     # (full width -> 0) when turning off. The column width, "Download Image
     # To", the Auto pill, and the Guide icon's gap are never touched.
-    $revealWidth = 232.0
+    $revealWidth = 306.0
     $revealHeight = 64.0
     $targetWidth = if ($Enabled) { $revealWidth } else { 0.0 }
     $targetRect = New-Object System.Windows.Rect(0, 0, $targetWidth, $revealHeight)
