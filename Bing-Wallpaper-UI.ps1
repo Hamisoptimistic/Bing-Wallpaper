@@ -4575,6 +4575,7 @@ function Show-UserGuideDialog {
 $script:isClosingInfoDialog = $false
 $script:activeInfoDialog = $null
 $script:infoDialogPendingGuide = $false
+$script:infoDialogPendingShortcuts = $false
 
 function Close-InfoDialog {
     if ($script:isClosingInfoDialog) { return }
@@ -4644,7 +4645,6 @@ function Show-InfoDialog {
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Close Button (X), same look/behavior as the User Guide dialog's close button -->
@@ -4698,7 +4698,7 @@ function Show-InfoDialog {
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                             <TextBlock Text="Updates" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Check for the latest version to get new features and fixes." FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                            <TextBlock Text="Check for the latest version to get new features and fixes" FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -4711,7 +4711,7 @@ function Show-InfoDialog {
                 </Border>
 
                 <!-- User Guide row -->
-                <Border Background="#212121" CornerRadius="20" Padding="22,20">
+                <Border Background="#212121" CornerRadius="20" Padding="22,20" Margin="0,0,0,14">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -4725,7 +4725,7 @@ function Show-InfoDialog {
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                             <TextBlock Text="User Guide" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Learn how to make the most of the app with our step-by-step guide." FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                            <TextBlock Text="Maximize your app experience" FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -4733,13 +4733,32 @@ function Show-InfoDialog {
                         </StackPanel>
                     </Grid>
                 </Border>
+
+                <!-- Keyboard Shortcuts row -->
+                <Border Background="#212121" CornerRadius="20" Padding="22,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="48" Height="48" CornerRadius="24" Background="#2A2A2A" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Keyboard Shortcuts" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="See every shortcut you can use to move faster in AutoScape" FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button Name="InfoShortcutsBtn" Content="View shortcuts" Width="155" Height="40" FontSize="13" FontWeight="SemiBold" ToolTip="See keyboard shortcuts"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </StackPanel>
             </ScrollViewer>
-
-            <!-- Footer -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
-                <Button Name="InfoFooterCloseBtn" Content="Close" Width="110" Height="40" FontSize="14" FontWeight="SemiBold"/>
-            </StackPanel>
 
         </Grid>
     </Border>
@@ -4765,11 +4784,16 @@ function Show-InfoDialog {
             })
     }
 
+    $shortcutsBtn = $dlg.FindName('InfoShortcutsBtn')
+    if ($shortcutsBtn) {
+        $shortcutsBtn.Add_Click({
+                $script:infoDialogPendingShortcuts = $true
+                Close-InfoDialog
+            })
+    }
+
     $closeButton = $dlg.FindName('InfoCloseButton')
     if ($closeButton) { $closeButton.Add_Click({ Close-InfoDialog }) }
-
-    $footerCloseBtn = $dlg.FindName('InfoFooterCloseBtn')
-    if ($footerCloseBtn) { $footerCloseBtn.Add_Click({ Close-InfoDialog }) }
 
     $dlg.Add_PreviewKeyDown({
             param($s, $e)
@@ -4790,6 +4814,19 @@ function Show-InfoDialog {
                 Show-AppErrorDialog `
                     -Message "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
                     -Title "Guide dialog error"
+            }
+        }
+        elseif ($script:infoDialogPendingShortcuts) {
+            $script:infoDialogPendingShortcuts = $false
+            try {
+                Show-ModernDialog -Title "AutoScape" -Header "Keyboard Shortcuts" -Icon "Info" -Buttons "OK" `
+                    -Message "Handy shortcuts you can use anywhere in the app:" `
+                    -Details "- Ctrl+S - Download the selected wallpaper`n- Ctrl+B - Set as desktop background`n- Ctrl+L - Set as lock screen`n- F5 - Refresh the gallery`n- Esc - Close the open dialog" | Out-Null
+            }
+            catch {
+                Show-AppErrorDialog `
+                    -Message "Show-ModernDialog (shortcuts) failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+                    -Title "Shortcuts dialog error"
             }
         }
     }
