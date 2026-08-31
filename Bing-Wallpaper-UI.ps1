@@ -868,7 +868,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 $xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AutoScape" Height="780" Width="1100" MinWidth="540" MinHeight="480"
+        Title="AutoScape" Height="780" Width="1100" MinWidth="820" MinHeight="560"
         Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
     <Window.Resources>
@@ -1151,7 +1151,7 @@ $xaml = @"
             <WrapPanel Grid.Row="1" Name="ToolbarWrap" Orientation="Horizontal" Margin="0,0,0,24">
 
                 <StackPanel Name="ColRegion" Margin="0,0,16,16">
-                    <TextBlock Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
@@ -1184,24 +1184,16 @@ $xaml = @"
                 </StackPanel>
 
                 <StackPanel Name="ColResolution" Margin="0,0,16,16">
-                    <TextBlock Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <TextBlock Name="LabelResolution" Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="ResolutionBox" Width="110" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Rectangle Canvas.Left="2" Canvas.Top="2" Width="16" Height="16" RadiusX="5" RadiusY="5" Stroke="#9E9E9E" StrokeThickness="1.7"/>
-                                    <Path Data="M6,8.4 L6,6 L8.4,6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M11.6,6 L14,6 L14,8.4" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M6,11.6 L6,14 L8.4,14" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M11.6,14 L14,14 L14,11.6" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                </Canvas>
-                            </Viewbox>
+                            <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#9E9E9E"/>
                         </ComboBox.Tag>
                     </ComboBox>
                 </StackPanel>
 
                 <StackPanel Name="ColApplyTo" Margin="0,0,16,16">
-                    <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <TextBlock Name="LabelApplyTo" Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="TargetBox" Width="155" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
@@ -1216,7 +1208,7 @@ $xaml = @"
                 </StackPanel>
 
                 <StackPanel Name="ColStyle" Margin="0,0,16,16">
-                    <TextBlock Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <TextBlock Name="LabelStyle" Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="StyleBox" Width="125" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
                             <Viewbox Width="16.5" Height="16.5">
@@ -1230,22 +1222,18 @@ $xaml = @"
                 </StackPanel>
 
                 <StackPanel Name="ColDownloadTo" Margin="0,0,16,16" Width="190">
-                    <TextBlock Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Name="LabelDownloadTo" Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" TextTrimming="CharacterEllipsis"/>
                     <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder">
                         <TextBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Path Data="M2,6 L2,15 L18,15 L18,7 L9,7 L7,5 L2,5 Z" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeLineJoin="Round"/>
-                                </Canvas>
-                            </Viewbox>
+                            <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#9E9E9E"/>
                         </TextBox.Tag>
                     </TextBox>
                 </StackPanel>
 
                 <StackPanel Name="ColAuto" Margin="0,0,16,16">
-                    <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                    <TextBlock Name="LabelAuto" Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <StackPanel Orientation="Horizontal">
-                        <Grid Height="38" VerticalAlignment="Center">
+                        <Grid Name="AutoPillRow" Height="38" VerticalAlignment="Center">
                             <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
                                     Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                     Cursor="Hand" VerticalAlignment="Center">
@@ -1268,10 +1256,10 @@ $xaml = @"
                             </Button.Effect>
                             <Viewbox Width="17" Height="17">
                                 <Canvas Width="20" Height="20">
-                                    <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6"/>
-                                    <Path Data="M10,5.5 L10,7.3 M10,12.7 L10,14.5 M5.5,10 L7.3,10 M12.7,10 L14.5,10 M6.6,6.6 L7.9,7.9 M12.1,12.1 L13.4,13.4 M13.4,6.6 L12.1,7.9 M7.9,12.1 L6.6,13.4"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                    <Ellipse Canvas.Left="7.2" Canvas.Top="7.2" Width="5.6" Height="5.6" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6"/>
+                                    <Ellipse Canvas.Left="1.5" Canvas.Top="1.5" Width="17" Height="17"
+                                             Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6"/>
+                                    <Path Data="M10,10 L10,5.3 M10,10 L14,12.2"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                                 </Canvas>
                             </Viewbox>
                         </Button>
@@ -1583,6 +1571,24 @@ $SpotlightPopupTransform = $window.FindName('SpotlightPopupTransform')
 $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
 $GuideBtn = $window.FindName('GuideBtn')
+
+# Compact-mode toolbar elements (see Update-ToolbarCompactState below)
+$ToolbarWrap = $window.FindName('ToolbarWrap')
+$ColRegion = $window.FindName('ColRegion')
+$ColRefresh = $window.FindName('ColRefresh')
+$ColResolution = $window.FindName('ColResolution')
+$ColApplyTo = $window.FindName('ColApplyTo')
+$ColStyle = $window.FindName('ColStyle')
+$ColDownloadTo = $window.FindName('ColDownloadTo')
+$ColAuto = $window.FindName('ColAuto')
+$ColGuide = $window.FindName('ColGuide')
+$AutoPillRow = $window.FindName('AutoPillRow')
+$LabelRegion = $window.FindName('LabelRegion')
+$LabelResolution = $window.FindName('LabelResolution')
+$LabelApplyTo = $window.FindName('LabelApplyTo')
+$LabelStyle = $window.FindName('LabelStyle')
+$LabelDownloadTo = $window.FindName('LabelDownloadTo')
+$LabelAuto = $window.FindName('LabelAuto')
 
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
@@ -3152,6 +3158,69 @@ function Update-GalleryViewportHeight {
     }
 }
 
+# Compact toolbar mode: below ~1260px window width, tighten margins/heights/
+# fonts on the toolbar row so it stays on one line on smaller/scaled laptop
+# screens (e.g. 13" 1366x768 @125% ~= 1093 logical px). This swaps to real,
+# natively-rendered smaller values rather than a LayoutTransform scale, so
+# text stays crisp and hit targets remain reasonable. A small gap between
+# the enter/exit thresholds (hysteresis) stops it flapping back and forth
+# if the window sits right at the boundary while being resized.
+$script:ToolbarIsCompact = $false
+$script:ToolbarCompactEnterWidth = 1260
+$script:ToolbarCompactExitWidth = 1300
+
+function Set-ToolbarCompact {
+    param([bool]$Compact)
+
+    $script:ToolbarIsCompact = $Compact
+    $tc = New-Object System.Windows.ThicknessConverter
+    $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,16' }))
+    $guideMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,0,10' } else { '0,0,0,16' }))
+    $comboHeight = if ($Compact) { 32 } else { 38 }
+    $comboFont = if ($Compact) { 12.5 } else { 13.5 }
+    $labelFont = if ($Compact) { 12 } else { 13 }
+    $iconSize = if ($Compact) { 32 } else { 38 }
+
+    foreach ($col in @($ColRegion, $ColRefresh, $ColResolution, $ColApplyTo, $ColStyle, $ColDownloadTo, $ColAuto)) {
+        if ($col) { $col.Margin = $colMargin }
+    }
+    if ($ColGuide) { $ColGuide.Margin = $guideMargin }
+
+    foreach ($box in @($RegionBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
+        if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
+    }
+    foreach ($btn in @($RefreshBtn, $GuideBtn, $SpotlightSetBtn)) {
+        if ($btn) { $btn.Width = $iconSize; $btn.Height = $iconSize }
+    }
+    foreach ($label in @($LabelRegion, $LabelResolution, $LabelApplyTo, $LabelStyle, $LabelDownloadTo, $LabelAuto)) {
+        if ($label) { $label.FontSize = $labelFont }
+    }
+    # The Auto pill (58x32) and its thumb never resize - their on/off travel
+    # distance is baked into Set-SpotlightState's animation. We only shrink
+    # the row Grid that centers the pill, which already fits a 32px pill
+    # with no vertical-centering math to break.
+    if ($AutoPillRow) { $AutoPillRow.Height = $comboHeight }
+
+    if ($RegionBox) { $RegionBox.Width = if ($Compact) { 205 } else { 235 } }
+    if ($ResolutionBox) { $ResolutionBox.Width = if ($Compact) { 95 } else { 110 } }
+    if ($TargetBox) { $TargetBox.Width = if ($Compact) { 138 } else { 155 } }
+    if ($StyleBox) { $StyleBox.Width = if ($Compact) { 110 } else { 125 } }
+    if ($ColDownloadTo) { $ColDownloadTo.Width = if ($Compact) { 165 } else { 190 } }
+}
+
+function Update-ToolbarCompactState {
+    if (-not $window -or $window.ActualWidth -le 0) { return }
+    $width = $window.ActualWidth
+
+    if (-not $script:ToolbarIsCompact -and $width -lt $script:ToolbarCompactEnterWidth) {
+        Set-ToolbarCompact -Compact $true
+    }
+    elseif ($script:ToolbarIsCompact -and $width -gt $script:ToolbarCompactExitWidth) {
+        Set-ToolbarCompact -Compact $false
+    }
+}
+
+
 function Render-GalleryGrid {
     param(
         [array]$Images,
@@ -3943,6 +4012,8 @@ $RefreshBtn.Add_Click({
 })
 
 $window.Add_SizeChanged({ Update-GalleryViewportHeight })
+$window.Add_SizeChanged({ Update-ToolbarCompactState })
+$window.Add_Loaded({ Update-ToolbarCompactState })
 $GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
 
 $script:activeGuideDialog = $null
@@ -4564,6 +4635,9 @@ $window.Add_PreviewKeyDown({
         }
 
 elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
+    if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
+    if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
+
     if ($e.Key -eq [System.Windows.Input.Key]::S) {
         if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
             $e.Handled = $true
@@ -4571,27 +4645,19 @@ elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.
             $DownloadBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
         }
     }
-    # ... your existing Ctrl+B and Ctrl+L code ...
-}
-
-
-        elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
-            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
-            if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
-
-            if ($e.Key -eq [System.Windows.Input.Key]::B) {
-                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-                    $e.Handled = $true
-                    Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Desktop' -Style $StyleBox.SelectedItem
-                }
-            }
-            elseif ($e.Key -eq [System.Windows.Input.Key]::L) {
-                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-                    $e.Handled = $true
-                    Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Lock screen' -Style $StyleBox.SelectedItem
-                }
-            }
+    elseif ($e.Key -eq [System.Windows.Input.Key]::B) {
+        if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+            $e.Handled = $true
+            Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Desktop' -Style $StyleBox.SelectedItem
         }
+    }
+    elseif ($e.Key -eq [System.Windows.Input.Key]::L) {
+        if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+            $e.Handled = $true
+            Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Lock screen' -Style $StyleBox.SelectedItem
+        }
+    }
+}
     })
 
 $window.Add_StateChanged({
