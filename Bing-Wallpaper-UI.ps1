@@ -86,17 +86,18 @@ function Write-UpdateLog {
     catch {}
 }
 
-if (-not ('BingWallpaper.FastAccent' -as [type])) {
-    $script:nativeCsSource = @'
+if (-not ('BingWallpaperNative' -as [type])) {
+    # CORE: only what's needed synchronously before/at window creation -
+    # taskbar app-id, Mica/dark title bar, and SystemParametersInfo (desktop
+    # wallpaper apply). SystemParametersInfo has to live here rather than in
+    # the deferred block below because the headless -AutoApply/Spotlight
+    # path (see "if ($AutoApply)" above) calls it directly and exits before
+    # any WPF Dispatcher exists to pump a deferred/background compile.
+    # None of this needs WPF/Http assemblies - it's plain P/Invoke - so the
+    # Add-Type call below intentionally omits -ReferencedAssemblies.
+    $script:nativeCsSourceCore = @'
 using System;
-using System.IO;
-using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 public static class AppUserModel
 {
@@ -133,11 +134,62 @@ public static class BingWallpaperNative
     [DllImport("dwmapi.dll")]
     public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
 
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19;
+
+    public static void EnableDarkTitleBar(IntPtr hwnd, int enable)
+    {
+        int useDark = enable != 0 ? 1 : 0;
+        if (DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int)) != 0)
+        {
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref useDark, sizeof(int));
+        }
+    }
+}
+'@
+
+    try {
+        Add-Type -TypeDefinition $script:nativeCsSourceCore -Language CSharp -ErrorAction Stop
+        Write-NativeLoadLog "OK: compiled core native helpers in-memory (no DLL file written)"
+    }
+    catch {
+        Write-NativeLoadLog "FAIL: core in-memory compile failed: $($_.Exception.Message)"
+        Show-AppErrorDialog `
+            -Message "Native helper compilation failed. AutoScape will not work correctly.`n`n$($_.Exception.Message)`n`nThis is often caused by antivirus/EDR software blocking runtime C# compilation (csc.exe). Check that AutoScape / csc.exe isn't being blocked, then restart the app." `
+            -Title "AutoScape: native compile failed"
+    }
+    Write-TimingLog "SCRIPT: core native C# helpers compiled ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
+}
+
+# EXTRA: everything only touched after the window is already visible -
+# folder-picker dark theming + legacy COM fallback, working-set trimming,
+# thumbnail accent extraction, and parallel thumbnail download. Compiled on
+# a background runspace (Start-DeferredNativeExtraCompile, kicked off from
+# ContentRendered below) instead of blocking the window from appearing.
+# Only this half needs the WPF imaging / HttpClient assemblies.
+$script:nativeCsSourceExtra = @'
+using System;
+using System.IO;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+public static class BingWallpaperNativeExtra
+{
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
     private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string pszSubIdList);
 
     [DllImport("uxtheme.dll", EntryPoint = "#135")]
     private static extern int SetPreferredAppMode(int preferredAppMode);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
@@ -152,18 +204,6 @@ public static class BingWallpaperNative
 
     [DllImport("psapi.dll")]
     private static extern bool EmptyWorkingSet(IntPtr hProcess);
-
-    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-    private const int DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19;
-
-    public static void EnableDarkTitleBar(IntPtr hwnd, int enable)
-    {
-        int useDark = enable != 0 ? 1 : 0;
-        if (DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int)) != 0)
-        {
-            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref useDark, sizeof(int));
-        }
-    }
 
     public static void EnableDarkDialogs()
     {
@@ -347,20 +387,105 @@ namespace BingWallpaper
 }
 '@
 
+function Start-DeferredNativeExtraCompile {
+    # Every call site for BingWallpaperNativeExtra / BingWallpaper.FastAccent /
+    # BingWallpaper.FastDownloader already tolerates the type not existing
+    # yet (try/catch, or a `-as [type]` check with a fallback path), so it's
+    # safe for this background compile to still be running when the window
+    # first appears.
+    if ('BingWallpaperNativeExtra' -as [type]) { return }
+    if ($script:nativeExtraContext) { return }
+    if ($script:nativeExtraCompileFailed) { return }
+
+    $ps = [powershell]::Create()
+    [void]$ps.AddScript({
+            param([string]$Source)
+            try {
+                Add-Type -TypeDefinition $Source -ReferencedAssemblies @(
+                    'PresentationCore', 'WindowsBase', 'System.Xaml', 'System.Net.Http'
+                ) -Language CSharp -ErrorAction Stop
+                return @{ Success = $true; Error = $null }
+            }
+            catch {
+                return @{ Success = $false; Error = $_.Exception.Message }
+            }
+        }).AddArgument($script:nativeCsSourceExtra)
+
+    $asyncOp = $ps.BeginInvoke()
+    $script:nativeExtraContext = @{ PS = $ps; AsyncOp = $asyncOp }
+
+    $script:nativeExtraTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:nativeExtraTimer.Interval = [TimeSpan]::FromMilliseconds(50)
+    $script:nativeExtraTimer.Add_Tick({
+            param($timerSender, $timerArgs)
+            if (-not $script:nativeExtraContext) {
+                $timerSender.Stop()
+                return
+            }
+            if ($script:nativeExtraContext.AsyncOp.IsCompleted) {
+                $timerSender.Stop()
+                Complete-NativeExtraCompile
+            }
+        })
+    $script:nativeExtraTimer.Start()
+}
+
+# Finishes the deferred compile kicked off above: EndInvoke, log the result,
+# dispose the background PS instance. Idempotent/safe to call from more than
+# one place (the timer tick above, or a caller blocked inside
+# Wait-NativeExtraCompile below) - only does real work the first time it's
+# called after a compile is in flight.
+function Complete-NativeExtraCompile {
+    $ctx = $script:nativeExtraContext
+    if (-not $ctx) { return }
+    $script:nativeExtraContext = $null
+    if ($script:nativeExtraTimer) {
+        try { $script:nativeExtraTimer.Stop() } catch {}
+        $script:nativeExtraTimer = $null
+    }
     try {
-        Add-Type -TypeDefinition $script:nativeCsSource -ReferencedAssemblies @(
-            'PresentationCore', 'PresentationFramework', 'WindowsBase',
-            'System.Net.Http', 'System.Drawing', 'System.Xaml'
-        ) -Language CSharp -ErrorAction Stop
-        Write-NativeLoadLog "OK: compiled native helpers in-memory (no DLL file written)"
+        $resCollection = $ctx.PS.EndInvoke($ctx.AsyncOp)
+        $res = if ($resCollection -and $resCollection.Count -gt 0) { $resCollection[0] } else { $null }
+        if ($res -and $res.Success -eq $true) {
+            Write-NativeLoadLog "OK: compiled extra native helpers in-memory (deferred, no DLL file written)"
+        }
+        else {
+            $err = if ($res) { $res.Error } else { 'Unknown error' }
+            $script:nativeExtraCompileFailed = $true
+            Write-NativeLoadLog "FAIL: deferred extra compile failed: $err"
+        }
     }
     catch {
-        Write-NativeLoadLog "FAIL: in-memory compile failed: $($_.Exception.Message)"
-        Show-AppErrorDialog `
-            -Message "Native helper compilation failed. AutoScape will not work correctly.`n`n$($_.Exception.Message)`n`nThis is often caused by antivirus/EDR software blocking runtime C# compilation (csc.exe). Check that AutoScape / csc.exe isn't being blocked, then restart the app." `
-            -Title "AutoScape: native compile failed"
+        $script:nativeExtraCompileFailed = $true
+        Write-NativeLoadLog "FAIL: deferred extra compile failed: $($_.Exception.Message)"
     }
-    Write-TimingLog "SCRIPT: native C# helpers compiled ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
+    finally {
+        try { $ctx.PS.Dispose() } catch {}
+    }
+}
+
+# Every call site for BingWallpaperNativeExtra / BingWallpaper.FastAccent /
+# BingWallpaper.FastDownloader tolerates the type not existing yet - but a
+# few of them (folder-picker dialog, per-card accent extraction) need the
+# real thing *right now*, not "whenever the background timer above happens
+# to catch up." Those call this instead of just try/catching around the
+# type reference: it blocks briefly (bounded by TimeoutMs) on the in-flight
+# compile's wait handle, finishes it, and returns whether the type is
+# actually available by the time it returns.
+function Wait-NativeExtraCompile {
+    param([int]$TimeoutMs = 2500)
+
+    if ('BingWallpaperNativeExtra' -as [type]) { return $true }
+    if ($script:nativeExtraCompileFailed) { return $false }
+
+    if (-not $script:nativeExtraContext) { Start-DeferredNativeExtraCompile }
+
+    if ($script:nativeExtraContext) {
+        try { $script:nativeExtraContext.AsyncOp.AsyncWaitHandle.WaitOne($TimeoutMs) | Out-Null } catch {}
+        Complete-NativeExtraCompile
+    }
+
+    return [bool]('BingWallpaperNativeExtra' -as [type])
 }
 
 # Dynamically detect executable version
@@ -1901,6 +2026,14 @@ $FolderBox.Add_PreviewMouseLeftButtonDown({
         $picked = $null
         $modernFailed = $false
 
+        # EnableDarkDialogs/GetForegroundWindow/PickFolder below all need
+        # BingWallpaperNativeExtra. If it's still compiling in the
+        # background (e.g. this is clicked right after launch),
+        # EnableDarkDialogs would throw before ShowDialog ever runs, and
+        # the legacy PickFolder fallback needs the exact same type - so
+        # without waiting here the whole click can silently do nothing.
+        [void](Wait-NativeExtraCompile)
+
         try {
             $dialog = New-Object Microsoft.Win32.OpenFolderDialog
             $dialog.Title = 'Select Download Folder'
@@ -1908,14 +2041,14 @@ $FolderBox.Add_PreviewMouseLeftButtonDown({
                 $dialog.InitialDirectory = $script:DownloadFolderPath
             }
 
-            [BingWallpaperNative]::EnableDarkDialogs()
+            [BingWallpaperNativeExtra]::EnableDarkDialogs()
 
             $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
             $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
             $darkTimer.Add_Tick({
-                    $hwnd = [BingWallpaperNative]::GetForegroundWindow()
-                    if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNative]::IsDialogWindow($hwnd)) {
-                        [BingWallpaperNative]::ForceDarkDialog($hwnd)
+                    $hwnd = [BingWallpaperNativeExtra]::GetForegroundWindow()
+                    if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNativeExtra]::IsDialogWindow($hwnd)) {
+                        [BingWallpaperNativeExtra]::ForceDarkDialog($hwnd)
                     }
                 })
 
@@ -1935,7 +2068,11 @@ $FolderBox.Add_PreviewMouseLeftButtonDown({
 
         if ($modernFailed) {
             $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
-            $legacyRes = [BingWallpaperNative]::PickFolder($helper.Handle, 'Select Download Folder')
+            $legacyRes = $null
+            try {
+                $legacyRes = [BingWallpaperNativeExtra]::PickFolder($helper.Handle, 'Select Download Folder')
+            }
+            catch {}
             if (-not [string]::IsNullOrEmpty($legacyRes)) {
                 $picked = $legacyRes
             }
@@ -1957,6 +2094,13 @@ $cardHoverBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.
 
 function Get-ImageAccentBrush([string]$imagePath) {
     try {
+        # ExtractBrush lives in the deferred/background-compiled extra
+        # native type. Cards are built shortly after that compile is
+        # kicked off, and the accent brush is only ever computed once per
+        # card (cached in card.Resources) - so without waiting here, every
+        # card would silently and permanently fall back to the flat gray
+        # brush below if the compile hadn't finished yet.
+        [void](Wait-NativeExtraCompile)
         return [BingWallpaper.FastAccent]::ExtractBrush($imagePath)
     }
     catch {
@@ -2221,7 +2365,7 @@ function Restore-StatusTextDefaultWithFade {
             $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
             $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $dur)
             $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-            [BingWallpaperNative]::FlushMemory()
+            try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
         })
     $script:fadeTimer.Start()
 }
@@ -2669,7 +2813,7 @@ function Show-ModernDialog {
 
     Open-InWindowModal -Control $dlg -Kind 'Dialog' -CloseCallback {
         $frame.Continue = $false
-        try { [BingWallpaperNative]::FlushMemory() } catch {}
+        try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
     }
 
     [System.Windows.Threading.Dispatcher]::PushFrame($frame)
@@ -4017,6 +4161,7 @@ if ($detectedItem) {
 }
 
 $window.Add_ContentRendered({
+    Start-DeferredNativeExtraCompile
     $RegionBox.Add_SelectionChanged({ Load-Gallery })
     Load-Gallery
 })
@@ -4738,13 +4883,13 @@ elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.
 
 $window.Add_StateChanged({
         if ($window.WindowState -eq [System.Windows.WindowState]::Minimized) {
-            [BingWallpaperNative]::FlushMemory()
+            try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
         }
     })
 
 $script:memTrimTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(45)
-$script:memTrimTimer.Add_Tick({ [BingWallpaperNative]::FlushMemory() })
+$script:memTrimTimer.Add_Tick({ try { [BingWallpaperNativeExtra]::FlushMemory() } catch {} })
 $script:memTrimTimer.Start()
 
 [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({
