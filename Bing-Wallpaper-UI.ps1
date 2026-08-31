@@ -1310,12 +1310,6 @@ $xaml = @"
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Name="ColGuide" Margin="0,0,0,16" VerticalAlignment="Bottom">
-                    <Button Name="GuideBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="User Guide">
-                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#60CDFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Button>
-                </StackPanel>
-
             </WrapPanel>
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
@@ -1332,7 +1326,9 @@ $xaml = @"
                 <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Name="CheckUpdateBtn" Content="Check for updates" Width="155" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update" />
+                    <Button Name="InfoBtn" Style="{StaticResource ModernIconButton}" Width="46" Height="46" Margin="0,0,12,0" ToolTip="Updates &amp; Help">
+                        <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
                     <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
                     <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
                 </StackPanel>
@@ -1557,7 +1553,11 @@ $RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 $StatusText = $window.FindName('StatusText')
-$CheckUpdateBtn = $window.FindName('CheckUpdateBtn')
+$InfoBtn = $window.FindName('InfoBtn')
+# CheckUpdateBtn no longer lives in the main toolbar - it now lives inside the
+# "Updates & Help" info modal (see Show-InfoDialog) and this variable is
+# (re)pointed at that inner button each time the modal is built.
+$CheckUpdateBtn = $null
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
 $SpotlightPill = $window.FindName('SpotlightPill')
@@ -1570,7 +1570,6 @@ $SpotlightPopupCard = $window.FindName('SpotlightPopupCard')
 $SpotlightPopupTransform = $window.FindName('SpotlightPopupTransform')
 $SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
 $SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
-$GuideBtn = $window.FindName('GuideBtn')
 
 # Compact-mode toolbar elements (see Update-ToolbarCompactState below)
 $ToolbarWrap = $window.FindName('ToolbarWrap')
@@ -1581,7 +1580,6 @@ $ColApplyTo = $window.FindName('ColApplyTo')
 $ColStyle = $window.FindName('ColStyle')
 $ColDownloadTo = $window.FindName('ColDownloadTo')
 $ColAuto = $window.FindName('ColAuto')
-$ColGuide = $window.FindName('ColGuide')
 $AutoPillRow = $window.FindName('AutoPillRow')
 $LabelRegion = $window.FindName('LabelRegion')
 $LabelResolution = $window.FindName('LabelResolution')
@@ -1644,7 +1642,7 @@ function Set-AppDimState {
 function Open-InWindowModal {
     param(
         [Parameter(Mandatory = $true)]$Control,
-        [ValidateSet('Guide', 'Dialog')][string]$Kind = 'Dialog',
+        [ValidateSet('Guide', 'Dialog', 'Info')][string]$Kind = 'Dialog',
         [scriptblock]$CloseCallback = $null
     )
 
@@ -2660,7 +2658,7 @@ function Show-ModernDialog {
 
 function Start-VerifiedUpdate {
     if ($script:updateContext -or $script:updateDlContext) { return }
-    $CheckUpdateBtn.IsEnabled = $false
+    if ($CheckUpdateBtn) { $CheckUpdateBtn.IsEnabled = $false }
     Set-TransientStatus -Message 'Checking for updates...' -Brush $statusDefaultBrush -Seconds 8
 
     $repo = $script:updateRepository
@@ -2793,7 +2791,7 @@ function Start-VerifiedUpdate {
                 }
                 finally {
                     try { $ctx.PS.Dispose() } catch {}
-                    $CheckUpdateBtn.IsEnabled = $true
+                    if ($CheckUpdateBtn) { $CheckUpdateBtn.IsEnabled = $true }
                 }
 
                 if (-not $isSuccess) {
@@ -2813,7 +2811,7 @@ function Start-VerifiedUpdate {
 
                 Write-UpdateLog "CHECK: update available. latestVersion=$latestVersionStr"
                 Set-TransientStatus -Message "Version $latestVersionStr is available." -Brush $statusDefaultBrush -Seconds 60
-                $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new update is available. Would you like to install it now? The app will restart automatically when finished." -Icon "Update" -Buttons "YesNo"
+                $confirmation = Show-ModernDialog -Title "Update Available" -Header "Version $latestVersionStr is Available" -Message "A new update is available. Would you like to install it now? The app will restart automatically when finished. It might take a few seconds." -Icon "Update" -Buttons "YesNo"
             
                 if ($confirmation -ne 'Yes') {
                     Write-UpdateLog "CHECK: user declined update to $latestVersionStr."
@@ -2863,7 +2861,7 @@ function Start-VerifiedUpdateDownloadAsync {
     }
     Write-UpdateLog "INSTALL: hash source=$(if ($expectedHashFromBody) { 'release-body' } elseif ($checksumAsset) { 'checksum-asset (fallback, may be stale)' } else { 'none' })"
 
-    $CheckUpdateBtn.IsEnabled = $false
+    if ($CheckUpdateBtn) { $CheckUpdateBtn.IsEnabled = $false }
     Set-TransientStatus -Message "Downloading version $LatestVersionStr..." -Brush $statusDefaultBrush -Seconds 60
 
     $downloadUrl = [string]$zipAsset.browser_download_url
@@ -3105,7 +3103,7 @@ finally {
                 if ($downloadedZip) { Remove-Item -LiteralPath $downloadedZip -Force -ErrorAction SilentlyContinue }
                 if ($updaterPath) { Remove-Item -LiteralPath $updaterPath -Force -ErrorAction SilentlyContinue }
 
-                $CheckUpdateBtn.IsEnabled = $true
+                if ($CheckUpdateBtn) { $CheckUpdateBtn.IsEnabled = $true }
                 $errMsg = "The update could not be started: $($_.Exception.Message)"
                 Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 8
                 Show-ModernDialog -Title "Update Error" -Header "Installation Could Not Start" -Message $errMsg -Icon "Error" -Buttons "OK" | Out-Null
@@ -3175,7 +3173,6 @@ function Set-ToolbarCompact {
     $script:ToolbarIsCompact = $Compact
     $tc = New-Object System.Windows.ThicknessConverter
     $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,16' }))
-    $guideMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,0,10' } else { '0,0,0,16' }))
     $comboHeight = if ($Compact) { 32 } else { 38 }
     $comboFont = if ($Compact) { 12.5 } else { 13.5 }
     $labelFont = if ($Compact) { 12 } else { 13 }
@@ -3184,12 +3181,11 @@ function Set-ToolbarCompact {
     foreach ($col in @($ColRegion, $ColRefresh, $ColResolution, $ColApplyTo, $ColStyle, $ColDownloadTo, $ColAuto)) {
         if ($col) { $col.Margin = $colMargin }
     }
-    if ($ColGuide) { $ColGuide.Margin = $guideMargin }
 
     foreach ($box in @($RegionBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
         if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
     }
-    foreach ($btn in @($RefreshBtn, $GuideBtn, $SpotlightSetBtn)) {
+    foreach ($btn in @($RefreshBtn, $SpotlightSetBtn)) {
         if ($btn) { $btn.Width = $iconSize; $btn.Height = $iconSize }
     }
     foreach ($label in @($LabelRegion, $LabelResolution, $LabelApplyTo, $LabelStyle, $LabelDownloadTo, $LabelAuto)) {
@@ -3872,16 +3868,19 @@ $DownloadBtn.Add_Click({
         $script:downloadTimer.Start()
     })
 
-$CheckUpdateBtn.Add_Click({
-        try {
-            Start-VerifiedUpdate
-        }
-        catch {
-            Show-AppErrorDialog `
-                -Message "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
-                -Title "Update check error"
-        }
-    })
+# Invoked by the "Check for updates" button inside the Info modal (Show-InfoDialog).
+# Kept as a named function (rather than an inline Add_Click) since that button
+# is rebuilt fresh each time the modal opens.
+function Invoke-CheckForUpdatesClick {
+    try {
+        Start-VerifiedUpdate
+    }
+    catch {
+        Show-AppErrorDialog `
+            -Message "Start-VerifiedUpdate failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+            -Title "Update check error"
+    }
+}
 
 @(
     @{ Label = 'On Login'; Minutes = 0 },
@@ -4567,40 +4566,223 @@ function Show-UserGuideDialog {
     Open-InWindowModal -Control $dlg -Kind 'Guide' -CloseCallback { $script:activeGuideDialog = $null }
 }
 
-if ($GuideBtn) {
-    try {
-        $guideGlow = New-Object System.Windows.Media.Effects.DropShadowEffect
-        $guideGlow.Color = [System.Windows.Media.Color]::FromRgb(0, 144, 255)
-        $guideGlow.ShadowDepth = 0
-        $guideGlow.BlurRadius = 10
-        $guideGlow.Opacity = 0.4
-        $GuideBtn.Effect = $guideGlow
+# ----------------------------------------------------------------------------
+# "Updates & Help" info modal - opened from the InfoBtn icon in the toolbar.
+# Reuses the same in-window modal engine (Open-InWindowModal/Close-InWindowModal)
+# as the User Guide dialog above, so it gets identical open/close fade
+# animation, dim overlay, click-outside-to-close, and Escape handling for free.
+# ----------------------------------------------------------------------------
+$script:isClosingInfoDialog = $false
+$script:activeInfoDialog = $null
+$script:infoDialogPendingGuide = $false
 
-        $glowEase = New-Object System.Windows.Media.Animation.QuadraticEase
-        $glowEase.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
-
-        $glowOpacityAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
-        $glowOpacityAnim.From = 0.25
-        $glowOpacityAnim.To = 0.85
-        $glowOpacityAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1800))
-        $glowOpacityAnim.AutoReverse = $true
-        $glowOpacityAnim.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
-        $glowOpacityAnim.EasingFunction = $glowEase
-
-        $glowBlurAnim = New-Object System.Windows.Media.Animation.DoubleAnimation
-        $glowBlurAnim.From = 6.0
-        $glowBlurAnim.To = 16.0
-        $glowBlurAnim.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(1800))
-        $glowBlurAnim.AutoReverse = $true
-        $glowBlurAnim.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
-        $glowBlurAnim.EasingFunction = $glowEase
-
-        $guideGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowOpacityAnim)
-        $guideGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::BlurRadiusProperty, $glowBlurAnim)
+function Close-InfoDialog {
+    if ($script:isClosingInfoDialog) { return }
+    if ($script:activeModalControl -and $script:activeModalKind -eq 'Info') {
+        $script:isClosingInfoDialog = $true
+        Close-InWindowModal
+        $script:isClosingInfoDialog = $false
     }
-    catch {}
+}
 
-    $GuideBtn.Add_Click({
+function Show-InfoDialog {
+    if ($script:activeModalControl -and $script:activeModalKind -eq 'Info' -and -not $script:activeModalClosing) {
+        Close-InfoDialog
+        return
+    }
+
+    $screenWidth = [System.Windows.SystemParameters]::PrimaryScreenWidth
+    $screenHeight = [System.Windows.SystemParameters]::PrimaryScreenHeight
+    if ($window -and $window.ActualWidth -gt 600) {
+        $screenWidth = $window.ActualWidth
+        $screenHeight = $window.ActualHeight
+    }
+    $maxModalWidth = [Math]::Max(320, [int]$screenWidth - 48)
+    $maxModalHeight = [Math]::Max(320, [int]$screenHeight - 48)
+    $modalWidth = [Math]::Min($maxModalWidth, 520)
+    $versionText = [System.Security.SecurityElement]::Escape("v$($script:appVersion)")
+
+    $infoXaml = @"
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="$modalWidth" MaxHeight="$maxModalHeight"
+        Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI">
+    <UserControl.Resources>
+        <!-- Matches the main window's implicit Button style so buttons inside
+             this modal look identical (rounded, hover) without depending on
+             the main window's resource dictionary. -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#262626"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0,10,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#333333"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#2A2A2A"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="RevealBorder" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Name="InfoDialogRoot" Padding="32,28,32,28" Background="#181818" Opacity="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Close Button (X), same look/behavior as the User Guide dialog's close button -->
+            <Button Name="InfoCloseButton" Width="32" Height="32"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Background="#262626" Foreground="#E8E8E8"
+                    BorderThickness="0" Cursor="Hand" ToolTip="Close" Panel.ZIndex="100">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="CloseBorder" Background="{TemplateBinding Background}" CornerRadius="7">
+                            <Canvas Width="20" Height="20">
+                                <Path Data="M 5,5 L 15,15 M 15,5 L 5,15"
+                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CloseBorder" Property="Background" Value="#E81123"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="CloseBorder" Property="Background" Value="#C50F1F"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,44,24">
+                <TextBlock Text="Updates &amp; Help" FontSize="22" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                <TextBlock Text="Stay updated and get the most out of AutoScape" FontSize="13" Foreground="#9E9E9E" Margin="0,5,0,0"/>
+            </StackPanel>
+
+            <!-- Rows -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+
+                <!-- Updates row -->
+                <Border Background="#212121" CornerRadius="20" Padding="22,20" Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="48" Height="48" CornerRadius="24" Background="#26355E" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#60CDFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Updates" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Check for the latest version to get new features and fixes." FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Border Background="#2A2A2A" CornerRadius="6" Padding="8,3" HorizontalAlignment="Right" Margin="0,0,0,10">
+                                <TextBlock Text="$versionText" FontSize="11" Foreground="#AAAAAA"/>
+                            </Border>
+                            <Button Name="InfoCheckUpdateBtn" Content="Check for updates" Width="155" Height="40" FontSize="13" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- User Guide row -->
+                <Border Background="#212121" CornerRadius="20" Padding="22,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="48" Height="48" CornerRadius="24" Background="#2A2A2A" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="User Guide" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Learn how to make the most of the app with our step-by-step guide." FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                            <Button Name="InfoOpenGuideBtn" Content="Open user guide" Width="155" Height="40" FontSize="13" FontWeight="SemiBold" ToolTip="Open the AutoScape user guide"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+            </ScrollViewer>
+
+            <!-- Footer -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+                <Button Name="InfoFooterCloseBtn" Content="Close" Width="110" Height="40" FontSize="14" FontWeight="SemiBold"/>
+            </StackPanel>
+
+        </Grid>
+    </Border>
+</UserControl>
+"@
+
+    $r = New-Object System.Xml.XmlNodeReader ([xml]$infoXaml)
+    $dlg = [Windows.Markup.XamlReader]::Load($r)
+
+    $infoRoot = $dlg.FindName('InfoDialogRoot')
+    if ($infoRoot) { $infoRoot.Opacity = 1.0 }
+
+    $script:CheckUpdateBtn = $dlg.FindName('InfoCheckUpdateBtn')
+    if ($script:CheckUpdateBtn) {
+        $script:CheckUpdateBtn.Add_Click({ Invoke-CheckForUpdatesClick })
+    }
+
+    $openGuideBtn = $dlg.FindName('InfoOpenGuideBtn')
+    if ($openGuideBtn) {
+        $openGuideBtn.Add_Click({
+                $script:infoDialogPendingGuide = $true
+                Close-InfoDialog
+            })
+    }
+
+    $closeButton = $dlg.FindName('InfoCloseButton')
+    if ($closeButton) { $closeButton.Add_Click({ Close-InfoDialog }) }
+
+    $footerCloseBtn = $dlg.FindName('InfoFooterCloseBtn')
+    if ($footerCloseBtn) { $footerCloseBtn.Add_Click({ Close-InfoDialog }) }
+
+    $dlg.Add_PreviewKeyDown({
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled = $true; Close-InfoDialog }
+        })
+
+    $script:activeInfoDialog = $dlg
+
+    Open-InWindowModal -Control $dlg -Kind 'Info' -CloseCallback {
+        $script:activeInfoDialog = $null
+        $script:CheckUpdateBtn = $null
+        if ($script:infoDialogPendingGuide) {
+            $script:infoDialogPendingGuide = $false
             try {
                 Show-UserGuideDialog
             }
@@ -4609,6 +4791,20 @@ if ($GuideBtn) {
                     -Message "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
                     -Title "Guide dialog error"
             }
+        }
+    }
+}
+
+if ($InfoBtn) {
+    $InfoBtn.Add_Click({
+            try {
+                Show-InfoDialog
+            }
+            catch {
+                Show-AppErrorDialog `
+                    -Message "Show-InfoDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+                    -Title "Info dialog error"
+            }
         })
 }
 
@@ -4616,6 +4812,7 @@ $window.Add_Closed({
         try {
             if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
             $script:activeGuideDialog = $null
+            $script:activeInfoDialog = $null
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
         }
         catch {}
@@ -4628,6 +4825,10 @@ $window.Add_PreviewKeyDown({
                 $e.Handled = $true
                 Close-UserGuideDialog
             }
+            elseif ($script:activeInfoDialog -and $script:activeInfoDialog.IsVisible) {
+                $e.Handled = $true
+                Close-InfoDialog
+            }
         }
         elseif ($e.Key -eq [System.Windows.Input.Key]::F5) {
             $e.Handled = $true
@@ -4636,6 +4837,7 @@ $window.Add_PreviewKeyDown({
 
 elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
     if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
+    if ($script:activeInfoDialog -and $script:activeInfoDialog.IsVisible) { return }
     if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
 
     if ($e.Key -eq [System.Windows.Input.Key]::S) {
