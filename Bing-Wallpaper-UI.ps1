@@ -539,7 +539,6 @@ function Set-DownloadFolderDisplay {
     $script:DownloadFolderPath = $Path
     if ([string]::IsNullOrEmpty($Path)) {
         $FolderBox.Text = ''
-        $FolderBox.ToolTip = 'Click to change download folder'
         return
     }
     $maxChars = 24
@@ -557,7 +556,6 @@ function Set-DownloadFolderDisplay {
             $FolderBox.Text = "...\$leaf"
         }
     }
-    $FolderBox.ToolTip = "$Path`r`n(Click to change download folder)"
 }
 
 function Get-BingImages {
@@ -878,6 +876,8 @@ $xaml = @"
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="600"/>
+            <Setter Property="ToolTipService.BetweenShowDelay" Value="600"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -1127,6 +1127,26 @@ $xaml = @"
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#2E2E2E"/>
+            <Setter Property="Foreground" Value="#F5F5F5"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.4" Color="Black"/>
+                            </Border.Effect>
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -1223,7 +1243,7 @@ $xaml = @"
 
                 <StackPanel Name="ColDownloadTo" Margin="0,0,16,16" Width="190">
                     <TextBlock Name="LabelDownloadTo" Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" TextTrimming="CharacterEllipsis"/>
-                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand" ToolTip="Click to change download folder">
+                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand">
                         <TextBox.Tag>
                             <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#9E9E9E"/>
                         </TextBox.Tag>
@@ -1326,11 +1346,11 @@ $xaml = @"
                 <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button Name="InfoBtn" Style="{StaticResource ModernIconButton}" Width="46" Height="46" Margin="0,0,12,0" ToolTip="Updates &amp; Help">
+                    <Button Name="InfoBtn" Style="{StaticResource ModernIconButton}" Width="46" Height="46" Margin="0,0,12,0" ToolTip="User Guide">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
-                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" ToolTip="Save selected image to your download folder" />
-                    <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" ToolTip="Set selected wallpaper directly" />
+                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" />
+                    <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" />
                 </StackPanel>
             </Grid>
         </Grid>
@@ -1555,7 +1575,7 @@ $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 $StatusText = $window.FindName('StatusText')
 $InfoBtn = $window.FindName('InfoBtn')
 # CheckUpdateBtn no longer lives in the main toolbar - it now lives inside the
-# "Updates & Help" info modal (see Show-InfoDialog) and this variable is
+# User Guide modal's footer (see Show-UserGuideDialog) and this variable is
 # (re)pointed at that inner button each time the modal is built.
 $CheckUpdateBtn = $null
 $DownloadBtn = $window.FindName('DownloadBtn')
@@ -2517,7 +2537,7 @@ function Show-ModernDialog {
         </Style>
     </UserControl.Resources>
 
-    <Border Name="DialogRoot" Padding="24" Background="#181818" Opacity="0">
+    <Border Name="DialogRoot" Padding="24" Background="#181818" CornerRadius="12" Opacity="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -3269,6 +3289,8 @@ function Render-GalleryGrid {
         $card.Tag = $image
         if ($image.copyright) {
             $card.ToolTip = "$displayTitle`n$($image.copyright)"
+            [System.Windows.Controls.ToolTipService]::SetInitialShowDelay($card, 600)
+            [System.Windows.Controls.ToolTipService]::SetBetweenShowDelay($card, 600)
         }
     
         $card.BorderThickness = New-Object System.Windows.Thickness(0)
@@ -3868,7 +3890,7 @@ $DownloadBtn.Add_Click({
         $script:downloadTimer.Start()
     })
 
-# Invoked by the "Check for updates" button inside the Info modal (Show-InfoDialog).
+# Invoked by the "Check for updates" button inside the User Guide modal's footer.
 # Kept as a named function (rather than an inline Add_Click) since that button
 # is rebuilt fresh each time the modal opens.
 function Invoke-CheckForUpdatesClick {
@@ -4017,6 +4039,7 @@ $GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
 
 $script:activeGuideDialog = $null
 $script:isClosingGuideDialog = $false
+$script:guideDialogPendingShortcuts = $false
 
 function Close-UserGuideDialog {
     if ($script:isClosingGuideDialog) { return }
@@ -4073,8 +4096,29 @@ function Show-UserGuideDialog {
 <UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="$modalWidth" Height="$modalHeight"
-        Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI">
-    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" Opacity="1">
+        Background="Transparent" Foreground="#F0F0F0" FontFamily="Segoe UI">
+    <UserControl.Resources>
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#2E2E2E"/>
+            <Setter Property="Foreground" Value="#F5F5F5"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.4" Color="Black"/>
+                            </Border.Effect>
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" CornerRadius="12" Opacity="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -4342,49 +4386,82 @@ function Show-UserGuideDialog {
             </Grid>
             </ScrollViewer>
 
-            <Grid Grid.Row="2" Margin="0,12,0,0">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Button Name="GuideGithubRepoBtn"
-                            Width="38" Height="38"
-                            HorizontalAlignment="Center"
-                            Background="#262626"
-                            Foreground="#D8D8D8"
-                            BorderThickness="0"
-                            Cursor="Hand"
-                            ToolTip="Open GitHub Repository"
-                            Margin="0,0,0,15">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border Name="GithubBorder"
-                                        Background="{TemplateBinding Background}"
-                                        CornerRadius="10">
-                                    <Viewbox Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <Canvas Width="24" Height="24">
-                                            <Path Data="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"
-                                                  Fill="{TemplateBinding Foreground}"/>
-                                        </Canvas>
-                                    </Viewbox>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="GithubBorder" Property="Background" Value="#333333"/>
-                                        <Setter Property="Foreground" Value="#FFFFFF"/>
-                                    </Trigger>
-                                    <Trigger Property="IsPressed" Value="True">
-                                        <Setter TargetName="GithubBorder" Property="Background" Value="#1F1F1F"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+            <StackPanel Grid.Row="2" Margin="0,12,0,0" HorizontalAlignment="Center">
+                <Border Background="#1E1E1E" BorderBrush="#2E2E2E" BorderThickness="1" CornerRadius="24" Padding="6">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Name="GuideGithubRepoBtn" Height="36" Padding="12,0" Background="Transparent" Foreground="#D8D8D8" BorderThickness="0" Cursor="Hand" ToolTip="Open GitHub Repository" ToolTipService.InitialShowDelay="600" ToolTipService.BetweenShowDelay="600">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Name="PillBg" Background="{TemplateBinding Background}" CornerRadius="18" Padding="{TemplateBinding Padding}">
+                                        <Viewbox Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Canvas Width="24" Height="24">
+                                                <Path Data="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" Fill="{TemplateBinding Foreground}"/>
+                                            </Canvas>
+                                        </Viewbox>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="PillBg" Property="Background" Value="#2A2A2A"/>
+                                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Text="Crafted with " FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
-                        <TextBlock Name="GuideHeartIcon" Text="&#xEB52;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#FF334B" VerticalAlignment="Center" Margin="3,2,3,0"/>
-                        <TextBlock Text=" by HamB" FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
+                        <Border Width="1" Height="20" Background="#333333" VerticalAlignment="Center" Margin="4,0"/>
+
+                        <Button Name="GuideShortcutsBtn" Height="36" Padding="14,0" Background="Transparent" Foreground="#D8D8D8" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Name="PillBg" Background="{TemplateBinding Background}" CornerRadius="18" Padding="{TemplateBinding Padding}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Keyboard Shortcuts" FontSize="13" FontWeight="SemiBold" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="PillBg" Property="Background" Value="#2A2A2A"/>
+                                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Border Width="1" Height="20" Background="#333333" VerticalAlignment="Center" Margin="4,0"/>
+
+                        <Button Name="GuideCheckUpdateBtn" Height="36" Padding="14,0" Background="Transparent" Foreground="#D8D8D8" BorderThickness="0" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Name="PillBg" Background="{TemplateBinding Background}" CornerRadius="18" Padding="{TemplateBinding Padding}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Check for Updates" FontSize="13" FontWeight="SemiBold" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="PillBg" Property="Background" Value="#2A2A2A"/>
+                                            <Setter Property="Foreground" Value="#FFFFFF"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter TargetName="PillBg" Property="Opacity" Value="0.5"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
                     </StackPanel>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                    <TextBlock Text="Crafted with " FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
+                    <TextBlock Name="GuideHeartIcon" Text="&#xEB52;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#FF334B" VerticalAlignment="Center" Margin="3,2,3,0"/>
+                    <TextBlock Text=" by HamB" FontSize="13" Foreground="#7A7A7A" VerticalAlignment="Center"/>
                 </StackPanel>
-            </Grid>
+            </StackPanel>
         </Grid>
     </Border>
 </UserControl>
@@ -4404,6 +4481,22 @@ function Show-UserGuideDialog {
                 }
                 catch {}
             })
+    }
+
+    $guideShortcutsBtn = $dlg.FindName('GuideShortcutsBtn')
+    if ($guideShortcutsBtn) {
+        $guideShortcutsBtn.Add_Click({
+                $script:guideDialogPendingShortcuts = $true
+                Close-UserGuideDialog
+            })
+    }
+
+    # Reuses the same $CheckUpdateBtn plumbing Start-VerifiedUpdate already
+    # expects (enable/disable while a check is in flight), just pointed at
+    # this button instead of the old Info modal's button.
+    $script:CheckUpdateBtn = $dlg.FindName('GuideCheckUpdateBtn')
+    if ($script:CheckUpdateBtn) {
+        $script:CheckUpdateBtn.Add_Click({ Invoke-CheckForUpdatesClick })
     }
 
     $imgControl = $dlg.FindName('GuideLatestImage')
@@ -4563,261 +4656,11 @@ function Show-UserGuideDialog {
             if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled = $true; Close-UserGuideDialog }
         })
 
-    Open-InWindowModal -Control $dlg -Kind 'Guide' -CloseCallback { $script:activeGuideDialog = $null }
-}
-
-# ----------------------------------------------------------------------------
-# "Updates & Help" info modal - opened from the InfoBtn icon in the toolbar.
-# Reuses the same in-window modal engine (Open-InWindowModal/Close-InWindowModal)
-# as the User Guide dialog above, so it gets identical open/close fade
-# animation, dim overlay, click-outside-to-close, and Escape handling for free.
-# ----------------------------------------------------------------------------
-$script:isClosingInfoDialog = $false
-$script:activeInfoDialog = $null
-$script:infoDialogPendingGuide = $false
-$script:infoDialogPendingShortcuts = $false
-
-function Close-InfoDialog {
-    if ($script:isClosingInfoDialog) { return }
-    if ($script:activeModalControl -and $script:activeModalKind -eq 'Info') {
-        $script:isClosingInfoDialog = $true
-        Close-InWindowModal
-        $script:isClosingInfoDialog = $false
-    }
-}
-
-function Show-InfoDialog {
-    if ($script:activeModalControl -and $script:activeModalKind -eq 'Info' -and -not $script:activeModalClosing) {
-        Close-InfoDialog
-        return
-    }
-
-    $screenWidth = [System.Windows.SystemParameters]::PrimaryScreenWidth
-    $screenHeight = [System.Windows.SystemParameters]::PrimaryScreenHeight
-    if ($window -and $window.ActualWidth -gt 600) {
-        $screenWidth = $window.ActualWidth
-        $screenHeight = $window.ActualHeight
-    }
-    $maxModalWidth = [Math]::Max(320, [int]$screenWidth - 48)
-    $maxModalHeight = [Math]::Max(320, [int]$screenHeight - 48)
-    $modalWidth = [Math]::Min($maxModalWidth, 520)
-    $versionText = [System.Security.SecurityElement]::Escape("v$($script:appVersion)")
-
-    $infoXaml = @"
-<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Width="$modalWidth" MaxHeight="$maxModalHeight"
-        Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI">
-    <UserControl.Resources>
-        <!-- Matches the main window's implicit Button style so buttons inside
-             this modal look identical (rounded, hover) without depending on
-             the main window's resource dictionary. -->
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#262626"/>
-            <Setter Property="Foreground" Value="#E0E0E0"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0,10,0"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#333333"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#2A2A2A"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="RevealBorder" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
-    <Border Name="InfoDialogRoot" Padding="32,28,32,28" Background="#181818" Opacity="1">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
-            <!-- Close Button (X), same look/behavior as the User Guide dialog's close button -->
-            <Button Name="InfoCloseButton" Width="32" Height="32"
-                    HorizontalAlignment="Right" VerticalAlignment="Top" Background="#262626" Foreground="#E8E8E8"
-                    BorderThickness="0" Cursor="Hand" ToolTip="Close" Panel.ZIndex="100">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border Name="CloseBorder" Background="{TemplateBinding Background}" CornerRadius="7">
-                            <Canvas Width="20" Height="20">
-                                <Path Data="M 5,5 L 15,15 M 15,5 L 5,15"
-                                      Stroke="{TemplateBinding Foreground}" StrokeThickness="2.6"
-                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                            </Canvas>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="CloseBorder" Property="Background" Value="#E81123"/>
-                                <Setter Property="Foreground" Value="#FFFFFF"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="CloseBorder" Property="Background" Value="#C50F1F"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Button.Template>
-            </Button>
-
-            <!-- Header -->
-            <StackPanel Grid.Row="0" Margin="0,0,44,24">
-                <TextBlock Text="Updates &amp; Help" FontSize="22" FontWeight="SemiBold" Foreground="#FFFFFF"/>
-                <TextBlock Text="Stay updated and get the most out of AutoScape" FontSize="13" Foreground="#9E9E9E" Margin="0,5,0,0"/>
-            </StackPanel>
-
-            <!-- Rows -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel>
-
-                <!-- Updates row -->
-                <Border Background="#212121" CornerRadius="20" Padding="22,20" Margin="0,0,0,14">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0" Width="48" Height="48" CornerRadius="24" Background="#26355E" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#60CDFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="Updates" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Check for the latest version to get new features and fixes" FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <Border Background="#2A2A2A" CornerRadius="6" Padding="8,3" HorizontalAlignment="Right" Margin="0,0,0,10">
-                                <TextBlock Text="$versionText" FontSize="11" Foreground="#AAAAAA"/>
-                            </Border>
-                            <Button Name="InfoCheckUpdateBtn" Content="Check for updates" Width="155" Height="40" FontSize="13" FontWeight="SemiBold" ToolTip="Check GitHub for a verified app update"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- User Guide row -->
-                <Border Background="#212121" CornerRadius="20" Padding="22,20" Margin="0,0,0,14">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0" Width="48" Height="48" CornerRadius="24" Background="#2A2A2A" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="User Guide" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Maximize your app experience" FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <Button Name="InfoOpenGuideBtn" Content="Open user guide" Width="155" Height="40" FontSize="13" FontWeight="SemiBold" ToolTip="Open the AutoScape user guide"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Keyboard Shortcuts row -->
-                <Border Background="#212121" CornerRadius="20" Padding="22,20">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Border Grid.Column="0" Width="48" Height="48" CornerRadius="24" Background="#2A2A2A" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="&#xE765;" FontFamily="Segoe MDL2 Assets" FontSize="19" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="Keyboard Shortcuts" FontSize="15.5" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="See every shortcut you can use to move faster in AutoScape" FontSize="12.5" Foreground="#9E9E9E" TextWrapping="Wrap" Margin="0,3,0,0"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <Button Name="InfoShortcutsBtn" Content="View shortcuts" Width="155" Height="40" FontSize="13" FontWeight="SemiBold" ToolTip="See keyboard shortcuts"/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </StackPanel>
-            </ScrollViewer>
-
-        </Grid>
-    </Border>
-</UserControl>
-"@
-
-    $r = New-Object System.Xml.XmlNodeReader ([xml]$infoXaml)
-    $dlg = [Windows.Markup.XamlReader]::Load($r)
-
-    $infoRoot = $dlg.FindName('InfoDialogRoot')
-    if ($infoRoot) { $infoRoot.Opacity = 1.0 }
-
-    $script:CheckUpdateBtn = $dlg.FindName('InfoCheckUpdateBtn')
-    if ($script:CheckUpdateBtn) {
-        $script:CheckUpdateBtn.Add_Click({ Invoke-CheckForUpdatesClick })
-    }
-
-    $openGuideBtn = $dlg.FindName('InfoOpenGuideBtn')
-    if ($openGuideBtn) {
-        $openGuideBtn.Add_Click({
-                $script:infoDialogPendingGuide = $true
-                Close-InfoDialog
-            })
-    }
-
-    $shortcutsBtn = $dlg.FindName('InfoShortcutsBtn')
-    if ($shortcutsBtn) {
-        $shortcutsBtn.Add_Click({
-                $script:infoDialogPendingShortcuts = $true
-                Close-InfoDialog
-            })
-    }
-
-    $closeButton = $dlg.FindName('InfoCloseButton')
-    if ($closeButton) { $closeButton.Add_Click({ Close-InfoDialog }) }
-
-    $dlg.Add_PreviewKeyDown({
-            param($s, $e)
-            if ($e.Key -eq [System.Windows.Input.Key]::Escape) { $e.Handled = $true; Close-InfoDialog }
-        })
-
-    $script:activeInfoDialog = $dlg
-
-    Open-InWindowModal -Control $dlg -Kind 'Info' -CloseCallback {
-        $script:activeInfoDialog = $null
+    Open-InWindowModal -Control $dlg -Kind 'Guide' -CloseCallback {
+        $script:activeGuideDialog = $null
         $script:CheckUpdateBtn = $null
-        if ($script:infoDialogPendingGuide) {
-            $script:infoDialogPendingGuide = $false
-            try {
-                Show-UserGuideDialog
-            }
-            catch {
-                Show-AppErrorDialog `
-                    -Message "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
-                    -Title "Guide dialog error"
-            }
-        }
-        elseif ($script:infoDialogPendingShortcuts) {
-            $script:infoDialogPendingShortcuts = $false
+        if ($script:guideDialogPendingShortcuts) {
+            $script:guideDialogPendingShortcuts = $false
             try {
                 Show-ModernDialog -Title "AutoScape" -Header "Keyboard Shortcuts" -Icon "Info" -Buttons "OK" `
                     -Message "Handy shortcuts you can use anywhere in the app:" `
@@ -4835,12 +4678,12 @@ function Show-InfoDialog {
 if ($InfoBtn) {
     $InfoBtn.Add_Click({
             try {
-                Show-InfoDialog
+                Show-UserGuideDialog
             }
             catch {
                 Show-AppErrorDialog `
-                    -Message "Show-InfoDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
-                    -Title "Info dialog error"
+                    -Message "Show-UserGuideDialog failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+                    -Title "Guide dialog error"
             }
         })
 }
@@ -4849,7 +4692,6 @@ $window.Add_Closed({
         try {
             if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
             $script:activeGuideDialog = $null
-            $script:activeInfoDialog = $null
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
         }
         catch {}
@@ -4862,10 +4704,6 @@ $window.Add_PreviewKeyDown({
                 $e.Handled = $true
                 Close-UserGuideDialog
             }
-            elseif ($script:activeInfoDialog -and $script:activeInfoDialog.IsVisible) {
-                $e.Handled = $true
-                Close-InfoDialog
-            }
         }
         elseif ($e.Key -eq [System.Windows.Input.Key]::F5) {
             $e.Handled = $true
@@ -4874,7 +4712,6 @@ $window.Add_PreviewKeyDown({
 
 elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
     if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
-    if ($script:activeInfoDialog -and $script:activeInfoDialog.IsVisible) { return }
     if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
 
     if ($e.Key -eq [System.Windows.Input.Key]::S) {
