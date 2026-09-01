@@ -383,6 +383,33 @@ namespace BingWallpaper
                 });
             }
         }
+
+        // Generic version for sources (like Wallhaven) whose thumbnail URLs
+        // are already-complete, arbitrary URLs rather than a Bing-style
+        // urlBase pattern. urls[i] downloads to targets[i]; a blank/null url
+        // or an already-cached target is skipped, same as the Bing path.
+        public static void DownloadUrlsParallel(string[] urls, string[] targets)
+        {
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                client.Timeout = TimeSpan.FromSeconds(20);
+
+                Parallel.For(0, urls.Length, new ParallelOptions { MaxDegreeOfParallelism = 6 }, i =>
+                {
+                    try
+                    {
+                        string url = urls[i];
+                        string target = targets[i];
+                        if (string.IsNullOrEmpty(url) || File.Exists(target)) return;
+
+                        byte[] data = client.GetByteArrayAsync(url).GetAwaiter().GetResult();
+                        File.WriteAllBytes(target, data);
+                    }
+                    catch { }
+                });
+            }
+        }
     }
 }
 '@
@@ -763,7 +790,7 @@ function Get-WallhavenImages {
     # honored down the line), it's appended; otherwise the request is sent
     # keyless and still works.
     param(
-        [int]$Count = 24,
+        [int]$Count = 16,
         [string]$ApiKey = ''
     )
 
@@ -771,23 +798,34 @@ function Get-WallhavenImages {
     # syntax - it limits results to wallpapers tagged #nature specifically,
     # rather than a loose full-text match on the word "nature".
     $tagQuery = [System.Uri]::EscapeDataString('+nature')
-    $uri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=1920x1080&ratios=16x9"
-    if ($ApiKey) {
-        $uri += "&apikey=$([System.Uri]::EscapeDataString($ApiKey))"
+
+    # Wallpapers must be at least 4K. If that comes back too thin (fewer
+    # than $Count results - the +nature tag at 4K can be a small pool),
+    # fall back to at-least-1440p so there's still enough variety to fill
+    # the gallery, rather than showing a sparse/empty grid.
+    function local:Get-WallhavenSearchItems {
+        param([string]$AtLeast)
+        $uri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=$AtLeast&ratios=16x9"
+        if ($ApiKey) { $uri += "&apikey=$([System.Uri]::EscapeDataString($ApiKey))" }
+        $wc = New-Object System.Net.WebClient
+        $wc.Encoding = [System.Text.Encoding]::UTF8
+        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        try {
+            $json = $wc.DownloadString($uri)
+            if ($json) { @((ConvertFrom-Json -InputObject $json).data) } else { @() }
+        }
+        catch {
+            @()
+        }
+        finally {
+            $wc.Dispose()
+        }
     }
 
-    $wc = New-Object System.Net.WebClient
-    $wc.Encoding = [System.Text.Encoding]::UTF8
-    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-    try {
-        $json = $wc.DownloadString($uri)
-        $items = if ($json) { @((ConvertFrom-Json -InputObject $json).data) } else { @() }
-    }
-    catch {
-        $items = @()
-    }
-    finally {
-        $wc.Dispose()
+    $items = @(Get-WallhavenSearchItems -AtLeast '3840x2160')
+    if ($items.Count -lt $Count) {
+        $fallbackItems = @(Get-WallhavenSearchItems -AtLeast '2560x1440')
+        if ($fallbackItems.Count -gt $items.Count) { $items = $fallbackItems }
     }
 
     $results = @()
@@ -797,7 +835,7 @@ function Get-WallhavenImages {
             source    = 'Wallhaven'
             urlbase   = "wallhaven_$($item.id)"
             url       = [string]$item.path
-            thumbUrl  = [string]$item.thumbs.small
+            thumbUrl  = [string]$item.thumbs.large
             title     = 'Nature Wallpaper'
             copyright = if ($uploaderName) { "by $uploaderName" } else { '' }
             enddate   = ''
@@ -3981,6 +4019,24 @@ function Render-GalleryGrid {
         $imgBorder.Child = $imageControl
         $stack.Children.Add($imgBorder)
 
+        # Bing/Spotlight thumbnails are already native 16:9, so their card
+        # height is left exactly as before (driven by the image's own
+        # aspect). Wallhaven's aren't guaranteed 16:9 even with the
+        # ratios=16x9 search filter, which is what made those cards taller -
+        # so only Wallhaven cards get an explicit height locked to the
+        # card's width, cropped to fit via the UniformToFill stretch above.
+        if ($image.source -eq 'Wallhaven') {
+            $imgBorder.Add_SizeChanged({
+                    param($evtSender, $e)
+                    if ($e.NewSize.Width -gt 0) {
+                        $desiredHeight = [Math]::Round($e.NewSize.Width * 9.0 / 16.0, 2)
+                        if ([double]::IsNaN($evtSender.Height) -or [Math]::Abs($evtSender.Height - $desiredHeight) -gt 0.5) {
+                            $evtSender.Height = $desiredHeight
+                        }
+                    }
+                })
+        }
+
         try {
             $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
             $thumbCachePath = Join-Path $ThumbCacheDir "${safeName}_thumb.jpg"
@@ -4237,28 +4293,51 @@ function Load-Gallery {
                 }
 
                 if ($Source -eq 'Wallhaven') {
+                    # Gallery always shows exactly 16 Wallhaven wallpapers,
+                    # independent of $Count (which stays 24 for Spotlight).
+                    $whCount = 16
                     $tagQuery = [System.Uri]::EscapeDataString('+nature')
-                    $uri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=1920x1080&ratios=16x9"
-                    if ($WallhavenKey) { $uri += "&apikey=$([System.Uri]::EscapeDataString($WallhavenKey))" }
 
-                    $wc = New-Object System.Net.WebClient
-                    $wc.Encoding = [System.Text.Encoding]::UTF8
-                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    $json = $wc.DownloadString($uri)
-                    $wc.Dispose()
+                    function Get-WallhavenSearchItems {
+                        param([string]$AtLeast)
+                        $searchUri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=$AtLeast&ratios=16x9"
+                        if ($WallhavenKey) { $searchUri += "&apikey=$([System.Uri]::EscapeDataString($WallhavenKey))" }
+                        $swc = New-Object System.Net.WebClient
+                        $swc.Encoding = [System.Text.Encoding]::UTF8
+                        $swc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        try {
+                            $sjson = $swc.DownloadString($searchUri)
+                            if ($sjson) { @((ConvertFrom-Json -InputObject $sjson).data) } else { @() }
+                        }
+                        catch {
+                            @()
+                        }
+                        finally {
+                            $swc.Dispose()
+                        }
+                    }
 
-                    $items = if ($json) { @((ConvertFrom-Json -InputObject $json).data) } else { @() }
+                    # Wallpapers must be at least 4K. If that comes back too
+                    # thin (fewer than $whCount results), fall back to
+                    # at-least-1440p so there's still enough variety to fill
+                    # the gallery.
+                    $items = @(Get-WallhavenSearchItems -AtLeast '3840x2160')
+                    if ($items.Count -lt $whCount) {
+                        $fallbackItems = @(Get-WallhavenSearchItems -AtLeast '2560x1440')
+                        if ($fallbackItems.Count -gt $items.Count) { $items = $fallbackItems }
+                    }
+
                     if (-not $items -or $items.Count -eq 0) {
                         return @{ Success = $false; Error = "Unable to connect to Wallhaven."; Images = @() }
                     }
 
                     $uniqueImages = @()
-                    foreach ($item in ($items | Select-Object -First $Count)) {
+                    foreach ($item in ($items | Select-Object -First $whCount)) {
                         $uploaderName = if ($item.uploader -and $item.uploader.username) { [string]$item.uploader.username } else { '' }
                         $uniqueImages += [PSCustomObject]@{
                             urlbase   = "wallhaven_$($item.id)"
                             url       = [string]$item.path
-                            thumbUrl  = [string]$item.thumbs.small
+                            thumbUrl  = [string]$item.thumbs.large
                             title     = 'Nature Wallpaper'
                             copyright = if ($uploaderName) { "by $uploaderName" } else { '' }
                         }
@@ -4280,16 +4359,26 @@ function Load-Gallery {
                     }
                     catch {}
 
-                    $wc2 = New-Object System.Net.WebClient
-                    $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    foreach ($img in $uniqueImages) {
-                        $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
-                        $target = Join-Path $CacheDir "${safe}_thumb.jpg"
-                        if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
-                            try { $wc2.DownloadFile($img.thumbUrl, $target) } catch {}
-                        }
+                    if ('BingWallpaper.FastDownloader' -as [type]) {
+                        $thumbUrls = [string[]]($uniqueImages | ForEach-Object { [string]$_.thumbUrl })
+                        $thumbTargets = [string[]]($uniqueImages | ForEach-Object {
+                                $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                                Join-Path $CacheDir "${safe}_thumb.jpg"
+                            })
+                        [BingWallpaper.FastDownloader]::DownloadUrlsParallel($thumbUrls, $thumbTargets)
                     }
-                    $wc2.Dispose()
+                    else {
+                        $wc2 = New-Object System.Net.WebClient
+                        $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        foreach ($img in $uniqueImages) {
+                            $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                            $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                            if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
+                                try { $wc2.DownloadFile($img.thumbUrl, $target) } catch {}
+                            }
+                        }
+                        $wc2.Dispose()
+                    }
 
                     $resultImages = @()
                     foreach ($img in $uniqueImages) {
