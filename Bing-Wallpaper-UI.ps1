@@ -754,6 +754,58 @@ function Get-SpotlightImages {
     return $results
 }
 
+function Get-WallhavenImages {
+    # Wallhaven's public search API (https://wallhaven.cc/api/v1/search).
+    # Per Wallhaven's own docs, an apikey is NOT required to receive SFW
+    # (purity=100) results - anonymous requests are already restricted to
+    # SFW content server-side. If the user has entered a key (for a higher
+    # rate limit, or because they want their own account's settings
+    # honored down the line), it's appended; otherwise the request is sent
+    # keyless and still works.
+    param(
+        [int]$Count = 24,
+        [string]$ApiKey = ''
+    )
+
+    # '+nature' (URL-encoded as %2Bnature) is Wallhaven's tag-restrict
+    # syntax - it limits results to wallpapers tagged #nature specifically,
+    # rather than a loose full-text match on the word "nature".
+    $tagQuery = [System.Uri]::EscapeDataString('+nature')
+    $uri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=1920x1080&ratios=16x9"
+    if ($ApiKey) {
+        $uri += "&apikey=$([System.Uri]::EscapeDataString($ApiKey))"
+    }
+
+    $wc = New-Object System.Net.WebClient
+    $wc.Encoding = [System.Text.Encoding]::UTF8
+    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    try {
+        $json = $wc.DownloadString($uri)
+        $items = if ($json) { @((ConvertFrom-Json -InputObject $json).data) } else { @() }
+    }
+    catch {
+        $items = @()
+    }
+    finally {
+        $wc.Dispose()
+    }
+
+    $results = @()
+    foreach ($item in ($items | Select-Object -First $Count)) {
+        $uploaderName = if ($item.uploader -and $item.uploader.username) { [string]$item.uploader.username } else { '' }
+        $results += [PSCustomObject]@{
+            source    = 'Wallhaven'
+            urlbase   = "wallhaven_$($item.id)"
+            url       = [string]$item.path
+            thumbUrl  = [string]$item.thumbs.small
+            title     = 'Nature Wallpaper'
+            copyright = if ($uploaderName) { "by $uploaderName" } else { '' }
+            enddate   = ''
+        }
+    }
+    return $results
+}
+
 function Get-BingImageUri {
     param(
         $Image,
@@ -762,6 +814,10 @@ function Get-BingImageUri {
     if ($Image.source -eq 'Spotlight') {
         if ($Image.url) { return $Image.url }
         throw "Invalid Spotlight image data - missing image URL."
+    }
+    if ($Image.source -eq 'Wallhaven') {
+        if ($Image.url) { return $Image.url }
+        throw "Invalid Wallhaven image data - missing image URL."
     }
 
     $urlBase = $Image.urlbase
@@ -920,6 +976,7 @@ function Load-Settings {
         SpotlightEnabled     = $false
         AutoDesktopSource    = "Bing"
         AutoLockScreenSource = "Bing"
+        WallhavenApiKey      = ""
     }
 }
 
@@ -1028,7 +1085,8 @@ if ($AutoApply) {
                     $images = Get-SpotlightImages -Count 1
                 }
                 'Wallhaven' {
-                    throw 'Wallhaven is not implemented yet.'
+                    $wallhavenKey = if ($savedSettings -and $savedSettings.WallhavenApiKey) { [string]$savedSettings.WallhavenApiKey } else { '' }
+                    $images = Get-WallhavenImages -Count 1 -ApiKey $wallhavenKey
                 }
                 default {
                     throw "Unknown wallpaper source: $Source"
@@ -1378,6 +1436,12 @@ $xaml = @"
                     <Border Name="SourceSpotlightIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="0"/>
                 </StackPanel>
             </Button>
+            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Wallhaven nature wallpapers (requires nothing, or add an API key for higher limits)">
+                <StackPanel>
+                    <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,4"/>
+                    <Border Name="SourceWallhavenIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="0"/>
+                </StackPanel>
+            </Button>
         </StackPanel>
     </Border>
 </Grid>
@@ -1397,6 +1461,12 @@ $xaml = @"
                             </Viewbox>
                         </ComboBox.Tag>
                     </ComboBox>
+                    <TextBox Name="WallhavenApiKeyBox" Width="235" FontSize="13.5" Height="38" Visibility="Collapsed"
+                             ToolTip="Optional - Wallhaven works without one for SFW wallpapers. Add a key from wallhaven.cc/settings/account for a higher rate limit.">
+                        <TextBox.Tag>
+                            <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
+                        </TextBox.Tag>
+                    </TextBox>
                 </StackPanel>
 
                 <StackPanel Name="ColRefresh" Margin="0,0,16,16" VerticalAlignment="Bottom">
@@ -1763,6 +1833,7 @@ function Save-Settings {
             AutoLockScreenSource = if ($AutoLockScreenSourceBox -and $AutoLockScreenSourceBox.SelectedItem) { [string]$AutoLockScreenSourceBox.SelectedItem } else { 'Bing' }
             AutoSchedule         = if ($AutoScheduleBox -and $AutoScheduleBox.SelectedItem) { [string]$AutoScheduleBox.SelectedItem.Tag } else { 'Daily' }
             SpotlightEnabled     = [bool]$script:SpotlightEnabled
+            WallhavenApiKey      = if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -1844,6 +1915,7 @@ function Enable-StrictToolTipDelay($targetElement) {
 }
 
 $RegionBox = $window.FindName('RegionBox')
+$WallhavenApiKeyBox = $window.FindName('WallhavenApiKeyBox')
 $ResolutionBox = $window.FindName('ResolutionBox')
 $TargetBox = $window.FindName('TargetBox')
 $StyleBox = $window.FindName('StyleBox')
@@ -1870,10 +1942,13 @@ $UpdateBtn = $window.FindName('UpdateBtn')
 # never collide with it.
 $SourceBingBtn = $window.FindName('SourceBingBtn')
 $SourceSpotlightBtn = $window.FindName('SourceSpotlightBtn')
+$SourceWallhavenBtn = $window.FindName('SourceWallhavenBtn')
 $SourceBingIndicator = $window.FindName('SourceBingIndicator')
 $SourceSpotlightIndicator = $window.FindName('SourceSpotlightIndicator')
+$SourceWallhavenIndicator = $window.FindName('SourceWallhavenIndicator')
 $SourceBingLabel = $window.FindName('SourceBingLabel')
 $SourceSpotlightLabel = $window.FindName('SourceSpotlightLabel')
+$SourceWallhavenLabel = $window.FindName('SourceWallhavenLabel')
 $AppSubtitleText = $window.FindName('AppSubtitleText')
 
 $script:currentSource = 'Bing'
@@ -1882,14 +1957,24 @@ function Update-SourceToggleVisual {
     $activeColor = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 255, 255))
     $inactiveColor = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(158, 158, 158))
     $isSpotlight = ($script:currentSource -eq 'Spotlight')
+    $isWallhaven = ($script:currentSource -eq 'Wallhaven')
 
-    if ($SourceBingLabel) { $SourceBingLabel.Foreground = if ($isSpotlight) { $inactiveColor } else { $activeColor } }
+    if ($SourceBingLabel) { $SourceBingLabel.Foreground = if ($script:currentSource -eq 'Bing') { $activeColor } else { $inactiveColor } }
     if ($SourceSpotlightLabel) { $SourceSpotlightLabel.Foreground = if ($isSpotlight) { $activeColor } else { $inactiveColor } }
-    if ($SourceBingIndicator) { $SourceBingIndicator.Opacity = if ($isSpotlight) { 0 } else { 1 } }
+    if ($SourceWallhavenLabel) { $SourceWallhavenLabel.Foreground = if ($isWallhaven) { $activeColor } else { $inactiveColor } }
+    if ($SourceBingIndicator) { $SourceBingIndicator.Opacity = if ($script:currentSource -eq 'Bing') { 1 } else { 0 } }
     if ($SourceSpotlightIndicator) { $SourceSpotlightIndicator.Opacity = if ($isSpotlight) { 1 } else { 0 } }
+    if ($SourceWallhavenIndicator) { $SourceWallhavenIndicator.Opacity = if ($isWallhaven) { 1 } else { 0 } }
     if ($AppSubtitleText) {
-        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } else { 'Bing wallpapers, delivered daily' }
+        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } else { 'Bing wallpapers, delivered daily' }
     }
+
+    # Region only means anything for Bing - swap it out for the (optional)
+    # Wallhaven API key box when that tab is active, and swap the label
+    # text to match, rather than adding a whole new toolbar column.
+    if ($RegionBox) { $RegionBox.Visibility = if ($isWallhaven) { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible } }
+    if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Visibility = if ($isWallhaven) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed } }
+    if ($LabelRegion) { $LabelRegion.Text = if ($isWallhaven) { 'API Key (optional)' } else { 'Region' } }
 }
 Update-SourceToggleVisual
 
@@ -1905,6 +1990,14 @@ if ($SourceSpotlightBtn) {
     $SourceSpotlightBtn.Add_Click({
             if ($script:currentSource -eq 'Spotlight') { return }
             $script:currentSource = 'Spotlight'
+            Update-SourceToggleVisual
+            Load-Gallery
+        })
+}
+if ($SourceWallhavenBtn) {
+    $SourceWallhavenBtn.Add_Click({
+            if ($script:currentSource -eq 'Wallhaven') { return }
+            $script:currentSource = 'Wallhaven'
             Update-SourceToggleVisual
             Load-Gallery
         })
@@ -2330,6 +2423,10 @@ foreach ($c in $countries) {
     }
 }
 
+if ($WallhavenApiKeyBox -and $script:appSettings.WallhavenApiKey) {
+    $WallhavenApiKeyBox.Text = [string]$script:appSettings.WallhavenApiKey
+}
+
 function Get-SelectedRegionCode {
     if ($RegionBox.SelectedItem -and $RegionBox.SelectedItem.Tag) {
         return $RegionBox.SelectedItem.Tag
@@ -2378,6 +2475,7 @@ else {
 
 $saveHandler = { Save-Settings }
 $RegionBox.Add_SelectionChanged($saveHandler)
+if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Add_LostFocus($saveHandler) }
 $ResolutionBox.Add_SelectionChanged($saveHandler)
 $TargetBox.Add_SelectionChanged($saveHandler)
 $StyleBox.Add_SelectionChanged($saveHandler)
@@ -3709,7 +3807,7 @@ function Set-ToolbarCompact {
         if ($col) { $col.Margin = $colMargin }
     }
 
-    foreach ($box in @($RegionBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
+    foreach ($box in @($RegionBox, $WallhavenApiKeyBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
         if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
     }
     foreach ($btn in @($RefreshBtn, $SpotlightSetBtn)) {
@@ -3725,6 +3823,7 @@ function Set-ToolbarCompact {
     if ($AutoPillRow) { $AutoPillRow.Height = $comboHeight }
 
     if ($RegionBox) { $RegionBox.Width = if ($Compact) { 205 } else { 235 } }
+    if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Width = if ($Compact) { 205 } else { 235 } }
     if ($ResolutionBox) { $ResolutionBox.Width = if ($Compact) { 95 } else { 110 } }
     if ($TargetBox) { $TargetBox.Width = if ($Compact) { 138 } else { 155 } }
     if ($StyleBox) { $StyleBox.Width = if ($Compact) { 110 } else { 125 } }
@@ -3925,7 +4024,7 @@ function Render-GalleryGrid {
             $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
         }
         catch {
-            $date.Text = if ($image.source -eq 'Spotlight') { 'Windows Spotlight' } else { 'Bing Wallpaper' }
+            $date.Text = if ($image.source -eq 'Spotlight') { 'Windows Spotlight' } elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing Wallpaper' }
         }
         $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
         $date.FontSize = 13.5
@@ -4059,12 +4158,12 @@ function Load-Gallery {
     $script:userHasExplicitlySelectedWallpaper = $false
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
     $StatusText.Opacity = 1
-    $StatusText.Text = if ($fetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } else { 'Connecting to Bing...' }
+    $StatusText.Text = if ($fetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($fetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } else { 'Connecting to Bing...' }
     $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count)
+            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey)
             try {
                 if ($Source -eq 'Spotlight') {
                     $uri = "https://peapix.com/spotlight/feed?n=$Count"
@@ -4126,6 +4225,76 @@ function Load-Gallery {
                     foreach ($img in $uniqueImages) {
                         $resultImages += [PSCustomObject]@{
                             source    = 'Spotlight'
+                            urlbase   = [string]$img.urlbase
+                            url       = [string]$img.url
+                            title     = [string]$img.title
+                            copyright = [string]$img.copyright
+                            enddate   = ''
+                        }
+                    }
+
+                    return @{ Success = $true; Error = $null; Images = $resultImages }
+                }
+
+                if ($Source -eq 'Wallhaven') {
+                    $tagQuery = [System.Uri]::EscapeDataString('+nature')
+                    $uri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=1920x1080&ratios=16x9"
+                    if ($WallhavenKey) { $uri += "&apikey=$([System.Uri]::EscapeDataString($WallhavenKey))" }
+
+                    $wc = New-Object System.Net.WebClient
+                    $wc.Encoding = [System.Text.Encoding]::UTF8
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $json = $wc.DownloadString($uri)
+                    $wc.Dispose()
+
+                    $items = if ($json) { @((ConvertFrom-Json -InputObject $json).data) } else { @() }
+                    if (-not $items -or $items.Count -eq 0) {
+                        return @{ Success = $false; Error = "Unable to connect to Wallhaven."; Images = @() }
+                    }
+
+                    $uniqueImages = @()
+                    foreach ($item in ($items | Select-Object -First $Count)) {
+                        $uploaderName = if ($item.uploader -and $item.uploader.username) { [string]$item.uploader.username } else { '' }
+                        $uniqueImages += [PSCustomObject]@{
+                            urlbase   = "wallhaven_$($item.id)"
+                            url       = [string]$item.path
+                            thumbUrl  = [string]$item.thumbs.small
+                            title     = 'Nature Wallpaper'
+                            copyright = if ($uploaderName) { "by $uploaderName" } else { '' }
+                        }
+                    }
+
+                    $urlBases = [string[]]($uniqueImages | ForEach-Object { [string]$_.urlbase })
+
+                    # Same bounded-cache pruning as the Bing/Spotlight paths -
+                    # drop thumbnails for wallpapers that rotated out of this
+                    # random batch.
+                    try {
+                        $keepNames = [System.Collections.Generic.HashSet[string]]::new()
+                        foreach ($ub in $urlBases) {
+                            [void]$keepNames.Add(($ub -replace '[^a-zA-Z0-9]', '') + '_thumb.jpg')
+                        }
+                        Get-ChildItem -LiteralPath $CacheDir -Filter '*_thumb.jpg' -File -ErrorAction SilentlyContinue |
+                        Where-Object { -not $keepNames.Contains($_.Name) } |
+                        Remove-Item -Force -ErrorAction SilentlyContinue
+                    }
+                    catch {}
+
+                    $wc2 = New-Object System.Net.WebClient
+                    $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    foreach ($img in $uniqueImages) {
+                        $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                        $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                        if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
+                            try { $wc2.DownloadFile($img.thumbUrl, $target) } catch {}
+                        }
+                    }
+                    $wc2.Dispose()
+
+                    $resultImages = @()
+                    foreach ($img in $uniqueImages) {
+                        $resultImages += [PSCustomObject]@{
+                            source    = 'Wallhaven'
                             urlbase   = [string]$img.urlbase
                             url       = [string]$img.url
                             title     = [string]$img.title
@@ -4212,7 +4381,7 @@ function Load-Gallery {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
             }
-        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24)
+        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24).AddArgument($(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }))
 
     $asyncOp = $ps.BeginInvoke()
 
@@ -4273,7 +4442,7 @@ function Load-Gallery {
                 $script:loadingStatusTimer.Add_Tick({
                         $script:loadingCounter++
                         if ($script:loadingCounter -le $script:loadingTotal) {
-                            $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } else { 'Bing' }
+                            $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } elseif ($script:currentSource -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing' }
                             $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from $sourceName..."
                         }
                         else {
@@ -4346,7 +4515,15 @@ $UpdateBtn.Add_Click({
             }
         }
         else { 
-            $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1) 
+            $targetImage = if ($script:currentSource -eq 'Spotlight') {
+                (Get-SpotlightImages | Select-Object -First 1)
+            }
+            elseif ($script:currentSource -eq 'Wallhaven') {
+                (Get-WallhavenImages -Count 1 -ApiKey $(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }) | Select-Object -First 1)
+            }
+            else {
+                (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
+            }
             if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
                 $targetCard = $GalleryPanel.Children[0]
             }
@@ -4377,6 +4554,9 @@ $DownloadBtn.Add_Click({
         else {
             $targetImage = if ($script:currentSource -eq 'Spotlight') {
                 (Get-SpotlightImages | Select-Object -First 1)
+            }
+            elseif ($script:currentSource -eq 'Wallhaven') {
+                (Get-WallhavenImages -Count 1 -ApiKey $(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }) | Select-Object -First 1)
             }
             else {
                 (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
