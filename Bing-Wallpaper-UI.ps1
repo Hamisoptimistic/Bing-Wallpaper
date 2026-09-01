@@ -749,10 +749,19 @@ function Get-SpotlightImages {
     # with no history of its own - Peapix already solves that problem.
     param([int]$Count = 24)
 
-    $uri = "https://peapix.com/spotlight/feed?n=$Count"
+    # A bare "?n=$Count" is the exact same URL every single call, which is
+    # exactly what lets a caching layer (WinINet on the client, or Peapix's
+    # own CDN at the edge) serve back a stale response instead of hitting
+    # the origin - explains "the website shows a new wallpaper but this app
+    # doesn't". The timestamp forces a genuinely unique URL every request,
+    # and the no-cache headers are belt-and-suspenders on top of that.
+    $cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $uri = "https://peapix.com/spotlight/feed?n=$Count&_=$cacheBust"
     $wc = New-Object System.Net.WebClient
     $wc.Encoding = [System.Text.Encoding]::UTF8
     $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    $wc.Headers.Add("Cache-Control", "no-cache, no-store")
+    $wc.Headers.Add("Pragma", "no-cache")
     try {
         $json = $wc.DownloadString($uri)
         $items = if ($json) { @(ConvertFrom-Json -InputObject $json) } else { @() }
@@ -839,6 +848,10 @@ function Get-WallhavenImages {
             title     = 'Nature Wallpaper'
             copyright = if ($uploaderName) { "by $uploaderName" } else { '' }
             enddate   = ''
+            resX      = [int]$item.dimension_x
+            resY      = [int]$item.dimension_y
+            fileSize  = [long]$item.file_size
+            fileType  = [string]$item.file_type
         }
     }
     return $results
@@ -4064,7 +4077,9 @@ function Render-GalleryGrid {
         catch {}
 
         $details = New-Object System.Windows.Controls.StackPanel
-        $details.Margin = New-Object System.Windows.Thickness(14, 10, 14, 12)
+        $details.Margin = New-Object System.Windows.Thickness(14, 0, 14, 0)
+        $details.VerticalAlignment = 'Center'
+        $details.HorizontalAlignment = 'Left'
 
         $title = New-Object System.Windows.Controls.TextBlock
         $title.Text = $displayTitle
@@ -4080,17 +4095,49 @@ function Render-GalleryGrid {
             $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
         }
         catch {
-            $date.Text = if ($image.source -eq 'Spotlight') { 'Windows Spotlight' } elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing Wallpaper' }
+            $date.Text = if ($image.source -eq 'Spotlight') {
+                if ($image.copyright) { $image.copyright } else { 'Windows Spotlight' }
+            }
+            elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing Wallpaper' }
         }
         $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
         $date.FontSize = 13.5
+        $date.TextTrimming = 'CharacterEllipsis'
         $details.Children.Add($date)
+
+        # Wallhaven: collapse the generic "Nature Wallpaper" / "Wallhaven"
+        # two-line label into one compact line built from that image's own
+        # Wallhaven API data (dimension_x/dimension_y, file_type, file_size)
+        # - e.g. "3840 × 2160  •  JPEG  •  5.2 MB" - instead of the same
+        # static text repeated on every card.
+        if ($image.source -eq 'Wallhaven') {
+            $infoParts = @()
+            if ($image.resX -and $image.resY) { $infoParts += "$($image.resX) × $($image.resY)" }
+            if ($image.fileType) {
+                $typeShort = ($image.fileType -split '/')[-1].ToUpper()
+                if ($typeShort) { $infoParts += $typeShort }
+            }
+            if ($image.fileSize) {
+                $sizeMB = [Math]::Round([double]$image.fileSize / 1MB, 1)
+                $infoParts += "$sizeMB MB"
+            }
+            if ($infoParts.Count -gt 0) {
+                $title.Text = $infoParts -join '  •  '
+                $title.Margin = New-Object System.Windows.Thickness(0, 0, 0, 0)
+                $date.Visibility = [System.Windows.Visibility]::Collapsed
+            }
+        }
 
         $card.Resources.Add('TitleText', $title)
         $card.Resources.Add('DateText', $date)
 
         $detailsContainer = New-Object System.Windows.Controls.Grid
         $detailsContainer.ClipToBounds = $true
+        # Fixed height (rather than auto-sizing to content) so every card's
+        # info bar is the same size regardless of source - previously
+        # Wallhaven's single-line info text made its bar noticeably shorter
+        # than the two-line Bing/Spotlight title+date bar.
+        $detailsContainer.Height = 64
         $detailsContainer.Children.Add($details)
 
         $shimmerOverlay = New-Object System.Windows.Controls.Border
@@ -4222,10 +4269,13 @@ function Load-Gallery {
             param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey)
             try {
                 if ($Source -eq 'Spotlight') {
-                    $uri = "https://peapix.com/spotlight/feed?n=$Count"
+                    $cacheBust = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                    $uri = "https://peapix.com/spotlight/feed?n=$Count&_=$cacheBust"
                     $wc = New-Object System.Net.WebClient
                     $wc.Encoding = [System.Text.Encoding]::UTF8
                     $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $wc.Headers.Add("Cache-Control", "no-cache, no-store")
+                    $wc.Headers.Add("Pragma", "no-cache")
                     $json = $wc.DownloadString($uri)
                     $wc.Dispose()
 
@@ -4340,6 +4390,10 @@ function Load-Gallery {
                             thumbUrl  = [string]$item.thumbs.large
                             title     = 'Nature Wallpaper'
                             copyright = if ($uploaderName) { "by $uploaderName" } else { '' }
+                            resX      = [int]$item.dimension_x
+                            resY      = [int]$item.dimension_y
+                            fileSize  = [long]$item.file_size
+                            fileType  = [string]$item.file_type
                         }
                     }
 
@@ -4389,6 +4443,10 @@ function Load-Gallery {
                             title     = [string]$img.title
                             copyright = [string]$img.copyright
                             enddate   = ''
+                            resX      = $img.resX
+                            resY      = $img.resY
+                            fileSize  = $img.fileSize
+                            fileType  = [string]$img.fileType
                         }
                     }
 
