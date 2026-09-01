@@ -912,14 +912,14 @@ function Load-Settings {
         catch {}
     }
     return @{
-        Region            = "auto"
-        Resolution        = "4K"
-        Target            = "Both"
-        Style             = (Get-CurrentDesktopWallpaperStyle)
-        SaveFolder        = (Get-DownloadFolder)
-        SpotlightEnabled  = $false
-        SpotlightInterval = 60
-        SpotlightTarget   = "Desktop"
+        Region               = "auto"
+        Resolution           = "4K"
+        Target               = "Both"
+        Style                = (Get-CurrentDesktopWallpaperStyle)
+        SaveFolder           = (Get-DownloadFolder)
+        SpotlightEnabled     = $false
+        AutoDesktopSource    = "Bing"
+        AutoLockScreenSource = "Bing"
     }
 }
 
@@ -1012,16 +1012,41 @@ if ($AutoApply) {
             }
             if ($PSBoundParameters.ContainsKey('Resolution') -eq $false -and $savedSettings.Resolution) { $Resolution = $savedSettings.Resolution }
             if ($PSBoundParameters.ContainsKey('Style') -eq $false -and $savedSettings.Style) { $Style = $savedSettings.Style }
-            if ($PSBoundParameters.ContainsKey('Target') -eq $false -and $savedSettings.SpotlightTarget) { $Target = $savedSettings.SpotlightTarget }
         }
-        $images = Get-BingImages -Region $Region
-        if (-not $images -or $images.Count -eq 0) {
-            throw "No Bing wallpaper metadata found for region '$Region'."
+
+        $desktopSource = if ($savedSettings -and $savedSettings.AutoDesktopSource) { [string]$savedSettings.AutoDesktopSource } else { 'Bing' }
+        $lockSource = if ($savedSettings -and $savedSettings.AutoLockScreenSource) { [string]$savedSettings.AutoLockScreenSource } else { 'Bing' }
+
+        function Invoke-AutoSource {
+            param([string]$Source, [string]$Target)
+
+            switch ($Source) {
+                'Bing' {
+                    $images = Get-BingImages -Region $Region
+                }
+                'Spotlight' {
+                    $images = Get-SpotlightImages -Count 1
+                }
+                'Wallhaven' {
+                    throw 'Wallhaven is not implemented yet.'
+                }
+                default {
+                    throw "Unknown wallpaper source: $Source"
+                }
+            }
+
+            if (-not $images -or $images.Count -eq 0) {
+                throw "No wallpaper was returned by $Source."
+            }
+
+            Set-BingImage -Image $images[0] -Resolution $Resolution -Target $Target -Style $Style | Out-Null
         }
-        $targetImage = $images[0]
-        $title = Get-CleanImageTitle $targetImage
-        $appliedPath = Set-BingImage -Image $targetImage -Resolution $Resolution -Target $Target -Style $Style
-        Write-Output "Successfully applied AutoScape wallpaper: $title ($appliedPath)"
+
+        $errors = @()
+        try { Invoke-AutoSource -Source $desktopSource -Target 'Desktop' } catch { $errors += "Desktop: $($_.Exception.Message)" }
+        try { Invoke-AutoSource -Source $lockSource -Target 'Lock screen' } catch { $errors += "Lock screen: $($_.Exception.Message)" }
+
+        if ($errors.Count -gt 0) { throw ($errors -join '; ') }
         [Environment]::Exit(0)
     }
     catch {
@@ -1485,34 +1510,20 @@ $xaml = @"
                                     <Border.Effect>
                                         <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
                                     </Border.Effect>
-                                    <StackPanel Orientation="Horizontal">
-                                        <StackPanel Width="135" Margin="0,0,16,0">
-                                            <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                            <ComboBox Name="SpotlightIntervalBox" Width="135" FontSize="13.5" Height="38">
-                                                <ComboBox.Tag>
-                                                    <Viewbox Width="16.5" Height="16.5">
-                                                        <Canvas Width="20" Height="20">
-                                                            <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                            <Line X1="10" Y1="10" X2="10" Y2="4" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                                            <Line X1="10" Y1="10" X2="14" Y2="12" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                                        </Canvas>
-                                                    </Viewbox>
-                                                </ComboBox.Tag>
-                                            </ComboBox>
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <StackPanel Width="155" Margin="0,0,16,0">
+                                                <TextBlock Text="Desktop" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                                <ComboBox Name="AutoDesktopSourceBox" Width="155" FontSize="13.5" Height="38"/>
+                                            </StackPanel>
+                                            <StackPanel Width="155">
+                                                <TextBlock Text="Lock screen" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                                <ComboBox Name="AutoLockScreenSourceBox" Width="155" FontSize="13.5" Height="38"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Width="155">
-                                            <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                            <ComboBox Name="SpotlightTargetBox" Width="155" FontSize="13.5" Height="38">
-                                                <ComboBox.Tag>
-                                                    <Viewbox Width="16.5" Height="16.5">
-                                                        <Canvas Width="20" Height="20">
-                                                            <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                            <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                            <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                                        </Canvas>
-                                                    </Viewbox>
-                                                </ComboBox.Tag>
-                                            </ComboBox>
+                                        <StackPanel Margin="0,14,0,0">
+                                            <TextBlock Text="Schedule" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                            <ComboBox Name="AutoScheduleBox" Width="326" FontSize="13.5" Height="38"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -1743,14 +1754,15 @@ $window.Add_StateChanged({
 function Save-Settings {
     try {
         $settingsObj = @{
-            Region            = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
-            Resolution        = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "4K" }
-            Target            = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
-            Style             = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
-            SaveFolder        = $script:DownloadFolderPath
-            SpotlightInterval = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { $SpotlightIntervalBox.SelectedItem.Tag } else { 60 }
-            SpotlightTarget   = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedItem } else { 'Desktop' }
-            SpotlightEnabled  = [bool]$script:SpotlightEnabled
+            Region               = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
+            Resolution           = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "4K" }
+            Target               = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
+            Style                = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
+            SaveFolder           = $script:DownloadFolderPath
+            AutoDesktopSource    = if ($AutoDesktopSourceBox -and $AutoDesktopSourceBox.SelectedItem) { [string]$AutoDesktopSourceBox.SelectedItem } else { 'Bing' }
+            AutoLockScreenSource = if ($AutoLockScreenSourceBox -and $AutoLockScreenSourceBox.SelectedItem) { [string]$AutoLockScreenSourceBox.SelectedItem } else { 'Bing' }
+            AutoSchedule         = if ($AutoScheduleBox -and $AutoScheduleBox.SelectedItem) { [string]$AutoScheduleBox.SelectedItem.Tag } else { 'Daily' }
+            SpotlightEnabled     = [bool]$script:SpotlightEnabled
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -1908,8 +1920,9 @@ $SpotlightSetBtnGlow = if ($SpotlightSetBtn) { $SpotlightSetBtn.Effect } else { 
 $SpotlightOptionsPopup = $window.FindName('SpotlightOptionsPopup')
 $SpotlightPopupCard = $window.FindName('SpotlightPopupCard')
 $SpotlightPopupTransform = $window.FindName('SpotlightPopupTransform')
-$SpotlightIntervalBox = $window.FindName('SpotlightIntervalBox')
-$SpotlightTargetBox = $window.FindName('SpotlightTargetBox')
+$AutoDesktopSourceBox = $window.FindName('AutoDesktopSourceBox')
+$AutoLockScreenSourceBox = $window.FindName('AutoLockScreenSourceBox')
+$AutoScheduleBox = $window.FindName('AutoScheduleBox')
 
 # Compact-mode toolbar elements (see Update-ToolbarCompactState below)
 $ToolbarWrap = $window.FindName('ToolbarWrap')
@@ -2794,66 +2807,45 @@ function Update-SpotlightScheduledTaskAsync {
     param([bool]$Enable)
 
     $bgEnable = $Enable
-    $bgMinutes = if ($SpotlightIntervalBox -and $SpotlightIntervalBox.SelectedItem) { [int]$SpotlightIntervalBox.SelectedItem.Tag } else { 60 }
-    $bgTarget = if ($SpotlightTargetBox -and $SpotlightTargetBox.SelectedItem) { [string]$SpotlightTargetBox.SelectedItem } else { 'Desktop' }
+    $bgSchedule = if ($AutoScheduleBox -and $AutoScheduleBox.SelectedItem) { [string]$AutoScheduleBox.SelectedItem.Tag } else { 'Daily' }
     $bgScriptPath = $script:SpotlightScriptPath
-    $bgAppDataRoot = $env:LOCALAPPDATA
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([bool]$Enable, [int]$Minutes, [string]$Target, [string]$ScriptPath, [string]$AppDataRoot)
+            param([bool]$Enable, [string]$Schedule, [string]$ScriptPath)
             try {
+                $taskName = 'AutoScapeDailyWallpaper'
+                $legacyTaskName = 'BingWallpaperSpotlight'
+
                 if ($Enable) {
-                    if (-not ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath))) {
-                        return
-                    }
+                    if (-not ($ScriptPath -and (Test-Path -LiteralPath $ScriptPath))) { return }
 
-                    $actionArgs = "-AutoApply -Target `"$Target`""
-
-                    # Previously this copied the raw .ps1 script text onto a
-                    # file literally named "AutoScape.exe" and pointed the
-                    # task at that - but a .ps1's text saved with a .exe
-                    # extension is not a valid Windows executable, so the
-                    # task silently failed to launch every single time it
-                    # fired. Now that the app always installs to a fixed,
-                    # stable path, we can point the task straight at the
-                    # real script through the same conhost/powershell
-                    # pattern used for the app's own shortcuts and the
-                    # updater - conhost.exe is Microsoft-signed, so this
-                    # keeps the "no unsigned exe" property too.
                     $conhostExe = Join-Path $env:WINDIR 'System32\conhost.exe'
                     $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-                    $fullArgs = "--headless `"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" $actionArgs"
+                    $fullArgs = "--headless `"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -AutoApply"
                     $workingDir = Split-Path -Parent $ScriptPath
 
                     $action = New-ScheduledTaskAction -Execute $conhostExe -Argument $fullArgs -WorkingDirectory $workingDir
                     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
-
-                    if ($Minutes -eq 0) {
-                        $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-                    }
-                    elseif ($Minutes -le 1) {
-                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
-                    }
-                    elseif ($Minutes -lt 60) {
-                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
-                    }
-                    elseif ($Minutes -lt 1440) {
-                        $hours = [math]::Max(1, [int]($Minutes / 60))
-                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours $hours)
+                    if ($Schedule -eq 'Test1Minute') {
+                        # Temporary test mode: repeat once per minute so Auto can be verified quickly.
+                        $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
                     }
                     else {
-                        $trigger = New-ScheduledTaskTrigger -Daily -At ((Get-Date).Date)
+                        # Normal production behavior: once per day at local midnight.
+                        $trigger = New-ScheduledTaskTrigger -Daily -At '12:00AM'
                     }
 
-                    Register-ScheduledTask -TaskName "BingWallpaperSpotlight" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+                    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+                    Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false -ErrorAction SilentlyContinue
                 }
                 else {
-                    Unregister-ScheduledTask -TaskName "BingWallpaperSpotlight" -Confirm:$false -ErrorAction SilentlyContinue
+                    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+                    Unregister-ScheduledTask -TaskName $legacyTaskName -Confirm:$false -ErrorAction SilentlyContinue
                 }
             }
             catch {}
-        }).AddArgument($bgEnable).AddArgument($bgMinutes).AddArgument($bgTarget).AddArgument($bgScriptPath).AddArgument($bgAppDataRoot)
+        }).AddArgument($bgEnable).AddArgument($bgSchedule).AddArgument($bgScriptPath)
 
     $null = $ps.BeginInvoke()
 }
@@ -4505,26 +4497,34 @@ function Invoke-CheckForUpdatesClick {
     }
 }
 
-@(
-    @{ Label = 'On Login'; Minutes = 0 },
-    @{ Label = '1 minute'; Minutes = 1 },
-    @{ Label = 'Hourly'; Minutes = 60 },
-    @{ Label = 'Every 6h'; Minutes = 360 },
-    @{ Label = 'Daily'; Minutes = 1440 }
-) | ForEach-Object {
-    $it = New-Object System.Windows.Controls.ComboBoxItem
-    $it.Content = $_.Label
-    $it.Tag = $_.Minutes
-    [void]$SpotlightIntervalBox.Items.Add($it)
+@('Bing', 'Spotlight', 'Wallhaven') | ForEach-Object {
+    [void]$AutoDesktopSourceBox.Items.Add($_)
+    [void]$AutoLockScreenSourceBox.Items.Add($_)
 }
 
-$savedMinutes = if ($script:appSettings.SpotlightInterval -ne $null) { [int]$script:appSettings.SpotlightInterval } else { 60 }
-$SpotlightIntervalBox.SelectedIndex = switch ($savedMinutes) { 0 { 0 } { $_ -eq 1 -or $_ -eq -1 } { 1 } 60 { 2 } 360 { 3 } default { 4 } }
+$savedDesktopSource = if ($script:appSettings.AutoDesktopSource) { [string]$script:appSettings.AutoDesktopSource } else { 'Bing' }
+$savedLockScreenSource = if ($script:appSettings.AutoLockScreenSource) { [string]$script:appSettings.AutoLockScreenSource } else { 'Bing' }
 
-@('Desktop', 'Lock screen', 'Both') | ForEach-Object { [void]$SpotlightTargetBox.Items.Add($_) }
-$savedTarget = if ($script:appSettings.SpotlightTarget) { $script:appSettings.SpotlightTarget } else { 'Desktop' }
-$SpotlightTargetBox.SelectedItem = $SpotlightTargetBox.Items | Where-Object { $_ -eq $savedTarget } | Select-Object -First 1
-if (-not $SpotlightTargetBox.SelectedItem) { $SpotlightTargetBox.SelectedIndex = 0 }
+$AutoDesktopSourceBox.SelectedItem = $savedDesktopSource
+if (-not $AutoDesktopSourceBox.SelectedItem) { $AutoDesktopSourceBox.SelectedItem = 'Bing' }
+$AutoLockScreenSourceBox.SelectedItem = $savedLockScreenSource
+if (-not $AutoLockScreenSourceBox.SelectedItem) { $AutoLockScreenSourceBox.SelectedItem = 'Bing' }
+
+if ($AutoScheduleBox) {
+    $dailyItem = New-Object System.Windows.Controls.ComboBoxItem
+    $dailyItem.Content = 'Daily · 12:00 AM'
+    $dailyItem.Tag = 'Daily'
+    [void]$AutoScheduleBox.Items.Add($dailyItem)
+
+    $testItem = New-Object System.Windows.Controls.ComboBoxItem
+    $testItem.Content = 'Every 1 minute (Test)'
+    $testItem.Tag = 'Test1Minute'
+    [void]$AutoScheduleBox.Items.Add($testItem)
+
+    $savedSchedule = if ($script:appSettings.AutoSchedule) { [string]$script:appSettings.AutoSchedule } else { 'Daily' }
+    $AutoScheduleBox.SelectedItem = $AutoScheduleBox.Items | Where-Object { [string]$_.Tag -eq $savedSchedule } | Select-Object -First 1
+    if (-not $AutoScheduleBox.SelectedItem) { $AutoScheduleBox.SelectedIndex = 0 }
+}
 
 $spotlightWasEnabled = ($script:appSettings.SpotlightEnabled -eq $true)
 if ($spotlightWasEnabled) {
@@ -4537,11 +4537,9 @@ $SpotlightPill.Add_PreviewMouseLeftButtonDown({
         $e.Handled = $true
         $newState = -not $script:SpotlightEnabled
         Set-SpotlightState -Enabled $newState
-        Update-SpotlightScheduledTaskAsync -Enable $newState
-        Save-Settings
-    
+
         if ($newState) {
-            Set-TransientStatus -Message "Automatic wallpaper changing enabled." -Brush $statusSuccessBrush
+            Set-TransientStatus -Message "Automatic wallpaper changing enabled. Default schedule: daily at 12:00 AM." -Brush $statusSuccessBrush
             if ($SpotlightOptionsPopup) { $SpotlightOptionsPopup.IsOpen = $true }
         }
         else {
@@ -4549,8 +4547,26 @@ $SpotlightPill.Add_PreviewMouseLeftButtonDown({
         }
     })
 
-$SpotlightIntervalBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
-$SpotlightTargetBox.Add_SelectionChanged({ if ($script:SpotlightEnabled) { Update-SpotlightScheduledTaskAsync -Enable $true; Save-Settings } })
+$AutoDesktopSourceBox.Add_SelectionChanged({
+        if ($script:SpotlightEnabled) {
+            Save-Settings
+        }
+    })
+
+$AutoLockScreenSourceBox.Add_SelectionChanged({
+        if ($script:SpotlightEnabled) {
+            Save-Settings
+        }
+    })
+
+if ($AutoScheduleBox) {
+    $AutoScheduleBox.Add_SelectionChanged({
+            if ($script:SpotlightEnabled) {
+                Update-SpotlightScheduledTaskAsync -Enable $true
+                Save-Settings
+            }
+        })
+}
 
 if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     $script:spotlightPopupClosedAt = [DateTime]::MinValue
@@ -4559,8 +4575,8 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     # The card's on-screen size is fixed by its fixed-width children (135 +
     # 155 columns, fixed padding/margins), so we can compute it once instead
     # of measuring at runtime.
-    $spotlightPopupCardWidth = 366.0
-    $spotlightPopupCardHeight = 120.0
+    $spotlightPopupCardWidth = 360.0
+    $spotlightPopupCardHeight = 184.0
     $spotlightPopupEdgePad = 8.0
 
     # If the window gets resized while the flyout is open, just close it
@@ -4599,7 +4615,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
                     $roomBelow = $window.ActualHeight - $spotlightPopupEdgePad - $targetBottom
                     if ($roomBelow -lt $spotlightPopupCardHeight) {
                         # Not enough room below - flip the card above the button instead.
-                        $vOffset = -($SpotlightSetBtn.ActualHeight + $spotlightPopupCardHeight + 6.0)
+                        $vOffset = - ($SpotlightSetBtn.ActualHeight + $spotlightPopupCardHeight + 6.0)
                     }
                     $SpotlightOptionsPopup.VerticalOffset = $vOffset
                 }
@@ -4662,21 +4678,21 @@ if ($detectedItem) {
 }
 
 $window.Add_ContentRendered({
-    Start-DeferredNativeExtraCompile
-    $RegionBox.Add_SelectionChanged({ Load-Gallery })
-    Load-Gallery
-})
+        Start-DeferredNativeExtraCompile
+        $RegionBox.Add_SelectionChanged({ Load-Gallery })
+        Load-Gallery
+    })
 
 $RefreshBtn.Add_Click({
-    if ($script:isRefreshAnimating) { return }
-    if (-not $RefreshIcon) {
-        Load-Gallery
-        return
-    }
-    $script:isRefreshAnimating = $true
-    $RefreshBtn.IsEnabled = $false
-    Start-RefreshAnimation
-})
+        if ($script:isRefreshAnimating) { return }
+        if (-not $RefreshIcon) {
+            Load-Gallery
+            return
+        }
+        $script:isRefreshAnimating = $true
+        $RefreshBtn.IsEnabled = $false
+        Start-RefreshAnimation
+    })
 
 $window.Add_SizeChanged({ Update-GalleryViewportHeight })
 $window.Add_SizeChanged({ Update-ToolbarCompactState })
@@ -5352,30 +5368,30 @@ $window.Add_PreviewKeyDown({
             Load-Gallery
         }
 
-elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
-    if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
-    if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
+        elseif (([System.Windows.Input.Keyboard]::Modifiers -band [System.Windows.Input.ModifierKeys]::Control) -ne 0) {
+            if ($script:activeGuideDialog -and $script:activeGuideDialog.IsVisible) { return }
+            if ($UpdateBtn -and -not $UpdateBtn.IsEnabled) { return }
 
-    if ($e.Key -eq [System.Windows.Input.Key]::S) {
-        if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-            $e.Handled = $true
-            # Call your download button click logic here
-            $DownloadBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+            if ($e.Key -eq [System.Windows.Input.Key]::S) {
+                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+                    $e.Handled = $true
+                    # Call your download button click logic here
+                    $DownloadBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+                }
+            }
+            elseif ($e.Key -eq [System.Windows.Input.Key]::B) {
+                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+                    $e.Handled = $true
+                    Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Desktop' -Style $StyleBox.SelectedItem
+                }
+            }
+            elseif ($e.Key -eq [System.Windows.Input.Key]::L) {
+                if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
+                    $e.Handled = $true
+                    Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Lock screen' -Style $StyleBox.SelectedItem
+                }
+            }
         }
-    }
-    elseif ($e.Key -eq [System.Windows.Input.Key]::B) {
-        if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-            $e.Handled = $true
-            Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Desktop' -Style $StyleBox.SelectedItem
-        }
-    }
-    elseif ($e.Key -eq [System.Windows.Input.Key]::L) {
-        if ($script:userHasExplicitlySelectedWallpaper -and $script:selectedCard -and $script:selectedImage) {
-            $e.Handled = $true
-            Apply-WallpaperAsync -Image $script:selectedImage -Card $script:selectedCard -Resolution $ResolutionBox.SelectedItem -Target 'Lock screen' -Style $StyleBox.SelectedItem
-        }
-    }
-}
     })
 
 $window.Add_StateChanged({
