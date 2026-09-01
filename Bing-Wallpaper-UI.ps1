@@ -715,11 +715,55 @@ function Get-BingImages {
     return $uniqueImages
 }
 
+function Get-SpotlightImages {
+    # Uses the Peapix public API (https://peapix.com/api), which archives the
+    # Windows Spotlight lock-screen feed with a stable, documented JSON
+    # endpoint. Microsoft's own feed is an unofficial, undocumented endpoint
+    # with no history of its own - Peapix already solves that problem.
+    param([int]$Count = 24)
+
+    $uri = "https://peapix.com/spotlight/feed?n=$Count"
+    $wc = New-Object System.Net.WebClient
+    $wc.Encoding = [System.Text.Encoding]::UTF8
+    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    try {
+        $json = $wc.DownloadString($uri)
+        $items = if ($json) { @(ConvertFrom-Json -InputObject $json) } else { @() }
+    }
+    catch {
+        $items = @()
+    }
+    finally {
+        $wc.Dispose()
+    }
+
+    $results = @()
+    foreach ($item in $items) {
+        $idMatch = [regex]::Match([string]$item.pageUrl, '(\d+)\s*$')
+        $id = if ($idMatch.Success) { $idMatch.Value } else { [string]$item.imageUrl }
+        $results += [PSCustomObject]@{
+            source    = 'Spotlight'
+            urlbase   = "spotlight_$id"
+            url       = [string]$item.fullUrl
+            thumbUrl  = [string]$item.thumbUrl
+            title     = [string]$item.title
+            copyright = [string]$item.copyright
+            enddate   = ''
+        }
+    }
+    return $results
+}
+
 function Get-BingImageUri {
     param(
         $Image,
         [string]$Resolution
     )
+    if ($Image.source -eq 'Spotlight') {
+        if ($Image.url) { return $Image.url }
+        throw "Invalid Spotlight image data - missing image URL."
+    }
+
     $urlBase = $Image.urlbase
     if (-not $urlBase -or -not ($urlBase -match '^/th\?id=')) {
         throw "Invalid image URLBase format received from Bing."
@@ -1289,9 +1333,28 @@ $xaml = @"
         <Border Name="LogoBorder" Background="Transparent" Width="50" Height="50" Margin="0,0,14,0" VerticalAlignment="Top"/>
         <StackPanel VerticalAlignment="Top">
             <TextBlock Text="AutoScape" FontSize="27" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="30" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,3"/>
-            <TextBlock Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="17" LineStackingStrategy="BlockLineHeight"/>
+            <TextBlock Name="AppSubtitleText" Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="17" LineStackingStrategy="BlockLineHeight"/>
         </StackPanel>
     </StackPanel>
+
+    <!-- Bing / Spotlight source toggle - centered on the same row as the logo -->
+    <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center"
+            Background="#1E1E1E" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="10" Padding="4">
+        <StackPanel Orientation="Horizontal">
+            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Bing daily wallpapers">
+                <StackPanel>
+                    <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,7,18,4"/>
+                    <Border Name="SourceBingIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="1"/>
+                </StackPanel>
+            </Button>
+            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Windows Spotlight lock screen images">
+                <StackPanel>
+                    <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,4"/>
+                    <Border Name="SourceSpotlightIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="0"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </Border>
 </Grid>
 
             <WrapPanel Grid.Row="1" Name="ToolbarWrap" Orientation="Horizontal" Margin="0,0,0,24">
@@ -1787,6 +1850,55 @@ Enable-StrictToolTipDelay $InfoBtn
 $CheckUpdateBtn = $null
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
+
+# --- Bing / Spotlight source toggle -----------------------------------
+# Note: this is unrelated to the existing "SpotlightPill" auto-rotate
+# toggle further below - that one is the "Auto" wallpaper-changer switch
+# and predates this feature. Names below are prefixed "Source" so they
+# never collide with it.
+$SourceBingBtn = $window.FindName('SourceBingBtn')
+$SourceSpotlightBtn = $window.FindName('SourceSpotlightBtn')
+$SourceBingIndicator = $window.FindName('SourceBingIndicator')
+$SourceSpotlightIndicator = $window.FindName('SourceSpotlightIndicator')
+$SourceBingLabel = $window.FindName('SourceBingLabel')
+$SourceSpotlightLabel = $window.FindName('SourceSpotlightLabel')
+$AppSubtitleText = $window.FindName('AppSubtitleText')
+
+$script:currentSource = 'Bing'
+
+function Update-SourceToggleVisual {
+    $activeColor = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 255, 255))
+    $inactiveColor = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(158, 158, 158))
+    $isSpotlight = ($script:currentSource -eq 'Spotlight')
+
+    if ($SourceBingLabel) { $SourceBingLabel.Foreground = if ($isSpotlight) { $inactiveColor } else { $activeColor } }
+    if ($SourceSpotlightLabel) { $SourceSpotlightLabel.Foreground = if ($isSpotlight) { $activeColor } else { $inactiveColor } }
+    if ($SourceBingIndicator) { $SourceBingIndicator.Opacity = if ($isSpotlight) { 0 } else { 1 } }
+    if ($SourceSpotlightIndicator) { $SourceSpotlightIndicator.Opacity = if ($isSpotlight) { 1 } else { 0 } }
+    if ($AppSubtitleText) {
+        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } else { 'Bing wallpapers, delivered daily' }
+    }
+}
+Update-SourceToggleVisual
+
+if ($SourceBingBtn) {
+    $SourceBingBtn.Add_Click({
+            if ($script:currentSource -eq 'Bing') { return }
+            $script:currentSource = 'Bing'
+            Update-SourceToggleVisual
+            Load-Gallery
+        })
+}
+if ($SourceSpotlightBtn) {
+    $SourceSpotlightBtn.Add_Click({
+            if ($script:currentSource -eq 'Spotlight') { return }
+            $script:currentSource = 'Spotlight'
+            Update-SourceToggleVisual
+            Load-Gallery
+        })
+}
+# ------------------------------------------------------------------------
+
 $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
 $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
@@ -3821,7 +3933,7 @@ function Render-GalleryGrid {
             $date.Text = ([DateTime]::ParseExact($image.enddate.ToString(), 'yyyyMMdd', $null)).ToString('ddd, MMM d')
         }
         catch {
-            $date.Text = "Bing Wallpaper"
+            $date.Text = if ($image.source -eq 'Spotlight') { 'Windows Spotlight' } else { 'Bing Wallpaper' }
         }
         $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
         $date.FontSize = 13.5
@@ -3931,11 +4043,19 @@ function Load-Gallery {
     }
 
     $selectedRegion = Get-SelectedRegionCode
+    $fetchSource = $script:currentSource
     $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
+    # Each source gets its own subfolder so switching the Bing/Spotlight
+    # toggle doesn't prune the other source's cached thumbnails out from
+    # under it (the prune step below only keeps what's in the CURRENT feed).
+    $sourceThumbDir = Join-Path $thumbCacheDir $fetchSource
 
     if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
         try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
+    }
+    if (-not (Test-Path -LiteralPath $sourceThumbDir)) {
+        try { New-Item -ItemType Directory -Path $sourceThumbDir -Force | Out-Null } catch {}
     }
 
     $GalleryPanel.Children.Clear()
@@ -3947,13 +4067,84 @@ function Load-Gallery {
     $script:userHasExplicitlySelectedWallpaper = $false
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
     $StatusText.Opacity = 1
-    $StatusText.Text = 'Connecting to Bing...'
+    $StatusText.Text = if ($fetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } else { 'Connecting to Bing...' }
     $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Region, [string]$CacheDir)
+            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count)
             try {
+                if ($Source -eq 'Spotlight') {
+                    $uri = "https://peapix.com/spotlight/feed?n=$Count"
+                    $wc = New-Object System.Net.WebClient
+                    $wc.Encoding = [System.Text.Encoding]::UTF8
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $json = $wc.DownloadString($uri)
+                    $wc.Dispose()
+
+                    $items = if ($json) { @(ConvertFrom-Json -InputObject $json) } else { @() }
+                    if (-not $items -or $items.Count -eq 0) {
+                        return @{ Success = $false; Error = "Unable to connect to Spotlight."; Images = @() }
+                    }
+
+                    $uniqueImages = @()
+                    foreach ($item in $items) {
+                        $idMatch = [regex]::Match([string]$item.pageUrl, '(\d+)\s*$')
+                        $id = if ($idMatch.Success) { $idMatch.Value } else { [string]$item.imageUrl }
+                        $uniqueImages += [PSCustomObject]@{
+                            urlbase   = "spotlight_$id"
+                            url       = [string]$item.fullUrl
+                            thumbUrl  = [string]$item.thumbUrl
+                            title     = [string]$item.title
+                            copyright = [string]$item.copyright
+                        }
+                    }
+
+                    $urlBases = [string[]]($uniqueImages | ForEach-Object { [string]$_.urlbase })
+
+                    # Prune thumbnails that rotated out of the current feed,
+                    # same bounded-cache logic as the Bing path below.
+                    try {
+                        $keepNames = [System.Collections.Generic.HashSet[string]]::new()
+                        foreach ($ub in $urlBases) {
+                            [void]$keepNames.Add(($ub -replace '[^a-zA-Z0-9]', '') + '_thumb.jpg')
+                        }
+                        Get-ChildItem -LiteralPath $CacheDir -Filter '*_thumb.jpg' -File -ErrorAction SilentlyContinue |
+                        Where-Object { -not $keepNames.Contains($_.Name) } |
+                        Remove-Item -Force -ErrorAction SilentlyContinue
+                    }
+                    catch {}
+
+                    # Peapix thumbUrls are already small (640px), so a plain
+                    # sequential download is cheap - no need for the native
+                    # parallel downloader, which is hardcoded to Bing's own
+                    # URL pattern anyway.
+                    $wc2 = New-Object System.Net.WebClient
+                    $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    foreach ($img in $uniqueImages) {
+                        $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                        $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                        if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
+                            try { $wc2.DownloadFile($img.thumbUrl, $target) } catch {}
+                        }
+                    }
+                    $wc2.Dispose()
+
+                    $resultImages = @()
+                    foreach ($img in $uniqueImages) {
+                        $resultImages += [PSCustomObject]@{
+                            source    = 'Spotlight'
+                            urlbase   = [string]$img.urlbase
+                            url       = [string]$img.url
+                            title     = [string]$img.title
+                            copyright = [string]$img.copyright
+                            enddate   = ''
+                        }
+                    }
+
+                    return @{ Success = $true; Error = $null; Images = $resultImages }
+                }
+
                 # BingWallpaper.FastDownloader was already compiled in-memory at
                 # script startup and is visible to this runspace (same process,
                 # same default AppDomain) - nothing to load here.
@@ -4029,14 +4220,14 @@ function Load-Gallery {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
             }
-        }).AddArgument($selectedRegion).AddArgument($thumbCacheDir)
+        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24)
 
     $asyncOp = $ps.BeginInvoke()
 
     $script:galleryRunspaceContext = @{
         PS            = $ps
         AsyncOp       = $asyncOp
-        ThumbCacheDir = $thumbCacheDir
+        ThumbCacheDir = $sourceThumbDir
     }
 
     $script:galleryTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -4090,7 +4281,8 @@ function Load-Gallery {
                 $script:loadingStatusTimer.Add_Tick({
                         $script:loadingCounter++
                         if ($script:loadingCounter -le $script:loadingTotal) {
-                            $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from Bing..."
+                            $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } else { 'Bing' }
+                            $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from $sourceName..."
                         }
                         else {
                             $script:loadingStatusTimer.Stop()
@@ -4191,7 +4383,12 @@ $DownloadBtn.Add_Click({
             }
         }
         else {
-            $targetImage = (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
+            $targetImage = if ($script:currentSource -eq 'Spotlight') {
+                (Get-SpotlightImages | Select-Object -First 1)
+            }
+            else {
+                (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
+            }
             if ($GalleryPanel -and $GalleryPanel.Children.Count -gt 0) {
                 $targetCard = $GalleryPanel.Children[0]
             }
