@@ -1107,6 +1107,7 @@ $xaml = @"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
                                    AllowsTransparency="True"
+                                   StaysOpen="False"
                                    Focusable="False">
                                 <Border Background="#1E1E1E" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
                                     <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
@@ -1383,7 +1384,7 @@ $xaml = @"
                                     Background="#2a2a2a" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                     Cursor="Hand" VerticalAlignment="Center">
                                 <Border.Effect>
-                                    <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
+                                    <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.5" Opacity="0"/>
                                 </Border.Effect>
                                 <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
                                          HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
@@ -1410,47 +1411,49 @@ $xaml = @"
                         </Button>
 
                         <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=SpotlightSetBtn}"
-                               Placement="Bottom" VerticalOffset="6" AllowsTransparency="True" StaysOpen="False"
+                               Placement="Bottom" VerticalOffset="6" HorizontalOffset="0" AllowsTransparency="True" StaysOpen="False"
                                PopupAnimation="None" Focusable="False">
-                            <Border Name="SpotlightPopupCard" Background="#1E1E1E" BorderBrush="#1FFFFFFF" BorderThickness="1.5"
-                                    CornerRadius="10" Padding="14" Opacity="0">
-                                <Border.RenderTransform>
+                            <Grid Name="SpotlightPopupTransformHost" Margin="14" RenderTransformOrigin="0.5,0.5">
+                                <Grid.RenderTransform>
                                     <TranslateTransform x:Name="SpotlightPopupTransform" Y="-8"/>
-                                </Border.RenderTransform>
-                                <Border.Effect>
-                                    <DropShadowEffect Color="#000000" BlurRadius="20" ShadowDepth="4" Opacity="0.4"/>
-                                </Border.Effect>
-                                <StackPanel Orientation="Horizontal">
-                                    <StackPanel Width="135" Margin="0,0,16,0">
-                                        <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                        <ComboBox Name="SpotlightIntervalBox" Width="135" FontSize="13.5" Height="38">
-                                            <ComboBox.Tag>
-                                                <Viewbox Width="16.5" Height="16.5">
-                                                    <Canvas Width="20" Height="20">
-                                                        <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                        <Line X1="10" Y1="10" X2="10" Y2="4" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                                        <Line X1="10" Y1="10" X2="14" Y2="12" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
-                                                    </Canvas>
-                                                </Viewbox>
-                                            </ComboBox.Tag>
-                                        </ComboBox>
+                                </Grid.RenderTransform>
+                                <Border Name="SpotlightPopupCard" Background="#1E1E1E" BorderBrush="#1FFFFFFF" BorderThickness="1.5"
+                                        CornerRadius="10" Padding="14" Opacity="0" SnapsToDevicePixels="False">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
+                                    </Border.Effect>
+                                    <StackPanel Orientation="Horizontal">
+                                        <StackPanel Width="135" Margin="0,0,16,0">
+                                            <TextBlock Text="Every" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                            <ComboBox Name="SpotlightIntervalBox" Width="135" FontSize="13.5" Height="38">
+                                                <ComboBox.Tag>
+                                                    <Viewbox Width="16.5" Height="16.5">
+                                                        <Canvas Width="20" Height="20">
+                                                            <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                            <Line X1="10" Y1="10" X2="10" Y2="4" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
+                                                            <Line X1="10" Y1="10" X2="14" Y2="12" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round"/>
+                                                        </Canvas>
+                                                    </Viewbox>
+                                                </ComboBox.Tag>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <StackPanel Width="155">
+                                            <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
+                                            <ComboBox Name="SpotlightTargetBox" Width="155" FontSize="13.5" Height="38">
+                                                <ComboBox.Tag>
+                                                    <Viewbox Width="16.5" Height="16.5">
+                                                        <Canvas Width="20" Height="20">
+                                                            <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                            <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                            <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                                        </Canvas>
+                                                    </Viewbox>
+                                                </ComboBox.Tag>
+                                            </ComboBox>
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Width="155">
-                                        <TextBlock Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                        <ComboBox Name="SpotlightTargetBox" Width="155" FontSize="13.5" Height="38">
-                                            <ComboBox.Tag>
-                                                <Viewbox Width="16.5" Height="16.5">
-                                                    <Canvas Width="20" Height="20">
-                                                        <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                        <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                        <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                                    </Canvas>
-                                                </Viewbox>
-                                            </ComboBox.Tag>
-                                        </ComboBox>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
+                                </Border>
+                            </Grid>
                         </Popup>
                     </StackPanel>
                 </StackPanel>
@@ -1482,6 +1485,12 @@ $xaml = @"
 
         <Border Name="ModalDimOverlay" Background="#000000" Opacity="0" Visibility="Collapsed" IsHitTestVisible="False" Panel.ZIndex="900"/>
         <Grid Name="ModalHost" Background="Transparent" Visibility="Collapsed" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Panel.ZIndex="1000"/>
+        <!-- Dedicated layer for Show-ModernDialog (Keyboard Shortcuts, Check for
+             Updates, etc.) so those dialogs stack ON TOP of a still-open User
+             Guide modal instead of sharing ModalHost's single slot and evicting
+             it. Sits above ModalHost's z-index of 1000. -->
+        <Border Name="DialogDimOverlay" Background="#000000" Opacity="0" Visibility="Collapsed" IsHitTestVisible="False" Panel.ZIndex="1050"/>
+        <Grid Name="DialogModalHost" Background="Transparent" Visibility="Collapsed" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Panel.ZIndex="1100"/>
     </Grid>
 </Window>
 "@
@@ -1664,6 +1673,9 @@ $window.Add_StateChanged({
         if ($script:activeModalControl) {
             Close-InWindowModal
         }
+        if ($script:activeDialogModalControl) {
+            Close-DialogModal
+        }
     })
 function Save-Settings {
     try {
@@ -1809,7 +1821,15 @@ $ModalHost = $window.FindName('ModalHost')
 $script:activeModalControl = $null
 $script:activeModalKind = $null
 $script:activeModalClosing = $false
-$script:activeModalCloseCallback = $null    
+$script:activeModalCloseCallback = $null
+
+# Second, higher layer used exclusively by Show-ModernDialog so it can stack
+# above an already-open User Guide modal (see Open-DialogModal/Close-DialogModal).
+$DialogDimOverlay = $window.FindName('DialogDimOverlay')
+$DialogModalHost = $window.FindName('DialogModalHost')
+$script:activeDialogModalControl = $null
+$script:activeDialogModalClosing = $false
+$script:activeDialogModalCloseCallback = $null
 
 function Set-AppDimState {
     param([bool]$Dim, [bool]$Immediate = $false)
@@ -2000,6 +2020,150 @@ if ($ModalHost) {
         })
 }
 
+function Open-DialogModal {
+    param(
+        [Parameter(Mandatory = $true)]$Control,
+        [scriptblock]$CloseCallback = $null
+    )
+
+    if (-not $DialogModalHost) { throw 'DialogModalHost is unavailable.' }
+    if (-not $DialogDimOverlay) { throw 'DialogDimOverlay is unavailable.' }
+
+    if ($script:activeDialogModalControl) { Close-DialogModal -Immediate $true }
+
+    $script:activeDialogModalControl = $Control
+    $script:activeDialogModalClosing = $false
+    $script:activeDialogModalCloseCallback = $CloseCallback
+
+    try { $Control.CacheMode = $null } catch {}
+    try { $Control.RenderTransform = $null } catch {}
+    try { $Control.Opacity = 0.0 } catch {}
+
+    $Control.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+    $Control.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+
+    $DialogModalHost.Children.Clear()
+    [void]$DialogModalHost.Children.Add($Control)
+    $DialogModalHost.Visibility = [System.Windows.Visibility]::Visible
+    $DialogModalHost.IsHitTestVisible = $true
+
+    $DialogModalHost.UpdateLayout()
+
+    $DialogDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+    $DialogDimOverlay.Opacity = 0.0
+    $DialogDimOverlay.Visibility = [System.Windows.Visibility]::Visible
+    $DialogDimOverlay.IsHitTestVisible = $true
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(190))
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $duration)
+    $fade.EasingFunction = $ease
+    $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $Control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
+
+    # This layer's own dim is intentionally light - it stacks on top of the
+    # Guide modal's existing 0.22 dim (when open), and the two combine visually
+    # (1-(1-0.22)*(1-0.08) ~= 0.28 total), so this alone should stay subtle.
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 0.6, $duration)
+    $dimAnim.EasingFunction = $ease
+    $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $DialogDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
+}
+
+function Close-DialogModal {
+    param([bool]$Immediate = $false)
+
+    if ($script:activeDialogModalClosing -and -not $Immediate) { return }
+
+    $control = $script:activeDialogModalControl
+    if (-not $control) { return }
+
+    if ($Immediate) {
+        $callback = $script:activeDialogModalCloseCallback
+        $script:activeDialogModalControl = $null
+        $script:activeDialogModalCloseCallback = $null
+        $script:activeDialogModalClosing = $false
+
+        try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null) } catch {}
+        $DialogModalHost.Children.Clear()
+        $DialogModalHost.Visibility = [System.Windows.Visibility]::Collapsed
+        $DialogModalHost.IsHitTestVisible = $false
+
+        $DialogDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+        $DialogDimOverlay.Opacity = 0.0
+        $DialogDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+        $DialogDimOverlay.IsHitTestVisible = $false
+
+        if ($callback) { & $callback }
+        return
+    }
+
+    $script:activeDialogModalClosing = $true
+    $DialogModalHost.IsHitTestVisible = $false
+
+    try { $control.CacheMode = $null } catch {}
+    try { $control.RenderTransform = $null } catch {}
+
+    $duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseIn
+
+    $fade = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$control.Opacity, 0.0, $duration)
+    $fade.EasingFunction = $ease
+    $fade.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fade)
+
+    $dimAnim = New-Object System.Windows.Media.Animation.DoubleAnimation([double]$DialogDimOverlay.Opacity, 0.0, $duration)
+    $dimAnim.EasingFunction = $ease
+    $dimAnim.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::HoldEnd
+    $DialogDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $dimAnim)
+
+    $timer = New-Object System.Windows.Threading.DispatcherTimer
+    $timer.Interval = [TimeSpan]::FromMilliseconds(160)
+    $timer.Add_Tick({
+            param($sender, $e)
+            $sender.Stop()
+
+            $callback = $script:activeDialogModalCloseCallback
+            $script:activeDialogModalControl = $null
+            $script:activeDialogModalCloseCallback = $null
+            $script:activeDialogModalClosing = $false
+
+            try { $control.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null) } catch {}
+
+            $DialogModalHost.Children.Clear()
+            $DialogModalHost.Visibility = [System.Windows.Visibility]::Collapsed
+            $DialogModalHost.IsHitTestVisible = $false
+
+            $DialogDimOverlay.BeginAnimation([System.Windows.Controls.Border]::OpacityProperty, $null)
+            $DialogDimOverlay.Opacity = 0.0
+            $DialogDimOverlay.Visibility = [System.Windows.Visibility]::Collapsed
+            $DialogDimOverlay.IsHitTestVisible = $false
+
+            if ($callback) { & $callback }
+        })
+    $timer.Start()
+}
+
+if ($DialogModalHost) {
+    $DialogModalHost.Add_PreviewMouseLeftButtonDown({
+            param($s, $e)
+            if (-not $script:activeDialogModalControl -or $script:activeDialogModalClosing) { return }
+            $source = $e.OriginalSource -as [System.Windows.DependencyObject]
+            $inside = $false
+            try {
+                if ($source) { $inside = $source.IsDescendantOf($script:activeDialogModalControl) }
+            }
+            catch { $inside = $false }
+            if (-not $inside) {
+                Close-DialogModal
+                $e.Handled = $true
+            }
+        })
+}
+
 function Start-RefreshAnimation {
     if (-not $RefreshIcon) { return }
 
@@ -2092,6 +2256,30 @@ $RegionBox.Add_SelectionChanged($saveHandler)
 $ResolutionBox.Add_SelectionChanged($saveHandler)
 $TargetBox.Add_SelectionChanged($saveHandler)
 $StyleBox.Add_SelectionChanged($saveHandler)
+
+# Toolbar dropdowns (Region/Resolution/Apply To/Style) should behave as a
+# mutually-exclusive set: clicking one while another is open must close the
+# other AND open the clicked one on that SAME click, not require a second
+# click. We hook each combo's own PreviewMouseLeftButtonDown (tunnel phase,
+# fires before the ToggleButton's ClickMode="Press" logic runs) and close
+# any other open dropdown there. This only fires when the click lands on the
+# ComboBox control itself (its closed toggle), never for clicks inside an
+# open popup's item list - popups render in their own top-level window, so
+# those clicks never route through this handler - meaning selection and
+# click-away-to-close behavior are untouched.
+$script:toolbarDropdowns = @($RegionBox, $ResolutionBox, $TargetBox, $StyleBox)
+foreach ($combo in $script:toolbarDropdowns) {
+    if ($combo) {
+        $combo.Add_PreviewMouseLeftButtonDown({
+                param($evtSender, $e)
+                foreach ($other in $script:toolbarDropdowns) {
+                    if ($other -and $other -ne $evtSender -and $other.IsDropDownOpen) {
+                        $other.IsDropDownOpen = $false
+                    }
+                }
+            })
+    }
+}
 
 $FolderBox.Add_PreviewMouseLeftButtonDown({
         $picked = $null
@@ -2686,7 +2874,7 @@ function Show-ModernDialog {
     $dialogXaml = @"
 <UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Width="460" Background="#181818" Foreground="#F0F0F0" FontFamily="Segoe UI">
+        Width="460" Background="Transparent" Foreground="#F0F0F0" FontFamily="Segoe UI">
     <UserControl.Resources>
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
@@ -2752,7 +2940,7 @@ function Show-ModernDialog {
         </Style>
     </UserControl.Resources>
 
-    <Border Name="DialogRoot" Padding="24" Background="#181818" CornerRadius="12" Opacity="0">
+    <Border Name="DialogRoot" Padding="24" Background="#181818" BorderBrush="#2E2E2E" BorderThickness="1.5" CornerRadius="12" Opacity="0">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -2837,7 +3025,7 @@ function Show-ModernDialog {
     $closeWithFade = {
         param([string]$choice)
         $script:dialogChoice = $choice
-        Close-InWindowModal
+        Close-DialogModal
     }
 
     if ($Buttons -eq 'YesNo') {
@@ -2882,7 +3070,7 @@ function Show-ModernDialog {
     $root = $dlg.FindName('DialogRoot')
     if ($root) { $root.Opacity = 1.0 }
 
-    Open-InWindowModal -Control $dlg -Kind 'Dialog' -CloseCallback {
+    Open-DialogModal -Control $dlg -CloseCallback {
         $frame.Continue = $false
         try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
     }
@@ -4171,6 +4359,19 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     $script:spotlightPopupClosedAt = [DateTime]::MinValue
     $spotlightSetBtnAccentBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(0, 120, 212))
 
+    # The card's on-screen size is fixed by its fixed-width children (135 +
+    # 155 columns, fixed padding/margins), so we can compute it once instead
+    # of measuring at runtime.
+    $spotlightPopupCardWidth = 366.0
+    $spotlightPopupCardHeight = 120.0
+    $spotlightPopupEdgePad = 8.0
+
+    # If the window gets resized while the flyout is open, just close it
+    # rather than let it sit at a now-stale (possibly off-window) position.
+    $window.Add_SizeChanged({
+            if ($SpotlightOptionsPopup -and $SpotlightOptionsPopup.IsOpen) { $SpotlightOptionsPopup.IsOpen = $false }
+        })
+
     $SpotlightSetBtn.Add_Click({
             # Popup has StaysOpen="False": clicking this same button while the
             # popup is open first fires the popup's own light-dismiss (the
@@ -4180,6 +4381,37 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
             # on the button actually closes it instead of bouncing back open.
             $msSinceClosed = ([DateTime]::Now - $script:spotlightPopupClosedAt).TotalMilliseconds
             if ($msSinceClosed -lt 200) { return }
+
+            if (-not $SpotlightOptionsPopup.IsOpen) {
+                # Work out where the button actually sits in the window right
+                # now, and clamp the popup's offsets so the card can't render
+                # past any edge of the (possibly small/resized) window. Falls
+                # back to the old fixed offsets if anything here goes wrong.
+                try {
+                    $targetPos = $SpotlightSetBtn.TranslatePoint([System.Windows.Point]::new(0, 0), $window)
+
+                    $hOffset = 0.0
+                    $maxH = ($window.ActualWidth - $spotlightPopupEdgePad) - $targetPos.X - $spotlightPopupCardWidth
+                    $minH = $spotlightPopupEdgePad - $targetPos.X
+                    if ($hOffset -gt $maxH) { $hOffset = $maxH }
+                    if ($hOffset -lt $minH) { $hOffset = $minH }
+                    $SpotlightOptionsPopup.HorizontalOffset = $hOffset
+
+                    $vOffset = 6.0
+                    $targetBottom = $targetPos.Y + $SpotlightSetBtn.ActualHeight
+                    $roomBelow = $window.ActualHeight - $spotlightPopupEdgePad - $targetBottom
+                    if ($roomBelow -lt $spotlightPopupCardHeight) {
+                        # Not enough room below - flip the card above the button instead.
+                        $vOffset = -($SpotlightSetBtn.ActualHeight + $spotlightPopupCardHeight + 6.0)
+                    }
+                    $SpotlightOptionsPopup.VerticalOffset = $vOffset
+                }
+                catch {
+                    $SpotlightOptionsPopup.HorizontalOffset = 0.0
+                    $SpotlightOptionsPopup.VerticalOffset = 6.0
+                }
+            }
+
             $SpotlightOptionsPopup.IsOpen = -not $SpotlightOptionsPopup.IsOpen
         })
 
@@ -4256,7 +4488,6 @@ $GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
 
 $script:activeGuideDialog = $null
 $script:isClosingGuideDialog = $false
-$script:guideDialogPendingShortcuts = $false
 
 function Close-UserGuideDialog {
     if ($script:isClosingGuideDialog) { return }
@@ -4335,7 +4566,7 @@ function Show-UserGuideDialog {
             </Setter>
         </Style>
     </UserControl.Resources>
-    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#181818" CornerRadius="12" Opacity="1">
+    <Border Name="DialogRoot" Padding="28,24,28,22" Background="#1a1a1a" BorderBrush="#2E2E2E" BorderThickness="1.5" CornerRadius="12" Opacity="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -4704,8 +4935,16 @@ function Show-UserGuideDialog {
     $guideShortcutsBtn = $dlg.FindName('GuideShortcutsBtn')
     if ($guideShortcutsBtn) {
         $guideShortcutsBtn.Add_Click({
-                $script:guideDialogPendingShortcuts = $true
-                Close-UserGuideDialog
+                try {
+                    Show-ModernDialog -Title "AutoScape" -Header "Keyboard Shortcuts" -Icon "Info" -Buttons "OK" `
+                        -Message "Handy shortcuts you can use anywhere in the app:" `
+                        -Details "- Ctrl+S - Download the selected wallpaper`n- Ctrl+B - Set as desktop background`n- Ctrl+L - Set as lock screen`n- F5 - Refresh the gallery`n- Esc - Close the open dialog" | Out-Null
+                }
+                catch {
+                    Show-AppErrorDialog `
+                        -Message "Show-ModernDialog (shortcuts) failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
+                        -Title "Shortcuts dialog error"
+                }
             })
     }
 
@@ -4877,19 +5116,6 @@ function Show-UserGuideDialog {
     Open-InWindowModal -Control $dlg -Kind 'Guide' -CloseCallback {
         $script:activeGuideDialog = $null
         $script:CheckUpdateBtn = $null
-        if ($script:guideDialogPendingShortcuts) {
-            $script:guideDialogPendingShortcuts = $false
-            try {
-                Show-ModernDialog -Title "AutoScape" -Header "Keyboard Shortcuts" -Icon "Info" -Buttons "OK" `
-                    -Message "Handy shortcuts you can use anywhere in the app:" `
-                    -Details "- Ctrl+S - Download the selected wallpaper`n- Ctrl+B - Set as desktop background`n- Ctrl+L - Set as lock screen`n- F5 - Refresh the gallery`n- Esc - Close the open dialog" | Out-Null
-            }
-            catch {
-                Show-AppErrorDialog `
-                    -Message "Show-ModernDialog (shortcuts) failed:`n`n$($_.Exception.GetType().FullName)`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)" `
-                    -Title "Shortcuts dialog error"
-            }
-        }
     }
 }
 
@@ -4909,6 +5135,7 @@ if ($InfoBtn) {
 $window.Add_Closed({
         try {
             if ($script:activeModalControl) { Close-InWindowModal -Immediate $true }
+            if ($script:activeDialogModalControl) { Close-DialogModal -Immediate $true }
             $script:activeGuideDialog = $null
             [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown()
         }
