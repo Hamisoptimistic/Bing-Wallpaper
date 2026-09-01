@@ -1262,7 +1262,7 @@ $xaml = @"
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1.5" CornerRadius="8" Padding="{TemplateBinding Padding}">
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.4" Color="Black"/>
                             </Border.Effect>
@@ -1380,7 +1380,7 @@ $xaml = @"
                     <StackPanel Orientation="Horizontal">
                         <Grid Name="AutoPillRow" Height="38" VerticalAlignment="Center">
                             <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
-                                    Background="#262626" BorderBrush="#3D3D3D" BorderThickness="1.5"
+                                    Background="#2a2a2a" BorderBrush="#3D3D3D" BorderThickness="1.5"
                                     Cursor="Hand" VerticalAlignment="Center">
                                 <Border.Effect>
                                     <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0" Opacity="0"/>
@@ -1474,7 +1474,7 @@ $xaml = @"
                     <Button Name="InfoBtn" Style="{StaticResource ModernIconButton}" Width="46" Height="46" Margin="0,0,12,0" ToolTip="User Guide">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
-                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#262626" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" />
+                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#2a2a2a" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" />
                     <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" />
                 </StackPanel>
             </Grid>
@@ -1688,17 +1688,87 @@ function Save-Settings {
 
 $script:appSettings = Load-Settings
 
+# WPF's own ToolTipService.InitialShowDelay/BetweenShowDelay machinery has
+# a known "recently shown, skip the delay" fast-path that isn't scoped to
+# just the element that was hovered - it's effectively global, and it
+# turns out toggling ToolTipService.IsEnabled around it isn't reliable
+# either: flipping it back on while the mouse is already sitting still on
+# an element doesn't retroactively make WPF start showing a tooltip
+# (its hover-detection kicks off from the MouseEnter event itself, which
+# has already passed by the time IsEnabled flips), so that approach could
+# make tooltips silently stop appearing altogether. Rather than continue
+# fighting that internal state machine, this takes tooltips over
+# entirely: WPF's automatic display is disabled once per element, and a
+# dedicated DispatcherTimer drives the open/close ourselves - so every
+# hover, first one or the hundredth in a row, behaves identically:
+# exactly 600ms after entering before it appears, gone the instant you
+# leave. No shared state between elements, nothing to fight.
+function Enable-StrictToolTipDelay($targetElement) {
+    if (-not $targetElement) { return }
+
+    # A plain string ToolTip (set via `$x.ToolTip = "..."` or a ToolTip=
+    # XAML attribute) only gets wrapped into a real ToolTip object by
+    # WPF's own automatic display machinery, which we're bypassing here -
+    # so wrap it ourselves up front to guarantee .IsOpen works below.
+    if ($targetElement.ToolTip -and -not ($targetElement.ToolTip -is [System.Windows.Controls.ToolTip])) {
+        $wrapped = New-Object System.Windows.Controls.ToolTip
+        $wrapped.Content = $targetElement.ToolTip
+        $targetElement.ToolTip = $wrapped
+    }
+
+    # Normally WPF's own ToolTipService sets this internally when it opens
+    # a tooltip automatically, which is also what lets the tooltip resolve
+    # the app's implicit dark ToolTip style from Window.Resources. Since
+    # we're opening it manually (IsOpen = $true below, not through
+    # ToolTipService), that link never gets made unless we set it
+    # ourselves - without it the tooltip renders with plain default WPF
+    # chrome (white background, square corners) instead of the app's
+    # style.
+    if ($targetElement.ToolTip -is [System.Windows.Controls.ToolTip]) {
+        $targetElement.ToolTip.PlacementTarget = $targetElement
+    }
+
+    [System.Windows.Controls.ToolTipService]::SetIsEnabled($targetElement, $false)
+
+    $showTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $showTimer.Interval = [TimeSpan]::FromMilliseconds(600)
+    $showTimer.Tag = $targetElement
+    $showTimer.Add_Tick({
+            param($tickSender, $tickArgs)
+            $tickSender.Stop()
+            $el = $tickSender.Tag
+            if ($el.ToolTip -is [System.Windows.Controls.ToolTip]) {
+                $el.ToolTip.IsOpen = $true
+            }
+        })
+
+    $targetElement.Add_MouseEnter({
+            $showTimer.Stop()
+            $showTimer.Start()
+        }.GetNewClosure())
+
+    $targetElement.Add_MouseLeave({
+            param($leaveSender, $leaveArgs)
+            $showTimer.Stop()
+            if ($leaveSender.ToolTip -is [System.Windows.Controls.ToolTip]) {
+                $leaveSender.ToolTip.IsOpen = $false
+            }
+        }.GetNewClosure())
+}
+
 $RegionBox = $window.FindName('RegionBox')
 $ResolutionBox = $window.FindName('ResolutionBox')
 $TargetBox = $window.FindName('TargetBox')
 $StyleBox = $window.FindName('StyleBox')
 $FolderBox = $window.FindName('FolderBox')
 $RefreshBtn = $window.FindName('RefreshBtn')
+Enable-StrictToolTipDelay $RefreshBtn
 $RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 $StatusText = $window.FindName('StatusText')
 $InfoBtn = $window.FindName('InfoBtn')
+Enable-StrictToolTipDelay $InfoBtn
 # CheckUpdateBtn no longer lives in the main toolbar - it now lives inside the
 # User Guide modal's footer (see Show-UserGuideDialog) and this variable is
 # (re)pointed at that inner button each time the modal is built.
@@ -1709,6 +1779,7 @@ $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
 $SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
 $SpotlightSetBtn = $window.FindName('SpotlightSetBtn')
+Enable-StrictToolTipDelay $SpotlightSetBtn
 $SpotlightSetBtnGlow = if ($SpotlightSetBtn) { $SpotlightSetBtn.Effect } else { $null }
 $SpotlightOptionsPopup = $window.FindName('SpotlightOptionsPopup')
 $SpotlightPopupCard = $window.FindName('SpotlightPopupCard')
@@ -3435,6 +3506,7 @@ function Render-GalleryGrid {
             $card.ToolTip = "$displayTitle`n$($image.copyright)"
             [System.Windows.Controls.ToolTipService]::SetInitialShowDelay($card, 600)
             [System.Windows.Controls.ToolTipService]::SetBetweenShowDelay($card, 600)
+            Enable-StrictToolTipDelay $card
         }
     
         $card.BorderThickness = New-Object System.Windows.Thickness(0)
@@ -4252,7 +4324,7 @@ function Show-UserGuideDialog {
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1.5" CornerRadius="8" Padding="{TemplateBinding Padding}">
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.4" Color="Black"/>
                             </Border.Effect>
@@ -4620,6 +4692,7 @@ function Show-UserGuideDialog {
 
     $guideGithubRepoBtn = $dlg.FindName('GuideGithubRepoBtn')
     if ($guideGithubRepoBtn) {
+        Enable-StrictToolTipDelay $guideGithubRepoBtn
         $guideGithubRepoBtn.Add_Click({
                 try {
                     Start-Process "https://github.com/Hamisoptimistic/Bing-Wallpaper" | Out-Null
