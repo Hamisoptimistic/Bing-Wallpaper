@@ -701,10 +701,10 @@ function Set-DownloadFolderDisplay {
     param([string]$Path)
     $script:DownloadFolderPath = $Path
     if ([string]::IsNullOrEmpty($Path)) {
-        $FolderBox.Text = ''
+        if ($FolderBox) { $FolderBox.Text = ''; $FolderBox.ToolTip = $null }
         return
     }
-    $maxChars = 24
+    $maxChars = if ($script:ToolbarIsCompact) { 15 } else { 20 }
     if ($Path.Length -le $maxChars) {
         $FolderBox.Text = $Path
     }
@@ -712,13 +712,14 @@ function Set-DownloadFolderDisplay {
         $leaf = Split-Path -Path $Path -Leaf
         $root = [System.IO.Path]::GetPathRoot($Path)
         $candidate = "$root...\$leaf"
-        if ($candidate.Length -le $maxChars -or $leaf.Length -ge $maxChars) {
+        if ($candidate.Length -le $maxChars) {
             $FolderBox.Text = $candidate
         }
         else {
             $FolderBox.Text = "...\$leaf"
         }
     }
+    if ($FolderBox) { $FolderBox.ToolTip = $Path }
 }
 
 function Get-BingImages {
@@ -893,30 +894,31 @@ function Get-PexelsImages {
         return @()
     }
 
-    # Curated singular nature search queries
-    $natureKeywords = @('field', 'sky', 'horizon', 'greenfield', 'trees', 'mountain', 'beach', 'desert', 'forest', 'canyon', 'waterfall', 'lake', 'ocean', 'river', 'clouds', 'sunset', 'sunrise', 'meadow', 'valley', 'coast', 'glacier', 'wilderness', 'landscape')
-    $randomTag = Get-Random -InputObject $natureKeywords
-    $randomPage = Get-Random -Minimum 1 -Maximum 11
-    $escapedQuery = [System.Uri]::EscapeDataString($randomTag)
+    # Query nature wallpapers across valid random pages (1-8) with automatic fallback
+    $randomPage = Get-Random -Minimum 1 -Maximum 9
 
     # Orientation=landscape strictly eliminates 9:16 mobile phone crops.
-    # size=large enforces high resolution photo assets.
-    $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&size=large&per_page=60&page=$randomPage"
+    $uri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=$randomPage"
 
     $wc = New-Object System.Net.WebClient
     $wc.Encoding = [System.Text.Encoding]::UTF8
     $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
     $wc.Headers.Add("Authorization", $ApiKey.Trim())
+    $data = @()
     try {
         $json = $wc.DownloadString($uri)
-        $data = if ($json) { @((ConvertFrom-Json -InputObject $json).photos) } else { @() }
+        if ($json) { $data = @((ConvertFrom-Json -InputObject $json).photos) }
     }
-    catch {
-        $data = @()
+    catch {}
+
+    if ($data.Count -eq 0 -and $randomPage -ne 1) {
+        try {
+            $fallbackUri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=1"
+            $json = $wc.DownloadString($fallbackUri)
+            if ($json) { $data = @((ConvertFrom-Json -InputObject $json).photos) }
+        } catch {}
     }
-    finally {
-        $wc.Dispose()
-    }
+    $wc.Dispose()
 
     # Rejection keywords to guarantee zero humans or portrait poses
     $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini')
@@ -927,7 +929,7 @@ function Get-PexelsImages {
 
         $w = if ($item.width) { [int]$item.width } else { 0 }
         $h = if ($item.height) { [int]$item.height } else { 0 }
-        if ($w -lt 2560 -or $h -lt 1440 -or $w -le $h) { continue }
+        if ($w -lt 1920 -or $h -lt 1080 -or $w -le $h) { continue }
 
         $altText = if ($item.alt) { [string]$item.alt } else { '' }
         $hasHuman = $false
@@ -939,26 +941,25 @@ function Get-PexelsImages {
         $fullUrl = if ($item.src.original) { [string]$item.src.original } elseif ($item.src.large2x) { [string]$item.src.large2x } else { [string]$item.src.large }
         $thumbUrl = if ($item.src.medium) { [string]$item.src.medium } else { [string]$item.src.small }
         $photoTitle = if ($altText) {
-            $t = $altText.Trim()
-            if ($t.Length -gt 60) { $t = $t.Substring(0, 60).Trim() }
-            $t
+            $altText.Trim()
         } else {
-            (Get-Culture).TextInfo.ToTitleCase("$randomTag Landscape")
+            'Nature Landscape'
         }
         $creator = if ($item.photographer) { "Photo by $([string]$item.photographer) on Pexels" } else { "Photo on Pexels" }
 
         $results += [PSCustomObject]@{
-            source    = 'Pexels'
-            urlbase   = "pexels_$($item.id)"
-            url       = $fullUrl
-            thumbUrl  = $thumbUrl
-            title     = $photoTitle
-            copyright = $creator
-            enddate   = ''
-            resX      = $w
-            resY      = $h
-            fileSize  = 0
-            fileType  = 'image/jpeg'
+            source       = 'Pexels'
+            urlbase      = "pexels_$($item.id)"
+            url          = $fullUrl
+            thumbUrl     = $thumbUrl
+            title        = $photoTitle
+            copyright    = $creator
+            photographer = [string]$item.photographer
+            enddate      = ''
+            resX         = $w
+            resY         = $h
+            fileSize     = 0
+            fileType     = 'image/jpeg'
         }
 
         if ($results.Count -ge $Count) { break }
@@ -1581,7 +1582,7 @@ $xaml = @"
     </Window.Resources>
 
     <Grid>
-        <Grid Name="MainContent" Margin="32">
+        <Grid Name="MainContent" Margin="24,20,24,16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -1589,50 +1590,55 @@ $xaml = @"
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-           <Grid Margin="0,0,0,32">
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
-        <Border Name="LogoBorder" Background="Transparent" Width="50" Height="50" Margin="0,0,14,0" VerticalAlignment="Top"/>
-        <StackPanel VerticalAlignment="Top">
-            <TextBlock Text="AutoScape" FontSize="27" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="30" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,3"/>
-            <TextBlock Name="AppSubtitleText" Text="Bing wallpapers, delivered daily" FontSize="13" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="17" LineStackingStrategy="BlockLineHeight"/>
-        </StackPanel>
-    </StackPanel>
+            <Grid Name="HeaderGrid" Margin="0,0,0,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-    <!-- Bing / Spotlight source toggle - centered on the same row as the logo -->
-    <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center"
-            Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
-        <StackPanel Orientation="Horizontal">
-            <Grid>
-                <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                    <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Button>
-            </Grid>
-            <Grid>
-                <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                    <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Button>
-            </Grid>
-            <Grid>
-                <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                    <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Button>
-            </Grid>
-            <Grid>
-                <Border Name="SourcePexelsIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                    <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Button>
-            </Grid>
-        </StackPanel>
-    </Border>
-</Grid>
+                <StackPanel Name="HeaderTitlePanel" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Border Name="LogoBorder" Background="Transparent" Width="46" Height="46" Margin="0,0,14,0" VerticalAlignment="Center"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="AutoScape" FontSize="26" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="29" Margin="0,0,0,2"/>
+                        <TextBlock Name="AppSubtitleText" Text="Bing wallpapers, delivered daily" FontSize="12.5" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="16"/>
+                    </StackPanel>
+                </StackPanel>
 
-            <WrapPanel Grid.Row="1" Name="ToolbarWrap" Orientation="Horizontal" Margin="0,0,0,24">
+                <!-- Bing / Spotlight / Wallhaven / Pexels source toggle pill centered in header -->
+                <Border Name="SourceTogglePill" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
+                    <StackPanel Orientation="Horizontal">
+                        <Grid>
+                            <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="16,6,16,7"/>
+                            </Button>
+                        </Grid>
+                        <Grid>
+                            <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
+                            </Button>
+                        </Grid>
+                        <Grid>
+                            <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
+                            </Button>
+                        </Grid>
+                        <Grid>
+                            <Border Name="SourcePexelsIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                            <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
-                <StackPanel Name="ColRegion" Margin="0,0,16,16">
+            <WrapPanel Grid.Row="1" Name="ToolbarWrap" Orientation="Horizontal" Margin="0,0,0,20">
+
+                <StackPanel Name="ColRegion" Margin="0,0,16,14">
                     <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
@@ -1665,7 +1671,8 @@ $xaml = @"
                     </Grid>
                 </StackPanel>
 
-                <StackPanel Name="ColRefresh" Margin="0,0,16,16" VerticalAlignment="Bottom">
+                <StackPanel Name="ColRefresh" Margin="0,0,16,14">
+                    <TextBlock Name="LabelRefresh" Text=" " FontSize="13" FontWeight="SemiBold" Margin="4,0,0,8" IsHitTestVisible="False"/>
                     <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
                         <Viewbox Width="19" Height="19" Margin="0,2,0,0">
                             <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
@@ -1721,7 +1728,7 @@ $xaml = @"
                     </ComboBox>
                 </StackPanel>
 
-                <StackPanel Name="ColDownloadTo" Margin="0,0,16,16" Width="190">
+                <StackPanel Name="ColDownloadTo" Margin="0,0,16,14" Width="190">
                     <TextBlock Name="LabelDownloadTo" Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" TextTrimming="CharacterEllipsis"/>
                     <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand">
                         <TextBox.Tag>
@@ -1730,8 +1737,8 @@ $xaml = @"
                     </TextBox>
                 </StackPanel>
 
-                <StackPanel Name="ColAuto" Margin="0,0,16,16" VerticalAlignment="Bottom">
-                    <TextBlock Name="LabelAuto" Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" Visibility="Collapsed"/>
+                <StackPanel Name="ColAuto" Margin="0,0,16,14">
+                    <TextBlock Name="LabelAuto" Text="Automation" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     
                     <Button Name="AutoUnifiedButton" Style="{StaticResource ModernIconButton}" Height="38" Padding="0,0,8,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -2423,6 +2430,10 @@ $LabelApplyTo = $window.FindName('LabelApplyTo')
 $LabelStyle = $window.FindName('LabelStyle')
 $LabelDownloadTo = $window.FindName('LabelDownloadTo')
 $LabelAuto = $window.FindName('LabelAuto')
+$LabelRefresh = $window.FindName('LabelRefresh')
+$HeaderGrid = $window.FindName('HeaderGrid')
+$MainContent = $window.FindName('MainContent')
+$SourceTogglePill = $window.FindName('SourceTogglePill')
 
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
@@ -4209,11 +4220,11 @@ function Set-ToolbarCompact {
 
     $script:ToolbarIsCompact = $Compact
     $tc = New-Object System.Windows.ThicknessConverter
-    $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,16' }))
-    $comboHeight = if ($Compact) { 32 } else { 38 }
+    $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,14' }))
+    $comboHeight = if ($Compact) { 34 } else { 38 }
     $comboFont = if ($Compact) { 12.5 } else { 13.5 }
     $labelFont = if ($Compact) { 12 } else { 13 }
-    $iconSize = if ($Compact) { 32 } else { 38 }
+    $iconSize = if ($Compact) { 34 } else { 38 }
 
     foreach ($col in @($ColRegion, $ColRefresh, $ColResolution, $ColApplyTo, $ColStyle, $ColDownloadTo, $ColAuto)) {
         if ($col) { $col.Margin = $colMargin }
@@ -4223,27 +4234,33 @@ function Set-ToolbarCompact {
         if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
     }
     if ($RefreshBtn) { $RefreshBtn.Width = $iconSize; $RefreshBtn.Height = $iconSize }
-    # SpotlightSetBtn lives inside AutoUnifiedButton, whose Height stays a fixed
-    # 38 regardless of compact mode - so this button keeps its own fixed size
-    # instead of following RefreshBtn's iconSize, or it would crowd the pill's
-    # rounded corners (see Border AutoUnifiedButton above).
-    if ($SpotlightSetBtn) { $SpotlightSetBtn.Width = 30; $SpotlightSetBtn.Height = 30 }
-    foreach ($label in @($LabelRegion, $LabelResolution, $LabelApplyTo, $LabelStyle, $LabelDownloadTo, $LabelAuto)) {
+    if ($AutoUnifiedButton) { $AutoUnifiedButton.Height = $comboHeight }
+    if ($SpotlightSetBtn) {
+        $btnSz = if ($Compact) { 26 } else { 30 }
+        $SpotlightSetBtn.Width = $btnSz
+        $SpotlightSetBtn.Height = $btnSz
+    }
+    foreach ($label in @($LabelRegion, $LabelRefresh, $LabelResolution, $LabelApplyTo, $LabelStyle, $LabelDownloadTo, $LabelAuto)) {
         if ($label) { $label.FontSize = $labelFont }
     }
-    # The Auto pill (40x20) and its thumb never resize - their on/off travel
-    # distance is baked into Set-SpotlightState's animation. We only shrink
-    # the row Grid that centers the pill, which already fits it fine
-    # with no vertical-centering math to break.
     if ($AutoPillRow) { $AutoPillRow.Height = $comboHeight }
 
-    if ($RegionBox) { $RegionBox.Width = if ($Compact) { 205 } else { 235 } }
-    if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Width = if ($Compact) { 205 } else { 235 } }
-    if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Width = if ($Compact) { 205 } else { 235 } }
+    $keyBoxWidth = if ($Compact) { 185 } else { 235 }
+    if ($RegionBox) { $RegionBox.Width = $keyBoxWidth }
+    if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Width = $keyBoxWidth }
+    if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Width = $keyBoxWidth }
     if ($ResolutionBox) { $ResolutionBox.Width = if ($Compact) { 95 } else { 110 } }
-    if ($TargetBox) { $TargetBox.Width = if ($Compact) { 138 } else { 155 } }
-    if ($StyleBox) { $StyleBox.Width = if ($Compact) { 110 } else { 125 } }
-    if ($ColDownloadTo) { $ColDownloadTo.Width = if ($Compact) { 165 } else { 190 } }
+    if ($TargetBox) { $TargetBox.Width = if ($Compact) { 135 } else { 155 } }
+    if ($StyleBox) { $StyleBox.Width = if ($Compact) { 105 } else { 125 } }
+    if ($ColDownloadTo) { $ColDownloadTo.Width = if ($Compact) { 160 } else { 190 } }
+
+    if ($MainContent) {
+        $MainContent.Margin = if ($Compact) { [System.Windows.Thickness]::new(20, 14, 20, 14) } else { [System.Windows.Thickness]::new(24, 20, 24, 16) }
+    }
+
+    if ($script:DownloadFolderPath) {
+        Set-DownloadFolderDisplay $script:DownloadFolderPath
+    }
 }
 
 function Update-ToolbarCompactState {
@@ -4255,6 +4272,27 @@ function Update-ToolbarCompactState {
     }
     elseif ($script:ToolbarIsCompact -and $width -gt $script:ToolbarCompactExitWidth) {
         Set-ToolbarCompact -Compact $false
+    }
+
+    # Responsive Header: center source tabs pill in header, or wrap under title when window is narrow
+    if ($SourceTogglePill) {
+        if ($width -lt 860) {
+            [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 1)
+            $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 12, 0, 0)
+        } else {
+            [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 0)
+            $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
+        }
+    }
+
+    # Responsive Gallery: 3 columns on narrow screens, 4 on wide
+    if ($GalleryPanel) {
+        $targetCols = if ($width -lt 850) { 3 } else { 4 }
+        if ($GalleryPanel.Columns -ne $targetCols) {
+            $GalleryPanel.Columns = $targetCols
+        }
     }
 }
 
@@ -4407,11 +4445,11 @@ function Render-GalleryGrid {
 
         # Bing/Spotlight thumbnails are already native 16:9, so their card
         # height is left exactly as before (driven by the image's own
-        # aspect). Wallhaven's aren't guaranteed 16:9 even with the
-        # ratios=16x9 search filter, which is what made those cards taller -
-        # so only Wallhaven cards get an explicit height locked to the
-        # card's width, cropped to fit via the UniformToFill stretch above.
-        if ($image.source -eq 'Wallhaven') {
+        # aspect). Wallhaven's and Pexels' aren't guaranteed 16:9,
+        # which makes cards different heights - so Wallhaven and Pexels cards
+        # get an explicit height locked to 16:9 of the card's width,
+        # cropped to fit via the UniformToFill stretch above.
+        if ($image.source -eq 'Wallhaven' -or $image.source -eq 'Pexels') {
             $imgBorder.Add_SizeChanged({
                     param($evtSender, $e)
                     if ($e.NewSize.Width -gt 0) {
@@ -4471,7 +4509,24 @@ function Render-GalleryGrid {
             $date.Text = if ($image.source -eq 'Spotlight') {
                 if ($image.copyright) { $image.copyright } else { 'Windows Spotlight' }
             }
-            elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing Wallpaper' }
+            elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' }
+            elseif ($image.source -eq 'Pexels') {
+                $authorName = if ($image.photographer) { [string]$image.photographer }
+                              elseif ($image.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                              elseif ($image.copyright) { [string]$image.copyright }
+                              else { '' }
+                $dimText = if ($image.resX -and $image.resY) { "$($image.resX) x $($image.resY)" } else { '' }
+                if ($dimText -and $authorName) {
+                    "$dimText  $([char]8226)  $authorName"
+                } elseif ($dimText) {
+                    $dimText
+                } elseif ($authorName) {
+                    $authorName
+                } else {
+                    'Pexels'
+                }
+            }
+            else { 'Bing Wallpaper' }
         }
         $date.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(160, 160, 160)))
         $date.FontSize = 13.5
@@ -4662,17 +4717,22 @@ function Load-Gallery {
                     $limit = if ($fetchSource -in @('Wallhaven', 'Pexels')) { 60 } else { 360 }
                     $validItems = $cachedArray | Select-Object -First $limit
                     foreach ($img in $validItems) {
+                        $pAuthor = if ($img.photographer) { [string]$img.photographer }
+                                   elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                                   elseif ($img.copyright) { [string]$img.copyright }
+                                   else { '' }
                         $script:phase1Images += [PSCustomObject]@{
-                            source    = $fetchSource
-                            urlbase   = [string]$img.urlbase
-                            url       = [string]$img.url
-                            title     = if ($img.title) { [string]$img.title } else { '' }
-                            copyright = if ($img.copyright) { [string]$img.copyright } else { '' }
-                            enddate   = if ($img.enddate) { [string]$img.enddate } else { '' }
-                            resX      = if ($img.resX) { [int]$img.resX } else { 0 }
-                            resY      = if ($img.resY) { [int]$img.resY } else { 0 }
-                            fileSize  = if ($img.fileSize) { [long]$img.fileSize } else { 0 }
-                            fileType  = if ($img.fileType) { [string]$img.fileType } else { '' }
+                            source       = $fetchSource
+                            urlbase      = [string]$img.urlbase
+                            url          = [string]$img.url
+                            title        = if ($img.title) { [string]$img.title } else { '' }
+                            copyright    = if ($img.copyright) { [string]$img.copyright } else { '' }
+                            photographer = $pAuthor
+                            enddate      = if ($img.enddate) { [string]$img.enddate } else { '' }
+                            resX         = if ($img.resX) { [int]$img.resX } else { 0 }
+                            resY         = if ($img.resY) { [int]$img.resY } else { 0 }
+                            fileSize     = if ($img.fileSize) { [long]$img.fileSize } else { 0 }
+                            fileType     = if ($img.fileType) { [string]$img.fileType } else { '' }
                         }
                     }
                 }
@@ -5185,15 +5245,12 @@ function Load-Gallery {
                         return @{ Success = $false; Error = "Please enter your Pexels API key in the toolbar."; Images = @() }
                     }
 
-                    $pexFetchCount = 24
+                    $pexFetchCount = 60
                     $pexShowCount = 60
 
-                    $natureKeywords = @('field', 'sky', 'horizon', 'greenfield', 'trees', 'mountain', 'beach', 'desert', 'forest', 'canyon', 'waterfall', 'lake', 'ocean', 'river', 'clouds', 'sunset', 'sunrise', 'meadow', 'valley', 'coast', 'glacier', 'wilderness', 'landscape')
-                    $randomTag = Get-Random -InputObject $natureKeywords
-                    $randomPage = Get-Random -Minimum 1 -Maximum 11
-                    $escapedQuery = [System.Uri]::EscapeDataString($randomTag)
+                    $randomPage = Get-Random -Minimum 1 -Maximum 9
 
-                    $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&size=large&per_page=60&page=$randomPage"
+                    $uri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=$randomPage"
 
                     $pwc = New-Object System.Net.WebClient
                     $pwc.Encoding = [System.Text.Encoding]::UTF8
@@ -5207,9 +5264,15 @@ function Load-Gallery {
                     catch {
                         $data = @()
                     }
-                    finally {
-                        $pwc.Dispose()
+
+                    if ($data.Count -eq 0 -and $randomPage -ne 1) {
+                        try {
+                            $fallbackUri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=1"
+                            $pjson = $pwc.DownloadString($fallbackUri)
+                            if ($pjson) { $data = @((ConvertFrom-Json -InputObject $pjson).photos) }
+                        } catch {}
                     }
+                    $pwc.Dispose()
 
                     $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini')
 
@@ -5218,7 +5281,7 @@ function Load-Gallery {
                         if (-not $item.src) { continue }
                         $w = if ($item.width) { [int]$item.width } else { 0 }
                         $h = if ($item.height) { [int]$item.height } else { 0 }
-                        if ($w -lt 2560 -or $h -lt 1440 -or $w -le $h) { continue }
+                        if ($w -lt 1920 -or $h -lt 1080 -or $w -le $h) { continue }
 
                         $altText = if ($item.alt) { [string]$item.alt } else { '' }
                         $hasHuman = $false
@@ -5289,11 +5352,9 @@ function Load-Gallery {
                         $thumbUrl = if ($item.src.medium) { [string]$item.src.medium } else { [string]$item.src.small }
                         $altDesc = if ($item.alt) { [string]$item.alt } else { '' }
                         $photoTitle = if ($altDesc) {
-                            $t = $altDesc.Trim()
-                            if ($t.Length -gt 60) { $t = $t.Substring(0, 60).Trim() }
-                            $t
+                            $altDesc.Trim()
                         } else {
-                            (Get-Culture).TextInfo.ToTitleCase("$randomTag Landscape")
+                            'Nature Landscape'
                         }
                         $creator = if ($item.photographer) { "Photo by $([string]$item.photographer) on Pexels" } else { "Photo on Pexels" }
 
@@ -5303,6 +5364,7 @@ function Load-Gallery {
                             thumbUrl     = $thumbUrl
                             title        = $photoTitle
                             copyright    = $creator
+                            photographer = [string]$item.photographer
                             resX         = [int]$item.width
                             resY         = [int]$item.height
                             fileSize     = 0
@@ -5347,7 +5409,19 @@ function Load-Gallery {
                                 $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
                                 Join-Path $CacheDir "${safe}_thumb.jpg"
                             })
-                        [BingWallpaper.FastDownloader]::DownloadUrlsParallel($thumbUrls, $thumbTargets, 8)
+                        [BingWallpaper.FastDownloader]::DownloadUrlsParallel($thumbUrls, $thumbTargets, 20)
+                    }
+                    else {
+                        $wc2 = New-Object System.Net.WebClient
+                        $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        foreach ($img in $candidateImages) {
+                            $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                            $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                            if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
+                                try { $wc2.DownloadFile($img.thumbUrl, $target) } catch {}
+                            }
+                        }
+                        $wc2.Dispose()
                     }
 
                     $uniqueImages = @($candidateImages | Where-Object {
@@ -5367,17 +5441,22 @@ function Load-Gallery {
 
                     $resultImages = @()
                     foreach ($img in $uniqueImages) {
+                        $pAuthor = if ($img.photographer) { [string]$img.photographer }
+                                   elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                                   elseif ($img.copyright) { [string]$img.copyright }
+                                   else { '' }
                         $resultImages += [PSCustomObject]@{
-                            source    = 'Pexels'
-                            urlbase   = [string]$img.urlbase
-                            url       = [string]$img.url
-                            title     = [string]$img.title
-                            copyright = [string]$img.copyright
-                            enddate   = ''
-                            resX      = $img.resX
-                            resY      = $img.resY
-                            fileSize  = $img.fileSize
-                            fileType  = [string]$img.fileType
+                            source       = 'Pexels'
+                            urlbase      = [string]$img.urlbase
+                            url          = [string]$img.url
+                            title        = [string]$img.title
+                            copyright    = [string]$img.copyright
+                            photographer = $pAuthor
+                            enddate      = ''
+                            resX         = $img.resX
+                            resY         = $img.resY
+                            fileSize     = $img.fileSize
+                            fileType     = [string]$img.fileType
                         }
                     }
 
