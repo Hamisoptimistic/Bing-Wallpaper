@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -360,28 +360,37 @@ namespace BingWallpaper
 
     public static class FastDownloader
     {
+        private class TimeoutWebClient : System.Net.WebClient
+        {
+            private int _timeout;
+            public TimeoutWebClient(int timeoutSeconds) { _timeout = timeoutSeconds * 1000; }
+            protected override System.Net.WebRequest GetWebRequest(Uri uri)
+            {
+                var w = base.GetWebRequest(uri);
+                if (w != null) w.Timeout = _timeout;
+                return w;
+            }
+        }
+
         public static void DownloadThumbnailsParallel(string[] urlBases, string cacheDir)
         {
-            using (var client = new HttpClient())
+            Parallel.ForEach(urlBases, new ParallelOptions { MaxDegreeOfParallelism = 6 }, urlBase =>
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-                client.Timeout = TimeSpan.FromSeconds(20);
-
-                Parallel.ForEach(urlBases, new ParallelOptions { MaxDegreeOfParallelism = 6 }, urlBase =>
+                try
                 {
-                    try
-                    {
-                        string safe = Regex.Replace(urlBase, "[^a-zA-Z0-9]", "");
-                        string target = Path.Combine(cacheDir, safe + "_thumb.jpg");
-                        if (File.Exists(target)) return;
+                    string safe = Regex.Replace(urlBase, "[^a-zA-Z0-9]", "");
+                    string target = Path.Combine(cacheDir, safe + "_thumb.jpg");
+                    if (File.Exists(target)) return;
 
-                        string uri = "https://www.bing.com" + urlBase + "_1920x1080.jpg";
-                        byte[] data = client.GetByteArrayAsync(uri).GetAwaiter().GetResult();
-                        File.WriteAllBytes(target, data);
+                    string uri = "https://www.bing.com" + urlBase + "_1920x1080.jpg&w=640&h=360&rs=1&c=4";
+                    using (var wc = new TimeoutWebClient(20))
+                    {
+                        wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                        wc.DownloadFile(uri, target);
                     }
-                    catch { }
-                });
-            }
+                }
+                catch { }
+            });
         }
 
         // Generic version for sources (like Wallhaven/Spotlight) whose
@@ -394,26 +403,22 @@ namespace BingWallpaper
         // entire batch for the full timeout before the rest can return.
         public static void DownloadUrlsParallel(string[] urls, string[] targets, int timeoutSeconds = 20)
         {
-            using (var client = new HttpClient())
+            Parallel.For(0, urls.Length, new ParallelOptions { MaxDegreeOfParallelism = 20 }, i =>
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-                client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-
-                Parallel.For(0, urls.Length, new ParallelOptions { MaxDegreeOfParallelism = 6 }, i =>
+                try
                 {
-                    try
-                    {
-                        string url = urls[i];
-                        string target = targets[i];
-                        if (string.IsNullOrEmpty(url) || File.Exists(target)) return;
+                    string url = urls[i];
+                    string target = targets[i];
+                    if (string.IsNullOrEmpty(url) || File.Exists(target)) return;
 
-                        byte[] data = client.GetByteArrayAsync(url).GetAwaiter().GetResult();
-                        if (data == null || data.Length == 0) return;
-                        File.WriteAllBytes(target, data);
+                    using (var wc = new TimeoutWebClient(timeoutSeconds))
+                    {
+                        wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                        wc.DownloadFile(url, target);
                     }
-                    catch { }
-                });
-            }
+                }
+                catch { }
+            });
         }
     }
 }
@@ -3903,19 +3908,27 @@ function Render-GalleryGrid {
     param(
         [array]$Images,
         [string]$ThumbCacheDir,
-        [switch]$SkipAnimation
+        [switch]$SkipAnimation,
+        [switch]$InsertAtTop
     )
 
     if (-not $Images -or $Images.Count -eq 0) { return }
 
-    $GalleryPanel.Children.Clear()
-    $script:selectedCard = $null
-    $script:selectedImage = $null
-    $script:selection.Card = $null
-    $script:selection.Image = $null
-    $script:loadedImages = $Images
-    $script:galleryImageControls = New-Object System.Collections.ArrayList
-    $script:galleryCards = New-Object System.Collections.ArrayList
+    if (-not $InsertAtTop) {
+        $GalleryPanel.Children.Clear()
+        $script:selectedCard = $null
+        $script:selectedImage = $null
+        $script:selection.Card = $null
+        $script:selection.Image = $null
+        $script:loadedImages = $Images
+        $script:galleryImageControls = New-Object System.Collections.ArrayList
+        $script:galleryCards = New-Object System.Collections.ArrayList
+    } else {
+        $newLoaded = New-Object System.Collections.ArrayList
+        foreach ($img in $Images) { [void]$newLoaded.Add($img) }
+        foreach ($img in $script:loadedImages) { [void]$newLoaded.Add($img) }
+        $script:loadedImages = $newLoaded.ToArray()
+    }
 
     if ($script:revealElements) {
         $staticElements = $script:revealElements | Where-Object { $_.Element.Name -eq "RevealBorder" }
@@ -4113,11 +4126,11 @@ function Render-GalleryGrid {
         # Wallhaven: collapse the generic "Nature Wallpaper" / "Wallhaven"
         # two-line label into one compact line built from that image's own
         # Wallhaven API data (dimension_x/dimension_y, file_type, file_size)
-        # - e.g. "3840 × 2160  •  JPEG  •  5.2 MB" - instead of the same
+        # - e.g. "3840 $([char]215) 2160  $([char]8226)  JPEG  $([char]8226)  5.2 MB" - instead of the same
         # static text repeated on every card.
         if ($image.source -eq 'Wallhaven') {
             $infoParts = @()
-            if ($image.resX -and $image.resY) { $infoParts += "$($image.resX) × $($image.resY)" }
+            if ($image.resX -and $image.resY) { $infoParts += "$($image.resX) $([char]215) $($image.resY)" }
             if ($image.fileType) {
                 $typeShort = ($image.fileType -split '/')[-1].ToUpper()
                 if ($typeShort) { $infoParts += $typeShort }
@@ -4127,7 +4140,7 @@ function Render-GalleryGrid {
                 $infoParts += "$sizeMB MB"
             }
             if ($infoParts.Count -gt 0) {
-                $title.Text = $infoParts -join '  •  '
+                $title.Text = $infoParts -join "  $([char]8226)  "
                 $title.Margin = New-Object System.Windows.Thickness(0, 0, 0, 0)
                 $date.Visibility = [System.Windows.Visibility]::Collapsed
             }
@@ -4179,8 +4192,13 @@ function Render-GalleryGrid {
                 }
             })
 
-        $GalleryPanel.Children.Add($card)
-        [void]$script:galleryCards.Add($card)
+        if ($InsertAtTop) {
+            $GalleryPanel.Children.Insert($current - 1, $card)
+            $script:galleryCards.Insert($current - 1, $card)
+        } else {
+            $GalleryPanel.Children.Add($card)
+            [void]$script:galleryCards.Add($card)
+        }
         if (-not $firstCard) { $firstCard = $card }
     
         if ($SkipAnimation) {
@@ -4195,6 +4213,18 @@ function Render-GalleryGrid {
     if ($firstCard -and $Images.Count -gt 0 -and (-not $script:userHasExplicitlySelectedWallpaper)) {
         Select-Card $firstCard $Images[0]
         $script:userHasExplicitlySelectedWallpaper = $false
+    }
+
+    if ($InsertAtTop) {
+        $limit = if ($script:currentSource -eq 'Wallhaven') { 40 } else { 60 }
+        while ($GalleryPanel.Children.Count -gt $limit) {
+            $lastIdx = $GalleryPanel.Children.Count - 1
+            $GalleryPanel.Children.RemoveAt($lastIdx)
+            $script:galleryCards.RemoveAt($lastIdx)
+            if ($script:galleryImageControls.Count -gt $lastIdx) {
+                $script:galleryImageControls.RemoveAt($lastIdx)
+            }
+        }
     }
 
     Update-GalleryViewportHeight
@@ -4245,10 +4275,12 @@ function Load-Gallery {
     $fetchSource = $script:currentSource
     $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
-    # Each source gets its own subfolder so switching the Bing/Spotlight
-    # toggle doesn't prune the other source's cached thumbnails out from
-    # under it (the prune step below only keeps what's in the CURRENT feed).
-    $sourceThumbDir = Join-Path $thumbCacheDir $fetchSource
+    
+    if ($fetchSource -eq 'Bing') {
+        $sourceThumbDir = Join-Path $thumbCacheDir "Bing_$selectedRegion"
+    } else {
+        $sourceThumbDir = Join-Path $thumbCacheDir $fetchSource
+    }
 
     if (-not (Test-Path -LiteralPath $thumbCacheDir)) {
         try { New-Item -ItemType Directory -Path $thumbCacheDir -Force | Out-Null } catch {}
@@ -4257,17 +4289,64 @@ function Load-Gallery {
         try { New-Item -ItemType Directory -Path $sourceThumbDir -Force | Out-Null } catch {}
     }
 
-    $GalleryPanel.Children.Clear()
+    $script:phase1Images = @()
     $script:selectedCard = $null
     $script:selectedImage = $null
     $script:selection.Card = $null
     $script:selection.Image = $null
     $script:loadedImages = @()
     $script:userHasExplicitlySelectedWallpaper = $false
+    
+    $historyPath = Join-Path $sourceThumbDir '_history.json'
+    if (Test-Path -LiteralPath $historyPath) {
+        try {
+            $rawHistory = Get-Content -LiteralPath $historyPath -Raw -ErrorAction SilentlyContinue
+            if ($rawHistory) {
+                $cachedArray = @(ConvertFrom-Json -InputObject $rawHistory)
+                if ($cachedArray.Count -gt 0) {
+                    $limit = if ($fetchSource -eq 'Wallhaven') { 40 } else { 60 }
+                    $validItems = $cachedArray | Select-Object -First $limit
+                    foreach ($img in $validItems) {
+                        $script:phase1Images += [PSCustomObject]@{
+                            source    = $fetchSource
+                            urlbase   = [string]$img.urlbase
+                            url       = [string]$img.url
+                            title     = if ($img.title) { [string]$img.title } else { '' }
+                            copyright = if ($img.copyright) { [string]$img.copyright } else { '' }
+                            enddate   = if ($img.enddate) { [string]$img.enddate } else { '' }
+                            resX      = if ($img.resX) { [int]$img.resX } else { 0 }
+                            resY      = if ($img.resY) { [int]$img.resY } else { 0 }
+                            fileSize  = if ($img.fileSize) { [long]$img.fileSize } else { 0 }
+                            fileType  = if ($img.fileType) { [string]$img.fileType } else { '' }
+                        }
+                    }
+                }
+            }
+        } catch {}
+    }
+
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-    $StatusText.Opacity = 1
-    $StatusText.Text = if ($fetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($fetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } else { 'Connecting to Bing...' }
     $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
+
+    $script:phase1ThumbDir = $sourceThumbDir
+    $script:phase1FetchSource = $fetchSource
+
+    if ($script:phase1Timer) { $script:phase1Timer.Stop() }
+    $script:phase1Timer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:phase1Timer.Interval = [TimeSpan]::FromMilliseconds(50)
+    $script:phase1Timer.Add_Tick({
+        param($timerSender, $timerArgs)
+        $timerSender.Stop()
+        if ($script:phase1FetchSource -ne 'Wallhaven' -and $script:phase1Images.Count -gt 0) {
+            $StatusText.Opacity = 0
+            Render-GalleryGrid -Images $script:phase1Images -ThumbCacheDir $script:phase1ThumbDir
+        } else {
+            $GalleryPanel.Children.Clear()
+            $StatusText.Opacity = 1
+            $StatusText.Text = if ($script:phase1FetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($script:phase1FetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } else { 'Connecting to Bing...' }
+        }
+    })
+    $script:phase1Timer.Start()
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
@@ -4915,7 +4994,7 @@ function Load-Gallery {
                         $safe = $ub -replace '[^a-zA-Z0-9]', ''
                         $target = Join-Path $CacheDir "${safe}_thumb.jpg"
                         if (-not (Test-Path -LiteralPath $target)) {
-                            try { $wc2.DownloadFile("https://www.bing.com${ub}_1920x1080.jpg", $target) } catch {}
+                            try { $wc2.DownloadFile("https://www.bing.com${ub}_1920x1080.jpg&w=640&h=360&rs=1&c=4", $target) } catch {}
                         }
                     }
                     $wc2.Dispose()
@@ -5005,26 +5084,50 @@ function Load-Gallery {
                     return
                 }
 
-                Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir
+                $newImages = @()
+                if ($script:phase1Images -and $script:phase1Images.Count -gt 0) {
+                    $existingUrlBases = New-Object System.Collections.Generic.HashSet[string]
+                    foreach ($p1 in $script:phase1Images) { [void]$existingUrlBases.Add($p1.urlbase) }
+                    
+                    foreach ($img in $images) {
+                        if (-not $existingUrlBases.Contains($img.urlbase)) {
+                            $newImages += $img
+                        }
+                    }
+                } else {
+                    $newImages = @($images)
+                }
 
-                $script:loadingCounter = 0
-                $script:loadingTotal = $images.Count
-        
-                if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
-                $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
-                $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
-                $script:loadingStatusTimer.Add_Tick({
-                        $script:loadingCounter++
-                        if ($script:loadingCounter -le $script:loadingTotal) {
-                            $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } elseif ($script:currentSource -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing' }
-                            $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from $sourceName..."
-                        }
-                        else {
-                            $script:loadingStatusTimer.Stop()
-                            Restore-StatusTextDefaultWithFade
-                        }
-                    })
-                $script:loadingStatusTimer.Start()
+                if ($newImages.Count -eq 0 -and $script:phase1Images.Count -gt 0) {
+                    Restore-StatusTextDefaultWithFade
+                } else {
+                    $isTopInsert = ($script:phase1Images -and $script:phase1Images.Count -gt 0)
+                    
+                    if ($isTopInsert) {
+                        Render-GalleryGrid -Images $newImages -ThumbCacheDir $ctx.ThumbCacheDir -InsertAtTop
+                    } else {
+                        Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir
+                    }
+
+                    $script:loadingCounter = 0
+                    $script:loadingTotal = if ($isTopInsert) { $newImages.Count } else { $images.Count }
+            
+                    if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+                    $script:loadingStatusTimer = New-Object System.Windows.Threading.DispatcherTimer
+                    $script:loadingStatusTimer.Interval = [TimeSpan]::FromMilliseconds(35)
+                    $script:loadingStatusTimer.Add_Tick({
+                            $script:loadingCounter++
+                            if ($script:loadingCounter -le $script:loadingTotal) {
+                                $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } elseif ($script:currentSource -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing' }
+                                $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from $sourceName..."
+                            }
+                            else {
+                                $script:loadingStatusTimer.Stop()
+                                Restore-StatusTextDefaultWithFade
+                            }
+                        })
+                    $script:loadingStatusTimer.Start()
+                }
             }
         })
     $script:galleryTimer.Start()
@@ -5266,7 +5369,7 @@ if (-not $AutoLockScreenSourceBox.SelectedItem) { $AutoLockScreenSourceBox.Selec
 
 if ($AutoScheduleBox) {
     $dailyItem = New-Object System.Windows.Controls.ComboBoxItem
-    $dailyItem.Content = 'Daily · 12:00 AM'
+    $dailyItem.Content = "Daily $([char]183) 12:00 AM"
     $dailyItem.Tag = 'Daily'
     [void]$AutoScheduleBox.Items.Add($dailyItem)
 
