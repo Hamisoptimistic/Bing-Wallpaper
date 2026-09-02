@@ -1210,8 +1210,8 @@ $xaml = @"
         <Style x:Key="ModernIconButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#35FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#15FFFFFF"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -1236,7 +1236,7 @@ $xaml = @"
         </Style>
 
         <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
-            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#35FFFFFF" BorderThickness="1.5" CornerRadius="8">
+            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -1294,11 +1294,12 @@ $xaml = @"
                             <Popup Name="PART_Popup"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
+                                   VerticalOffset="8"
                                    AllowsTransparency="True"
                                    StaysOpen="False"
                                    Focusable="False">
-                                <Border Background="Transparent" BorderBrush="#35FFFFFF" BorderThickness="1.5" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
-                                    <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
+                                <Border Background="#F21E1E1E" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Margin="0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
+                                    <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Auto">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
                                 </Border>
@@ -1354,7 +1355,7 @@ $xaml = @"
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#35FFFFFF" BorderThickness="1.5" CornerRadius="8">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8">
                             <Grid>
                                 <ContentPresenter Content="{TemplateBinding Tag}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,0"/>
                                 <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
@@ -1485,24 +1486,24 @@ $xaml = @"
     <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center"
             Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
         <StackPanel Orientation="Horizontal">
-            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                <Grid>
-                    <Border Name="SourceBingIndicator" Background="#15FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+            <Grid>
+                <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
                     <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Grid>
-            </Button>
-            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                <Grid>
-                    <Border Name="SourceSpotlightIndicator" Background="#15FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                </Button>
+            </Grid>
+            <Grid>
+                <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
                     <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Grid>
-            </Button>
-            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                <Grid>
-                    <Border Name="SourceWallhavenIndicator" Background="#15FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                </Button>
+            </Grid>
+            <Grid>
+                <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
                     <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
-                </Grid>
-            </Button>
+                </Button>
+            </Grid>
         </StackPanel>
     </Border>
 </Grid>
@@ -1629,24 +1630,22 @@ $xaml = @"
     
                             <Button Name="SpotlightSetBtn" Width="30" Height="30" Margin="0,0,4,0" VerticalAlignment="Center"
                                     Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
-                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1.5" Foreground="#777">
+                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="0" Foreground="#777">
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="Button">
-                                                    <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                                                    <Border Name="ChevronBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
                                                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
-                                                            <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#35FFFFFF"/>
+                                                            <Setter TargetName="ChevronBorder" Property="Background" Value="#15FFFFFF"/>
                                                             <Setter Property="Foreground" Value="#DDD"/>
                                                         </Trigger>
                                                         <Trigger Property="IsPressed" Value="True">
-                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
-                                                            <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
+                                                            <Setter TargetName="ChevronBorder" Property="Background" Value="#25FFFFFF"/>
                                                             <Setter Property="Foreground" Value="#0078D4"/>
                                                         </Trigger>
                                                     </ControlTemplate.Triggers>
@@ -1670,26 +1669,101 @@ $xaml = @"
                                 <Grid.RenderTransform>
                                     <TranslateTransform x:Name="SpotlightPopupTransform" Y="-8"/>
                                 </Grid.RenderTransform>
-                                <Border Name="SpotlightPopupCard" Background="#1E1E1E" BorderBrush="#1FFFFFFF" BorderThickness="1.5"
-                                        CornerRadius="10" Padding="14" Opacity="0" SnapsToDevicePixels="False">
+                                <Border Name="SpotlightPopupCard" Background="#F21E1E1E" BorderBrush="#15FFFFFF" BorderThickness="1"
+                                        CornerRadius="8" Padding="16" Width="320" Opacity="0" SnapsToDevicePixels="False">
                                     <Border.Effect>
                                         <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
                                     </Border.Effect>
                                     <StackPanel>
-                                        <StackPanel Orientation="Horizontal">
-                                            <StackPanel Width="155" Margin="0,0,16,0">
-                                                <TextBlock Text="Desktop" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                                <ComboBox Name="AutoDesktopSourceBox" Width="155" FontSize="13.5" Height="38"/>
-                                            </StackPanel>
-                                            <StackPanel Width="155">
-                                                <TextBlock Text="Lock screen" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                                <ComboBox Name="AutoLockScreenSourceBox" Width="155" FontSize="13.5" Height="38"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <StackPanel Margin="0,14,0,0">
-                                            <TextBlock Text="Schedule" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                                            <ComboBox Name="AutoScheduleBox" Width="326" FontSize="13.5" Height="38"/>
-                                        </StackPanel>
+                                        <TextBlock Text="Choose your wallpaper source" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,10"/>
+                                        <Border Height="1" Background="#2A2A2A" Margin="0,0,0,14"/>
+                                        
+                                        <!-- Hidden ComboBoxes for logic retention -->
+                                        <ComboBox Name="AutoDesktopSourceBox" Visibility="Collapsed" />
+                                        <ComboBox Name="AutoLockScreenSourceBox" Visibility="Collapsed" />
+                                        <ComboBox Name="AutoScheduleBox" Visibility="Collapsed" />
+                                        
+                                        <TextBlock Text="Desktop" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
+                                        <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Grid.Column="0">
+                                                    <Border Name="DeskBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="DeskBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="DeskBingLbl" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="1">
+                                                    <Border Name="DeskSpotlightInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="DeskSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="DeskSpotlightLbl" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="2">
+                                                    <Border Name="DeskWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="DeskWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="DeskWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                        
+                                        <TextBlock Text="Lock screen" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
+                                        <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Grid.Column="0">
+                                                    <Border Name="LockBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="LockBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="LockBingLbl" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="1">
+                                                    <Border Name="LockSpotlightInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="LockSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="LockSpotlightLbl" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="2">
+                                                    <Border Name="LockWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="LockWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="LockWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                        
+                                        <TextBlock Text="Schedule" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
+                                        <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Grid Grid.Column="0">
+                                                    <Border Name="SchedEverydayInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="SchedEverydayBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="SchedEverydayLbl" Text="Everyday" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="1">
+                                                    <Border Name="SchedTestInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="SchedTestBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="SchedTestLbl" Text="1 Minute (Test)" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                        
+                                        <TextBlock Text="Changes are saved Automatically" FontSize="11" Foreground="#888888" HorizontalAlignment="Left" Margin="6,0,0,0" FontStyle="Italic"/>
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -1763,29 +1837,20 @@ function Test-IsInsideToolbar($visual) {
 
 function Find-RevealBorders($visual) {
     if (-not $visual) { return }
-    if ($visual -is [System.Windows.Controls.Border] -and $visual.Name -eq "RevealBorder") {
-        if (Test-IsInsideToolbar $visual) {
-            # Toolbar items always show a static border (same weight/opacity as
-            # the Bing/Spotlight/Wallhaven pill) instead of only revealing a
-            # border near the mouse cursor.
-            $visual.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(21, 255, 255, 255))
-            $visual.BorderThickness = New-Object System.Windows.Thickness(1)
+    if ($visual -is [System.Windows.Controls.Border] -and ($visual.Name -eq "RevealBorder" -or $visual.Name -eq "AutoUnifiedButton")) {
+        $alreadyAdded = $false
+        foreach ($item in $script:revealElements) {
+            if ($item.Element -eq $visual) { $alreadyAdded = $true; break }
         }
-        else {
-            $alreadyAdded = $false
-            foreach ($item in $script:revealElements) {
-                if ($item.Element -eq $visual) { $alreadyAdded = $true; break }
-            }
-            if (-not $alreadyAdded) {
-                $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
-                $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(60, 255, 255, 255), 0.0)))
-                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-                $revealBrush.RadiusX = 160
-                $revealBrush.RadiusY = 160
-                $visual.BorderBrush = $revealBrush
-                $script:revealElements.Add(@{ Element = $visual; Brush = $revealBrush }) | Out-Null
-            }
+        if (-not $alreadyAdded) {
+            $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
+            $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(60, 255, 255, 255), 0.0)))
+            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(21, 255, 255, 255), 1.0)))
+            $revealBrush.RadiusX = 160
+            $revealBrush.RadiusY = 160
+            $visual.BorderBrush = $revealBrush
+            $script:revealElements.Add(@{ Element = $visual; Brush = $revealBrush }) | Out-Null
         }
     }
     
@@ -1796,7 +1861,11 @@ function Find-RevealBorders($visual) {
     }
 }
 
-$window.Add_Loaded({ Find-RevealBorders $window })
+$window.Add_Loaded({
+    $tb = $window.FindName('WallhavenApiKeyBox')
+    if ($tb) { $tb.ApplyTemplate() | Out-Null }
+    Find-RevealBorders $window
+})
 
 $window.Add_MouseMove({
         param($evtSender, $e)
@@ -5508,13 +5577,74 @@ $AutoUnifiedButton.Add_MouseLeftButtonUp({
         }
     })
 
+function Update-AutoOptionUI {
+    param([string]$Category, $SelectedItem)
+    if (-not $SelectedItem) { return }
+
+    $inds = @(); $lbls = @(); $vals = @()
+    if ($Category -eq 'Desktop') {
+        $inds = @($window.FindName('DeskBingInd'), $window.FindName('DeskSpotlightInd'), $window.FindName('DeskWallhavenInd'))
+        $lbls = @($window.FindName('DeskBingLbl'), $window.FindName('DeskSpotlightLbl'), $window.FindName('DeskWallhavenLbl'))
+        $vals = @('Bing', 'Spotlight', 'Wallhaven')
+    } elseif ($Category -eq 'LockScreen') {
+        $inds = @($window.FindName('LockBingInd'), $window.FindName('LockSpotlightInd'), $window.FindName('LockWallhavenInd'))
+        $lbls = @($window.FindName('LockBingLbl'), $window.FindName('LockSpotlightLbl'), $window.FindName('LockWallhavenLbl'))
+        $vals = @('Bing', 'Spotlight', 'Wallhaven')
+    } elseif ($Category -eq 'Schedule') {
+        $inds = @($window.FindName('SchedEverydayInd'), $window.FindName('SchedTestInd'))
+        $lbls = @($window.FindName('SchedEverydayLbl'), $window.FindName('SchedTestLbl'))
+        if ($AutoScheduleBox.Items.Count -ge 2) {
+            $vals = @($AutoScheduleBox.Items[0], $AutoScheduleBox.Items[1])
+        }
+    }
+    
+    for ($i = 0; $i -lt $inds.Count; $i++) {
+        if ($inds[$i] -and $lbls[$i] -and $vals[$i]) {
+            $match = $false
+            if ($Category -eq 'Schedule') {
+                if ($SelectedItem.Content -eq $vals[$i].Content) { $match = $true }
+            } else {
+                if ([string]$SelectedItem -eq $vals[$i]) { $match = $true }
+            }
+            if ($match) {
+                $inds[$i].Opacity = 1
+                $lbls[$i].Foreground = "#FFFFFF"
+            } else {
+                $inds[$i].Opacity = 0
+                $lbls[$i].Foreground = "#9E9E9E"
+            }
+        }
+    }
+}
+
+$DeskBingBtn = $window.FindName('DeskBingBtn')
+if ($DeskBingBtn) { $DeskBingBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Bing' }) }
+$DeskSpotlightBtn = $window.FindName('DeskSpotlightBtn')
+if ($DeskSpotlightBtn) { $DeskSpotlightBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Spotlight' }) }
+$DeskWallhavenBtn = $window.FindName('DeskWallhavenBtn')
+if ($DeskWallhavenBtn) { $DeskWallhavenBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Wallhaven' }) }
+
+$LockBingBtn = $window.FindName('LockBingBtn')
+if ($LockBingBtn) { $LockBingBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Bing' }) }
+$LockSpotlightBtn = $window.FindName('LockSpotlightBtn')
+if ($LockSpotlightBtn) { $LockSpotlightBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Spotlight' }) }
+$LockWallhavenBtn = $window.FindName('LockWallhavenBtn')
+if ($LockWallhavenBtn) { $LockWallhavenBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Wallhaven' }) }
+
+$SchedEverydayBtn = $window.FindName('SchedEverydayBtn')
+if ($SchedEverydayBtn) { $SchedEverydayBtn.Add_Click({ $AutoScheduleBox.SelectedItem = $AutoScheduleBox.Items[0] }) }
+$SchedTestBtn = $window.FindName('SchedTestBtn')
+if ($SchedTestBtn) { $SchedTestBtn.Add_Click({ $AutoScheduleBox.SelectedItem = $AutoScheduleBox.Items[1] }) }
+
 $AutoDesktopSourceBox.Add_SelectionChanged({
+        Update-AutoOptionUI 'Desktop' $AutoDesktopSourceBox.SelectedItem
         if ($script:SpotlightEnabled) {
             Save-Settings
         }
     })
 
 $AutoLockScreenSourceBox.Add_SelectionChanged({
+        Update-AutoOptionUI 'LockScreen' $AutoLockScreenSourceBox.SelectedItem
         if ($script:SpotlightEnabled) {
             Save-Settings
         }
@@ -5522,12 +5652,16 @@ $AutoLockScreenSourceBox.Add_SelectionChanged({
 
 if ($AutoScheduleBox) {
     $AutoScheduleBox.Add_SelectionChanged({
+            Update-AutoOptionUI 'Schedule' $AutoScheduleBox.SelectedItem
             if ($script:SpotlightEnabled) {
                 Update-SpotlightScheduledTaskAsync -Enable $true
                 Save-Settings
             }
         })
+    Update-AutoOptionUI 'Schedule' $AutoScheduleBox.SelectedItem
 }
+Update-AutoOptionUI 'Desktop' $AutoDesktopSourceBox.SelectedItem
+Update-AutoOptionUI 'LockScreen' $AutoLockScreenSourceBox.SelectedItem
 
 if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     $script:spotlightPopupClosedAt = [DateTime]::MinValue
@@ -5536,8 +5670,8 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     # The card's on-screen size is fixed by its fixed-width children (135 +
     # 155 columns, fixed padding/margins), so we can compute it once instead
     # of measuring at runtime.
-    $spotlightPopupCardWidth = 360.0
-    $spotlightPopupCardHeight = 184.0
+    $spotlightPopupCardWidth = 320.0
+    $spotlightPopupCardHeight = 310.0
     $spotlightPopupEdgePad = 8.0
 
     # If the window gets resized while the flyout is open, just close it
