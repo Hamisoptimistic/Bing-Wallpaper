@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -1483,25 +1483,25 @@ $xaml = @"
 
     <!-- Bing / Spotlight source toggle - centered on the same row as the logo -->
     <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center"
-            Background="#1E1E1E" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="10" Padding="4">
+            Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
         <StackPanel Orientation="Horizontal">
-            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Bing daily wallpapers">
-                <StackPanel>
-                    <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,7,18,4"/>
-                    <Border Name="SourceBingIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="1"/>
-                </StackPanel>
+            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                <Grid>
+                    <Border Name="SourceBingIndicator" Background="#15FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                    <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,6,18,7"/>
+                </Grid>
             </Button>
-            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Windows Spotlight lock screen images">
-                <StackPanel>
-                    <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,4"/>
-                    <Border Name="SourceSpotlightIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="0"/>
-                </StackPanel>
+            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                <Grid>
+                    <Border Name="SourceSpotlightIndicator" Background="#15FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                    <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
+                </Grid>
             </Button>
-            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Wallhaven nature wallpapers (requires nothing, or add an API key for higher limits)">
-                <StackPanel>
-                    <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,4"/>
-                    <Border Name="SourceWallhavenIndicator" Height="2.5" CornerRadius="1.5" Background="#0078D4" Margin="18,0,18,6" Opacity="0"/>
-                </StackPanel>
+            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                <Grid>
+                    <Border Name="SourceWallhavenIndicator" Background="#15FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                    <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,6,18,7"/>
+                </Grid>
             </Button>
         </StackPanel>
     </Border>
