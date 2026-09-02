@@ -1219,7 +1219,7 @@ $xaml = @"
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1239,7 +1239,7 @@ $xaml = @"
         </Style>
 
         <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
-            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8">
+            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="6">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -1252,6 +1252,11 @@ $xaml = @"
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                     <Setter TargetName="ArrowIcon" Property="Foreground" Value="#DDD"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
+                    <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
+                    <Setter TargetName="ArrowIcon" Property="Foreground" Value="#0078D4"/>
                 </Trigger>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
@@ -1358,7 +1363,7 @@ $xaml = @"
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="6">
                             <Grid>
                                 <ContentPresenter Content="{TemplateBinding Tag}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,0"/>
                                 <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
@@ -1602,17 +1607,7 @@ $xaml = @"
                 <StackPanel Name="ColAuto" Margin="0,0,16,16" VerticalAlignment="Bottom">
                     <TextBlock Name="LabelAuto" Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" Visibility="Collapsed"/>
                     
-                    <Border Name="AutoUnifiedButton" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Height="38" Cursor="Hand">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#15FFFFFF"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        
+                    <Button Name="AutoUnifiedButton" Style="{StaticResource ModernIconButton}" Height="38" Padding="0,0,8,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" Margin="12,0,8,0"/>
 
@@ -1663,7 +1658,7 @@ $xaml = @"
                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
                         </StackPanel>
-                    </Border>
+                    </Button>
 
                     <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=AutoUnifiedButton}"
                                Placement="Bottom" VerticalOffset="6" HorizontalOffset="0" AllowsTransparency="True" StaysOpen="False"
@@ -5569,9 +5564,12 @@ if ($spotlightWasEnabled) {
     Update-SpotlightScheduledTaskAsync -Enable $true
 }
 
-$AutoUnifiedButton.Add_MouseLeftButtonUp({
+$AutoUnifiedButton.Add_Click({
         param($sender, $e)
-        $e.Handled = $true
+        if ($e) {
+            $e.Handled = $true
+            if ($e.Source -ne $AutoUnifiedButton) { return }
+        }
         $newState = -not $script:SpotlightEnabled
         Set-SpotlightState -Enabled:$newState
 
@@ -5702,6 +5700,9 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
         })
 
     $SpotlightSetBtn.Add_Click({
+            param($sender, $e)
+            if ($e) { $e.Handled = $true }
+
             # Popup has StaysOpen="False": clicking this same button while the
             # popup is open first fires the popup's own light-dismiss (the
             # button is outside the popup's visual tree), THEN this Click
