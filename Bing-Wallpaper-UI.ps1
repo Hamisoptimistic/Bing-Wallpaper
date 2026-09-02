@@ -1149,6 +1149,9 @@ if ($AutoApply) {
                     $wallhavenKey = if ($savedSettings -and $savedSettings.WallhavenApiKey) { [string]$savedSettings.WallhavenApiKey } else { '' }
                     $images = Get-WallhavenImages -Count 1 -ApiKey $wallhavenKey
                 }
+                'None' {
+                    return
+                }
                 default {
                     throw "Unknown wallpaper source: $Source"
                 }
@@ -1670,7 +1673,7 @@ $xaml = @"
                                     <TranslateTransform x:Name="SpotlightPopupTransform" Y="-8"/>
                                 </Grid.RenderTransform>
                                 <Border Name="SpotlightPopupCard" Background="#F21E1E1E" BorderBrush="#15FFFFFF" BorderThickness="1"
-                                        CornerRadius="8" Padding="16" Width="320" Opacity="0" SnapsToDevicePixels="False">
+                                        CornerRadius="8" Padding="16" Width="400" Opacity="0" SnapsToDevicePixels="False">
                                     <Border.Effect>
                                         <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
                                     </Border.Effect>
@@ -1687,6 +1690,7 @@ $xaml = @"
                                         <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
@@ -1709,6 +1713,12 @@ $xaml = @"
                                                         <TextBlock Name="DeskWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
                                                     </Button>
                                                 </Grid>
+                                                <Grid Grid.Column="3">
+                                                    <Border Name="DeskNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="DeskNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="DeskNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
                                             </Grid>
                                         </Border>
                                         
@@ -1716,6 +1726,7 @@ $xaml = @"
                                         <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
@@ -1736,6 +1747,12 @@ $xaml = @"
                                                     <Border Name="LockWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
                                                     <Button Name="LockWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
                                                         <TextBlock Name="LockWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="3">
+                                                    <Border Name="LockNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="LockNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="LockNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
                                                     </Button>
                                                 </Grid>
                                             </Grid>
@@ -5517,7 +5534,7 @@ function Invoke-CheckForUpdatesClick {
     }
 }
 
-@('Bing', 'Spotlight', 'Wallhaven') | ForEach-Object {
+@('Bing', 'Spotlight', 'Wallhaven', 'None') | ForEach-Object {
     [void]$AutoDesktopSourceBox.Items.Add($_)
     [void]$AutoLockScreenSourceBox.Items.Add($_)
 }
@@ -5583,13 +5600,13 @@ function Update-AutoOptionUI {
 
     $inds = @(); $lbls = @(); $vals = @()
     if ($Category -eq 'Desktop') {
-        $inds = @($window.FindName('DeskBingInd'), $window.FindName('DeskSpotlightInd'), $window.FindName('DeskWallhavenInd'))
-        $lbls = @($window.FindName('DeskBingLbl'), $window.FindName('DeskSpotlightLbl'), $window.FindName('DeskWallhavenLbl'))
-        $vals = @('Bing', 'Spotlight', 'Wallhaven')
+        $inds = @($window.FindName('DeskBingInd'), $window.FindName('DeskSpotlightInd'), $window.FindName('DeskWallhavenInd'), $window.FindName('DeskNoneInd'))
+        $lbls = @($window.FindName('DeskBingLbl'), $window.FindName('DeskSpotlightLbl'), $window.FindName('DeskWallhavenLbl'), $window.FindName('DeskNoneLbl'))
+        $vals = @('Bing', 'Spotlight', 'Wallhaven', 'None')
     } elseif ($Category -eq 'LockScreen') {
-        $inds = @($window.FindName('LockBingInd'), $window.FindName('LockSpotlightInd'), $window.FindName('LockWallhavenInd'))
-        $lbls = @($window.FindName('LockBingLbl'), $window.FindName('LockSpotlightLbl'), $window.FindName('LockWallhavenLbl'))
-        $vals = @('Bing', 'Spotlight', 'Wallhaven')
+        $inds = @($window.FindName('LockBingInd'), $window.FindName('LockSpotlightInd'), $window.FindName('LockWallhavenInd'), $window.FindName('LockNoneInd'))
+        $lbls = @($window.FindName('LockBingLbl'), $window.FindName('LockSpotlightLbl'), $window.FindName('LockWallhavenLbl'), $window.FindName('LockNoneLbl'))
+        $vals = @('Bing', 'Spotlight', 'Wallhaven', 'None')
     } elseif ($Category -eq 'Schedule') {
         $inds = @($window.FindName('SchedEverydayInd'), $window.FindName('SchedTestInd'))
         $lbls = @($window.FindName('SchedEverydayLbl'), $window.FindName('SchedTestLbl'))
@@ -5623,6 +5640,8 @@ $DeskSpotlightBtn = $window.FindName('DeskSpotlightBtn')
 if ($DeskSpotlightBtn) { $DeskSpotlightBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Spotlight' }) }
 $DeskWallhavenBtn = $window.FindName('DeskWallhavenBtn')
 if ($DeskWallhavenBtn) { $DeskWallhavenBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Wallhaven' }) }
+$DeskNoneBtn = $window.FindName('DeskNoneBtn')
+if ($DeskNoneBtn) { $DeskNoneBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'None' }) }
 
 $LockBingBtn = $window.FindName('LockBingBtn')
 if ($LockBingBtn) { $LockBingBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Bing' }) }
@@ -5630,6 +5649,8 @@ $LockSpotlightBtn = $window.FindName('LockSpotlightBtn')
 if ($LockSpotlightBtn) { $LockSpotlightBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Spotlight' }) }
 $LockWallhavenBtn = $window.FindName('LockWallhavenBtn')
 if ($LockWallhavenBtn) { $LockWallhavenBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Wallhaven' }) }
+$LockNoneBtn = $window.FindName('LockNoneBtn')
+if ($LockNoneBtn) { $LockNoneBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'None' }) }
 
 $SchedEverydayBtn = $window.FindName('SchedEverydayBtn')
 if ($SchedEverydayBtn) { $SchedEverydayBtn.Add_Click({ $AutoScheduleBox.SelectedItem = $AutoScheduleBox.Items[0] }) }
