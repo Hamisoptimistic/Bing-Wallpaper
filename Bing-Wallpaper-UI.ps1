@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -1595,41 +1595,74 @@ $xaml = @"
                     </TextBox>
                 </StackPanel>
 
-                <StackPanel Name="ColAuto" Margin="0,0,16,16">
-                    <TextBlock Name="LabelAuto" Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <StackPanel Orientation="Horizontal">
-                        <Grid Name="AutoPillRow" Height="38" VerticalAlignment="Center">
-                            <Border Name="SpotlightPill" Width="58" Height="32" CornerRadius="16"
-                                    Background="#2a2a2a" BorderBrush="#3D3D3D" BorderThickness="1.5"
-                                    Cursor="Hand" VerticalAlignment="Center">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="#0078D4" BlurRadius="14" ShadowDepth="0.5" Opacity="0"/>
-                                </Border.Effect>
-                                <Ellipse Name="SpotlightThumb" Width="22" Height="22" Fill="#FFFFFF"
-                                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0">
-                                    <Ellipse.RenderTransform>
-                                        <TranslateTransform X="0" Y="0"/>
-                                    </Ellipse.RenderTransform>
-                                </Ellipse>
-                            </Border>
-                        </Grid>
+                <StackPanel Name="ColAuto" Margin="0,0,16,16" VerticalAlignment="Bottom">
+                    <TextBlock Name="LabelAuto" Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" Visibility="Collapsed"/>
+                    
+                    <Border Name="AutoUnifiedButton" Background="#2A2A2A" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8" Height="38" Cursor="Hand">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#282828"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" Margin="12,0,8,0"/>
 
-                        <Button Name="SpotlightSetBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38"
-                                Margin="8,0,0,0" IsEnabled="False" ToolTip="Configure automatic wallpaper changes">
-                            <Button.Effect>
-                                <DropShadowEffect Color="#0078D4" BlurRadius="12" ShadowDepth="0" Opacity="0"/>
-                            </Button.Effect>
-                            <Viewbox Width="17" Height="17">
-                                <Canvas Width="20" Height="20">
-                                    <Ellipse Canvas.Left="1.5" Canvas.Top="1.5" Width="17" Height="17"
-                                             Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6"/>
-                                    <Path Data="M10,10 L10,5.3 M10,10 L14,12.2"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </Button>
+                            <Grid Name="AutoPillRow" VerticalAlignment="Center" Margin="0,0,4,0">
+                                <Border Name="SpotlightPill" Width="44" Height="20" CornerRadius="10"
+                                        Background="#404040" BorderBrush="#5A5A5A" BorderThickness="1"
+                                        Cursor="Hand" VerticalAlignment="Center"
+                                        SnapsToDevicePixels="True" UseLayoutRounding="True">
+                                    <Ellipse Name="SpotlightThumb" Width="14" Height="14" Fill="#C8C8C8"
+                                             HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0"
+                                             SnapsToDevicePixels="True" UseLayoutRounding="True">
+                                        <Ellipse.RenderTransform>
+                                            <TranslateTransform X="0" Y="0"/>
+                                        </Ellipse.RenderTransform>
+                                    </Ellipse>
+                                </Border>
+                            </Grid>
+    
+                            <Button Name="SpotlightSetBtn" Width="30" Height="30" Margin="0,0,4,0" VerticalAlignment="Center"
+                                    Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
+                                    Background="#2A2A2A" BorderBrush="#1FFFFFFF" BorderThickness="1.5" Foreground="#777">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
+                                                            <Setter Property="Foreground" Value="#DDD"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsPressed" Value="True">
+                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                                                            <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
+                                                            <Setter Property="Foreground" Value="#0078D4"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
 
-                        <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=SpotlightSetBtn}"
+                                <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=AutoUnifiedButton}"
                                Placement="Bottom" VerticalOffset="6" HorizontalOffset="0" AllowsTransparency="True" StaysOpen="False"
                                PopupAnimation="None" Focusable="False">
                             <Grid Name="SpotlightPopupTransformHost" Margin="14" RenderTransformOrigin="0.5,0.5">
@@ -1660,7 +1693,6 @@ $xaml = @"
                                 </Border>
                             </Grid>
                         </Popup>
-                    </StackPanel>
                 </StackPanel>
 
             </WrapPanel>
@@ -2067,7 +2099,24 @@ if ($SourceWallhavenBtn) {
 
 $SpotlightPill = $window.FindName('SpotlightPill')
 $SpotlightThumb = $window.FindName('SpotlightThumb')
-$SpotlightGlow = if ($SpotlightPill) { $SpotlightPill.Effect } else { $null }
+$SpotlightThumbTranslate = $null
+$SpotlightThumbScale = $null
+if ($SpotlightThumb -and $SpotlightThumb.RenderTransform) {
+    try {
+        $SpotlightThumbTranslate = $SpotlightThumb.RenderTransform
+        $SpotlightThumbScale = New-Object System.Windows.Media.ScaleTransform(1.0, 1.0)
+        $thumbTransformGroup = New-Object System.Windows.Media.TransformGroup
+        [void]$thumbTransformGroup.Children.Add($SpotlightThumbScale)
+        [void]$thumbTransformGroup.Children.Add($SpotlightThumbTranslate)
+        $SpotlightThumb.RenderTransform = $thumbTransformGroup
+        $SpotlightThumb.RenderTransformOrigin = New-Object System.Windows.Point(0.5, 0.5)
+    }
+    catch {
+        # If anything here fails, fall back to the plain translate transform
+        # so the toggle still slides even without the squish flourish.
+        $SpotlightThumbScale = $null
+    }
+}
 $SpotlightSetBtn = $window.FindName('SpotlightSetBtn')
 Enable-StrictToolTipDelay $SpotlightSetBtn
 $SpotlightSetBtnGlow = if ($SpotlightSetBtn) { $SpotlightSetBtn.Effect } else { $null }
@@ -2076,6 +2125,7 @@ $SpotlightPopupCard = $window.FindName('SpotlightPopupCard')
 $SpotlightPopupTransform = $window.FindName('SpotlightPopupTransform')
 $AutoDesktopSourceBox = $window.FindName('AutoDesktopSourceBox')
 $AutoLockScreenSourceBox = $window.FindName('AutoLockScreenSourceBox')
+$AutoUnifiedButton = $window.FindName('AutoUnifiedButton')
 $AutoScheduleBox = $window.FindName('AutoScheduleBox')
 
 # Compact-mode toolbar elements (see Update-ToolbarCompactState below)
@@ -2941,11 +2991,15 @@ $script:SpotlightTaskName = 'BingWallpaperSpotlight'
 $script:SpotlightScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
 $script:SpotlightEnabled = $false
 
-$script:pillBgBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(38, 38, 38))
-$script:pillBorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(61, 61, 61))
+$script:pillBgBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(64, 64, 64))
+$script:pillBorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(90, 90, 90))
+$script:pillThumbBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(200, 200, 200))
 if ($SpotlightPill) {
     $SpotlightPill.Background = $script:pillBgBrush
     $SpotlightPill.BorderBrush = $script:pillBorderBrush
+}
+if ($SpotlightThumb) {
+    $SpotlightThumb.Fill = $script:pillThumbBrush
 }
 
 $processPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
@@ -3010,47 +3064,63 @@ function Update-SpotlightScheduledTaskAsync {
 }
 
 function Set-SpotlightState {
-    param([bool]$Enabled, [bool]$Animate = $true, [bool]$UpdateTask = $true)
+    param(
+        [switch]$Enabled,
+        [switch]$Animate = $true,
+        [switch]$UpdateTask = $true
+    )
     $script:SpotlightEnabled = $Enabled
 
-    $targetX = if ($Enabled) { 26.0 } else { 0.0 }
-    $targetBgColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(38, 38, 38) }
-    $targetBorderColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(61, 61, 61) }
-    $targetGlowOpacity = if ($Enabled) { 0.65 } else { 0.0 }
+    # Travel distance = track width (44) - thumb diameter (14) - 2x margin (3) = 24px.
+    $targetX = if ($Enabled) { 24.0 } else { 0.0 }
+    $targetBgColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(64, 64, 64) }
+    $targetBorderColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(90, 90, 90) }
+    $targetThumbColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(255, 255, 255) } else { [System.Windows.Media.Color]::FromRgb(200, 200, 200) }
 
-    # "Every" / "Apply To" now live in a Popup anchored to SpotlightSetBtn
-    # instead of an always-reserved 306px column in the toolbar's WrapPanel.
-    # The Set button is only actionable while Auto is on; turning Auto off
-    # also closes the popup if it happened to be open.
     if ($SpotlightSetBtn) { $SpotlightSetBtn.IsEnabled = $Enabled }
     if (-not $Enabled -and $SpotlightOptionsPopup) { $SpotlightOptionsPopup.IsOpen = $false }
 
     if ($Animate) {
-        $dur = [TimeSpan]::FromMilliseconds(200)
+        $dur = [TimeSpan]::FromMilliseconds(220)
         $easing = New-Object System.Windows.Media.Animation.CubicEase
         $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
 
         $thumbAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetX, (New-Object System.Windows.Duration($dur))
         $thumbAnim.EasingFunction = $easing
-        $SpotlightThumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $thumbAnim)
+        $SpotlightThumbTranslate.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $thumbAnim)
 
         $bgAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetBgColor, (New-Object System.Windows.Duration($dur))
         $bgAnim.EasingFunction = $easing
         $script:pillBgBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $bgAnim)
 
-        $borderAnim = New-Object System.Windows.Media.ColorAnimation -ArgumentList $targetBorderColor, (New-Object System.Windows.Duration($dur))
+        $borderAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetBorderColor, (New-Object System.Windows.Duration($dur))
         $borderAnim.EasingFunction = $easing
         $script:pillBorderBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $borderAnim)
 
-        if ($SpotlightGlow) {
-            $glowAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetGlowOpacity, (New-Object System.Windows.Duration($dur))
-            $glowAnim.EasingFunction = $easing
-            $SpotlightGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowAnim)
+        $thumbColorAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetThumbColor, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180)))
+        $script:pillThumbBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $thumbColorAnim)
+
+        if ($SpotlightThumbScale) {
+            try {
+                $squish = New-Object System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
+                $squishOutEase = New-Object System.Windows.Media.Animation.QuadraticEase
+                $squishOutEase.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+                $k0 = New-Object System.Windows.Media.Animation.LinearDoubleKeyFrame(1.0, [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::Zero))
+                $k1 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame(1.2, [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::FromMilliseconds(80)))
+                $k1.EasingFunction = $squishOutEase
+                $k2 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame(1.0, [System.Windows.Media.Animation.KeyTime]::FromTimeSpan($dur))
+                $k2.EasingFunction = $easing
+                [void]$squish.KeyFrames.Add($k0)
+                [void]$squish.KeyFrames.Add($k1)
+                [void]$squish.KeyFrames.Add($k2)
+                $SpotlightThumbScale.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $squish)
+            }
+            catch {}
         }
     }
     else {
-        $SpotlightThumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-        $SpotlightThumb.RenderTransform.X = $targetX
+        $SpotlightThumbTranslate.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
+        $SpotlightThumbTranslate.X = $targetX
 
         $script:pillBgBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
         $script:pillBgBrush.Color = $targetBgColor
@@ -3058,10 +3128,8 @@ function Set-SpotlightState {
         $script:pillBorderBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
         $script:pillBorderBrush.Color = $targetBorderColor
 
-        if ($SpotlightGlow) {
-            $SpotlightGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $null)
-            $SpotlightGlow.Opacity = $targetGlowOpacity
-        }
+        $script:pillThumbBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
+        $script:pillThumbBrush.Color = $targetThumbColor
     }
 
     if ($UpdateTask) {
@@ -3871,15 +3939,18 @@ function Set-ToolbarCompact {
     foreach ($box in @($RegionBox, $WallhavenApiKeyBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
         if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
     }
-    foreach ($btn in @($RefreshBtn, $SpotlightSetBtn)) {
-        if ($btn) { $btn.Width = $iconSize; $btn.Height = $iconSize }
-    }
+    if ($RefreshBtn) { $RefreshBtn.Width = $iconSize; $RefreshBtn.Height = $iconSize }
+    # SpotlightSetBtn lives inside AutoUnifiedButton, whose Height stays a fixed
+    # 38 regardless of compact mode - so this button keeps its own fixed size
+    # instead of following RefreshBtn's iconSize, or it would crowd the pill's
+    # rounded corners (see Border AutoUnifiedButton above).
+    if ($SpotlightSetBtn) { $SpotlightSetBtn.Width = 30; $SpotlightSetBtn.Height = 30 }
     foreach ($label in @($LabelRegion, $LabelResolution, $LabelApplyTo, $LabelStyle, $LabelDownloadTo, $LabelAuto)) {
         if ($label) { $label.FontSize = $labelFont }
     }
-    # The Auto pill (58x32) and its thumb never resize - their on/off travel
+    # The Auto pill (40x20) and its thumb never resize - their on/off travel
     # distance is baked into Set-SpotlightState's animation. We only shrink
-    # the row Grid that centers the pill, which already fits a 32px pill
+    # the row Grid that centers the pill, which already fits it fine
     # with no vertical-centering math to break.
     if ($AutoPillRow) { $AutoPillRow.Height = $comboHeight }
 
@@ -5385,19 +5456,29 @@ if ($AutoScheduleBox) {
 
 $spotlightWasEnabled = ($script:appSettings.SpotlightEnabled -eq $true)
 if ($spotlightWasEnabled) {
-    Set-SpotlightState -Enabled $true -Animate $false -UpdateTask $false
+    Set-SpotlightState -Enabled:$true -Animate:$false -UpdateTask:$false
     Update-SpotlightScheduledTaskAsync -Enable $true
 }
 
-$SpotlightPill.Add_PreviewMouseLeftButtonDown({
+$AutoUnifiedButton.Add_MouseLeftButtonUp({
         param($sender, $e)
         $e.Handled = $true
         $newState = -not $script:SpotlightEnabled
-        Set-SpotlightState -Enabled $newState
+        Set-SpotlightState -Enabled:$newState
 
         if ($newState) {
             Set-TransientStatus -Message "Automatic wallpaper changing enabled. Default schedule: daily at 12:00 AM." -Brush $statusSuccessBrush
-            if ($SpotlightOptionsPopup) { $SpotlightOptionsPopup.IsOpen = $true }
+            if ($SpotlightOptionsPopup) {
+                $openPopupTimer = New-Object System.Windows.Threading.DispatcherTimer
+                $openPopupTimer.Interval = [TimeSpan]::FromMilliseconds(240)
+                $openPopupTimer.Add_Tick({
+                    if ($script:SpotlightEnabled -and -not $SpotlightOptionsPopup.IsOpen) {
+                        $SpotlightOptionsPopup.IsOpen = $true
+                    }
+                    $this.Stop()
+                })
+                $openPopupTimer.Start()
+            }
         }
         else {
             Set-TransientStatus -Message "Automatic wallpaper changing disabled." -Brush $statusErrorBrush
@@ -5501,14 +5582,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
             $slideAnim.EasingFunction = $easing
             $SpotlightPopupTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $slideAnim)
 
-            # Border + glow on the Set button itself, so it's obvious which
-            # icon this flyout "belongs to" while it's open.
-            $SpotlightSetBtn.BorderBrush = $spotlightSetBtnAccentBrush
-            if ($SpotlightSetBtnGlow) {
-                $glowAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.55, $dur
-                $glowAnim.EasingFunction = $easing
-                $SpotlightSetBtnGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $glowAnim)
-            }
+            # (Removed glow/border highlight per user request)
         })
 
     $SpotlightOptionsPopup.Add_Closed({
@@ -5519,11 +5593,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
             $SpotlightPopupTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $null)
             $SpotlightPopupTransform.Y = -8
 
-            $SpotlightSetBtn.ClearValue([System.Windows.Controls.Control]::BorderBrushProperty)
-            if ($SpotlightSetBtnGlow) {
-                $SpotlightSetBtnGlow.BeginAnimation([System.Windows.Media.Effects.DropShadowEffect]::OpacityProperty, $null)
-                $SpotlightSetBtnGlow.Opacity = 0
-            }
+            # (Removed glow/border highlight per user request)
         })
 }
 
@@ -6276,3 +6346,4 @@ $script:memTrimTimer.Start()
 Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
+[Environment]::Exit(0)

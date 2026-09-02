@@ -94,9 +94,10 @@ echo %DIM%  You can launch AutoScape from either shortcut.%RESET%
 echo.
 echo %DARKBLUE%  ------------------------------------------------------------------------------------------%RESET%
 echo.
-echo %DIM%  Press any key to close.%RESET%
+echo %DIM%  Press any key to close and launch AutoScape...%RESET%
 
 pause >nul
+start "" "%APPDATA%\Microsoft\Windows\Start Menu\Programs\AutoScape.lnk"
 exit /b 0
 
 
