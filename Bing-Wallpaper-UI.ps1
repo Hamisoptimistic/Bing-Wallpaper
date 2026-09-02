@@ -1795,7 +1795,7 @@ $xaml = @"
                 </ScrollViewer>
             </Border>
 
-            <Grid Grid.Row="3" Margin="0,28,0,0">
+            <Grid Grid.Row="3" Margin="0,28,16,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -1806,8 +1806,8 @@ $xaml = @"
                     <Button Name="InfoBtn" Style="{StaticResource ModernIconButton}" Width="46" Height="46" Margin="0,0,12,0" ToolTip="User Guide">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
-                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="#2a2a2a" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" />
-                    <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="#0078D4" Foreground="White" FontSize="15" FontWeight="SemiBold" />
+                    <Button Name="DownloadBtn" Content="Download" Width="130" Height="46" Margin="0,0,12,0" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" Foreground="#E0E0E0" FontSize="15" FontWeight="SemiBold" />
+                    <Button Name="UpdateBtn" Content="Apply" Width="140" Height="46" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" Foreground="White" FontSize="15" FontWeight="SemiBold" />
                 </StackPanel>
             </Grid>
         </Grid>
