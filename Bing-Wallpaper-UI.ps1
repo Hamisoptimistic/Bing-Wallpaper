@@ -886,7 +886,7 @@ function Get-WallhavenImages {
 
 function Get-PexelsImages {
     param(
-        [int]$Count = 24,
+        [int]$Count = 40,
         [string]$ApiKey = ''
     )
 
@@ -894,11 +894,26 @@ function Get-PexelsImages {
         return @()
     }
 
-    # Query nature wallpapers across valid random pages (1-8) with automatic fallback
-    $randomPage = Get-Random -Minimum 1 -Maximum 9
+    # Curated premium landscape wallpaper queries requested by user
+    $wallpaperQueries = @(
+        'beautiful scenery',
+        'beautiful view',
+        'peaceful nature',
+        'nature beauty',
+        'mountain',
+        'mountain landscape',
+        'mountain lake',
+        'lakes',
+        'summer landscape',
+        'autumn landscape',
+        'autumn forest'
+    )
+    $query = Get-Random -InputObject $wallpaperQueries
+    $escapedQuery = [System.Uri]::EscapeDataString($query)
+    $randomPage = Get-Random -Minimum 1 -Maximum 4
 
-    # Orientation=landscape strictly eliminates 9:16 mobile phone crops.
-    $uri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=$randomPage"
+    # Orientation=landscape strictly eliminates 9:16 mobile phone crops
+    $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&per_page=50&page=$randomPage"
 
     $wc = New-Object System.Net.WebClient
     $wc.Encoding = [System.Text.Encoding]::UTF8
@@ -911,17 +926,29 @@ function Get-PexelsImages {
     }
     catch {}
 
-    if ($data.Count -eq 0 -and $randomPage -ne 1) {
-        try {
-            $fallbackUri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=1"
-            $json = $wc.DownloadString($fallbackUri)
-            if ($json) { $data = @((ConvertFrom-Json -InputObject $json).photos) }
-        } catch {}
+    if ($data.Count -eq 0) {
+        $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
+        foreach ($fq in $fallbackQueries) {
+            try {
+                $fEsc = [System.Uri]::EscapeDataString($fq)
+                $fallbackUri = "https://api.pexels.com/v1/search?query=$fEsc&orientation=landscape&per_page=50&page=1"
+                $wc2 = New-Object System.Net.WebClient
+                $wc2.Encoding = [System.Text.Encoding]::UTF8
+                $wc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                $wc2.Headers.Add("Authorization", $ApiKey.Trim())
+                $fJson = $wc2.DownloadString($fallbackUri)
+                $wc2.Dispose()
+                if ($fJson) {
+                    $data = @((ConvertFrom-Json -InputObject $fJson).photos)
+                    if ($data.Count -gt 0) { break }
+                }
+            } catch {}
+        }
     }
     $wc.Dispose()
 
-    # Rejection keywords to guarantee zero humans or portrait poses
-    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini')
+    # Rejection keywords to guarantee zero humans, portraits, or amateur macro closeups
+    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini', 'insect', 'bug', 'larva', 'worm', 'macro')
 
     $results = @()
     foreach ($item in $data) {
@@ -1651,23 +1678,17 @@ $xaml = @"
                             </Viewbox>
                         </ComboBox.Tag>
                     </ComboBox>
-                    <Grid Name="WallhavenKeyGrid" Visibility="Collapsed">
-                        <TextBox Name="WallhavenApiKeyBox" Width="235" FontSize="13.5" Height="38"
-                                 ToolTip="Optional - Wallhaven works without one for SFW wallpapers. Add a key from wallhaven.cc/settings/account for a higher rate limit.">
+                    <!-- Universal API Key Grid for all current and future sources (Wallhaven, Pexels, NASA, etc.) -->
+                    <Grid Name="ApiKeyGrid" Visibility="Collapsed">
+                        <TextBox Name="ApiKeyBox" Width="235" FontSize="13.5" Height="38" Padding="40,0,32,0">
                             <TextBox.Tag>
                                 <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
                             </TextBox.Tag>
                         </TextBox>
-                        <TextBlock Name="WallhavenPlaceholder" Text="Paste your Wallhaven API key here" Foreground="#55FFFFFF" FontSize="12" IsHitTestVisible="False" VerticalAlignment="Center" Margin="40,0,14,0"/>
-                    </Grid>
-                    <Grid Name="PexelsKeyGrid" Visibility="Collapsed">
-                        <TextBox Name="PexelsApiKeyBox" Width="235" FontSize="13.5" Height="38"
-                                 ToolTip="Required - Get a free instant API key from pexels.com/api">
-                            <TextBox.Tag>
-                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
-                            </TextBox.Tag>
-                        </TextBox>
-                        <TextBlock Name="PexelsPlaceholder" Text="Paste your Pexels API key here" Foreground="#55FFFFFF" FontSize="12" IsHitTestVisible="False" VerticalAlignment="Center" Margin="40,0,14,0"/>
+                        <TextBlock Name="ApiKeyPlaceholder" Text="Paste API key here" Foreground="#55FFFFFF" FontSize="12" IsHitTestVisible="False" VerticalAlignment="Center" Margin="40,0,32,0"/>
+                        <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="26" Height="26" HorizontalAlignment="Right" Margin="0,0,6,0" ToolTip="Clear API Key" Visibility="Collapsed">
+                            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Button>
                     </Grid>
                 </StackPanel>
 
@@ -2021,10 +2042,8 @@ function Find-RevealBorders($visual) {
 }
 
 $window.Add_Loaded({
-    $tb = $window.FindName('WallhavenApiKeyBox')
+    $tb = $window.FindName('ApiKeyBox')
     if ($tb) { $tb.ApplyTemplate() | Out-Null }
-    $ptb = $window.FindName('PexelsApiKeyBox')
-    if ($ptb) { $ptb.ApplyTemplate() | Out-Null }
     Find-RevealBorders $window
 })
 
@@ -2167,6 +2186,114 @@ $window.Add_StateChanged({
             Close-DialogModal
         }
     })
+$script:appSettings = Load-Settings
+
+$script:ApiKeySources = @{
+    'Wallhaven' = @{
+        Label        = 'API Key (optional)'
+        Placeholder  = 'Paste your Wallhaven API key here'
+        Tooltip      = 'Optional - Wallhaven works without one for SFW wallpapers. Add a key from wallhaven.cc/settings/account for a higher rate limit.'
+        ExpectedLen  = 32
+        CharPattern  = '^[a-zA-Z0-9]+$'
+        IsOptional   = $true
+        SettingsProp = 'WallhavenApiKey'
+    }
+    'Pexels' = @{
+        Label        = 'Pexels API Key'
+        Placeholder  = 'Paste your Pexels API key here'
+        Tooltip      = 'Required - Get a free instant API key from pexels.com/api'
+        ExpectedLen  = 56
+        CharPattern  = '^[a-zA-Z0-9_-]+$'
+        IsOptional   = $false
+        SettingsProp = 'PexelsApiKey'
+    }
+}
+
+function Test-SourceApiKey([string]$Source, [string]$Key) {
+    if ([string]::IsNullOrWhiteSpace($Key)) {
+        $isOpt = if ($script:ApiKeySources.ContainsKey($Source)) { [bool]$script:ApiKeySources[$Source].IsOptional } else { $false }
+        if ($isOpt) {
+            return @{ Valid = $true; Error = $null }
+        }
+        return @{ Valid = $false; Error = "Please enter a valid $Source API key." }
+    }
+
+    $trimmed = $Key.Trim()
+
+    # Reject if user pasted another source's key!
+    foreach ($otherSource in $script:ApiKeySources.Keys) {
+        if ($otherSource -ne $Source) {
+            $otherSpec = $script:ApiKeySources[$otherSource]
+            if ($trimmed.Length -eq $otherSpec.ExpectedLen) {
+                return @{
+                    Valid = $false
+                    Error = "Invalid $Source key: That is a $otherSource API key ($($otherSpec.ExpectedLen) characters). Please enter a valid $Source API key."
+                }
+            }
+        }
+    }
+
+    $spec = if ($script:ApiKeySources.ContainsKey($Source)) { $script:ApiKeySources[$Source] } else { $null }
+    if ($spec) {
+        if ($spec.ExpectedLen -and $trimmed.Length -ne $spec.ExpectedLen) {
+            return @{
+                Valid = $false
+                Error = "Invalid $Source API key. $Source API keys must be $($spec.ExpectedLen) characters."
+            }
+        }
+        if ($spec.CharPattern -and -not ($trimmed -match $spec.CharPattern)) {
+            return @{
+                Valid = $false
+                Error = "Invalid $Source API key format."
+            }
+        }
+    }
+
+    return @{ Valid = $true; Error = $null }
+}
+
+$script:ApiKeys = @{}
+foreach ($sName in $script:ApiKeySources.Keys) {
+    $prop = $script:ApiKeySources[$sName].SettingsProp
+    $storedVal = if ($script:appSettings -and $script:appSettings.$prop) { [string]$script:appSettings.$prop } else { '' }
+    if ($storedVal) {
+        $valResult = Test-SourceApiKey -Source $sName -Key $storedVal
+        if ($valResult.Valid) {
+            $script:ApiKeys[$sName] = $storedVal
+        } else {
+            $script:ApiKeys[$sName] = ''
+            if ($script:appSettings) { $script:appSettings.$prop = '' }
+        }
+    } else {
+        $script:ApiKeys[$sName] = ''
+    }
+}
+
+function Get-SourceApiKey([string]$Source) {
+    if ($script:ApiKeys.ContainsKey($Source)) {
+        return [string]$script:ApiKeys[$Source]
+    }
+    return ''
+}
+
+function Set-SourceApiKey([string]$Source, [string]$Key) {
+    $script:ApiKeys[$Source] = [string]$Key
+    $prop = if ($script:ApiKeySources.ContainsKey($Source)) { $script:ApiKeySources[$Source].SettingsProp } else { "${Source}ApiKey" }
+    if ($script:appSettings) {
+        $script:appSettings.$prop = [string]$Key
+    }
+    Save-Settings
+}
+
+function Get-MaskedApiKey([string]$Key) {
+    if ([string]::IsNullOrWhiteSpace($Key)) { return '' }
+    $trimmed = $Key.Trim()
+    if ($trimmed.Length -le 5) { return $trimmed }
+    $visible = $trimmed.Substring(0, 5)
+    $maskCount = [Math]::Min(20, [Math]::Max(10, $trimmed.Length - 5))
+    return $visible + ('*' * $maskCount)
+}
+
 function Save-Settings {
     try {
         $settingsObj = @{
@@ -2179,8 +2306,8 @@ function Save-Settings {
             AutoLockScreenSource = if ($AutoLockScreenSourceBox -and $AutoLockScreenSourceBox.SelectedItem) { [string]$AutoLockScreenSourceBox.SelectedItem } else { 'Bing' }
             AutoSchedule         = if ($AutoScheduleBox -and $AutoScheduleBox.SelectedItem) { [string]$AutoScheduleBox.SelectedItem.Tag } else { 'Daily' }
             SpotlightEnabled     = [bool]$script:SpotlightEnabled
-            WallhavenApiKey      = if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }
-            PexelsApiKey         = if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Text } else { '' }
+            WallhavenApiKey      = (Get-SourceApiKey 'Wallhaven')
+            PexelsApiKey         = (Get-SourceApiKey 'Pexels')
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -2190,8 +2317,6 @@ function Save-Settings {
     }
     catch {}
 }
-
-$script:appSettings = Load-Settings
 
 # WPF's own ToolTipService.InitialShowDelay/BetweenShowDelay machinery has
 # a known "recently shown, skip the delay" fast-path that isn't scoped to
@@ -2262,12 +2387,11 @@ function Enable-StrictToolTipDelay($targetElement) {
 }
 
 $RegionBox = $window.FindName('RegionBox')
-$WallhavenKeyGrid = $window.FindName('WallhavenKeyGrid')
-$WallhavenApiKeyBox = $window.FindName('WallhavenApiKeyBox')
-$WallhavenPlaceholder = $window.FindName('WallhavenPlaceholder')
-$PexelsKeyGrid = $window.FindName('PexelsKeyGrid')
-$PexelsApiKeyBox = $window.FindName('PexelsApiKeyBox')
-$PexelsPlaceholder = $window.FindName('PexelsPlaceholder')
+$ApiKeyGrid = $window.FindName('ApiKeyGrid')
+$ApiKeyBox = $window.FindName('ApiKeyBox')
+$ApiKeyPlaceholder = $window.FindName('ApiKeyPlaceholder')
+$ClearApiKeyBtn = $window.FindName('ClearApiKeyBtn')
+Enable-StrictToolTipDelay $ClearApiKeyBtn
 $ResolutionBox = $window.FindName('ResolutionBox')
 $TargetBox = $window.FindName('TargetBox')
 $StyleBox = $window.FindName('StyleBox')
@@ -2287,7 +2411,7 @@ $CheckUpdateBtn = $null
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
 
-# --- Bing / Spotlight / Wallhaven / Pexels source toggle -----------------
+# --- Source toggle pill -----------------
 $SourceBingBtn = $window.FindName('SourceBingBtn')
 $SourceSpotlightBtn = $window.FindName('SourceSpotlightBtn')
 $SourceWallhavenBtn = $window.FindName('SourceWallhavenBtn')
@@ -2303,6 +2427,24 @@ $SourcePexelsLabel = $window.FindName('SourcePexelsLabel')
 $AppSubtitleText = $window.FindName('AppSubtitleText')
 
 $script:currentSource = 'Bing'
+
+function Update-GlobalApiKeyBoxState([string]$Key) {
+    if (-not $ApiKeyBox) { return }
+    if ([string]::IsNullOrWhiteSpace($Key)) {
+        $ApiKeyBox.IsReadOnly = $false
+        $ApiKeyBox.Cursor = [System.Windows.Input.Cursors]::IBeam
+        $ApiKeyBox.Text = ''
+        if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.Visibility = [System.Windows.Visibility]::Visible }
+        if ($ClearApiKeyBtn) { $ClearApiKeyBtn.Visibility = [System.Windows.Visibility]::Collapsed }
+    }
+    else {
+        $ApiKeyBox.IsReadOnly = $true
+        $ApiKeyBox.Cursor = [System.Windows.Input.Cursors]::Arrow
+        $ApiKeyBox.Text = Get-MaskedApiKey $Key
+        if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($ClearApiKeyBtn) { $ClearApiKeyBtn.Visibility = [System.Windows.Visibility]::Visible }
+    }
+}
 
 function Update-SourceToggleVisual {
     $activeColor = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(255, 255, 255))
@@ -2323,30 +2465,89 @@ function Update-SourceToggleVisual {
         $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } elseif ($isPexels) { 'Pexels 4K nature photography' } else { 'Bing wallpapers, delivered daily' }
     }
 
-    # Region only applies to Bing/Spotlight - swap out for Wallhaven or Pexels API key box
-    if ($RegionBox) { $RegionBox.Visibility = if ($isWallhaven -or $isPexels) { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible } }
-    if ($WallhavenKeyGrid) { $WallhavenKeyGrid.Visibility = if ($isWallhaven) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed } }
-    if ($PexelsKeyGrid) { $PexelsKeyGrid.Visibility = if ($isPexels) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed } }
-    if ($LabelRegion) {
-        $LabelRegion.Text = if ($isWallhaven) { 'API Key (optional)' } elseif ($isPexels) { 'Pexels API Key' } else { 'Region' }
+    # Universal handling for any current or future API-key-based source
+    $isApiKeySource = $script:ApiKeySources.ContainsKey($script:currentSource)
+    if ($isApiKeySource) {
+        $spec = $script:ApiKeySources[$script:currentSource]
+        if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Visible }
+        if ($LabelRegion) { $LabelRegion.Text = $spec.Label }
+        if ($ApiKeyBox) { $ApiKeyBox.ToolTip = $spec.Tooltip }
+        if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.Text = $spec.Placeholder }
+
+        $currentKey = Get-SourceApiKey $script:currentSource
+        Update-GlobalApiKeyBoxState -Key $currentKey
+    } else {
+        if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Visible }
+        if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($LabelRegion) { $LabelRegion.Text = 'Region' }
     }
 }
 Update-SourceToggleVisual
 
-# Placeholder management for API key inputs
-function Update-KeyPlaceholder {
-    param($box, $placeholder)
-    if ($box -and $placeholder) {
-        $placeholder.Visibility = if ([string]::IsNullOrEmpty($box.Text)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
-    }
+# Clear button handler: wipes the key for the active source in memory & settings.json, unlocks box, and prompts user
+if ($ClearApiKeyBtn) {
+    $ClearApiKeyBtn.Add_Click({
+        $src = $script:currentSource
+        if (-not $script:ApiKeySources.ContainsKey($src)) { return }
+
+        Set-SourceApiKey -Source $src -Key ''
+        Update-GlobalApiKeyBoxState -Key ''
+
+        if ($ApiKeyBox) {
+            $ApiKeyBox.Focus()
+        }
+
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $StatusText.Opacity = 1
+        $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(158, 158, 158)))
+        $StatusText.Text = "$src API key cleared. Paste your key and press Enter."
+    })
 }
-if ($WallhavenApiKeyBox -and $WallhavenPlaceholder) {
-    $WallhavenApiKeyBox.Add_TextChanged({ Update-KeyPlaceholder $WallhavenApiKeyBox $WallhavenPlaceholder })
-    Update-KeyPlaceholder $WallhavenApiKeyBox $WallhavenPlaceholder
-}
-if ($PexelsApiKeyBox -and $PexelsPlaceholder) {
-    $PexelsApiKeyBox.Add_TextChanged({ Update-KeyPlaceholder $PexelsApiKeyBox $PexelsPlaceholder })
-    Update-KeyPlaceholder $PexelsApiKeyBox $PexelsPlaceholder
+
+# Universal API key box event wiring
+if ($ApiKeyBox) {
+    $ApiKeyBox.Add_TextChanged({
+        if ($ApiKeyBox.IsReadOnly) { return }
+        $txt = $ApiKeyBox.Text.Trim()
+        if ($ApiKeyPlaceholder) {
+            $ApiKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+        }
+    })
+
+    $ApiKeyBox.Add_PreviewKeyDown({
+        param($s, $e)
+        if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
+            $e.Handled = $true
+            $src = $script:currentSource
+            if (-not $script:ApiKeySources.ContainsKey($src)) { return }
+
+            if ($ApiKeyBox.IsReadOnly) {
+                # Already locked with valid key: Enter key simply refreshes gallery!
+                Load-Gallery
+                return
+            }
+
+            $rawInput = $ApiKeyBox.Text.Trim()
+            $validation = Test-SourceApiKey -Source $src -Key $rawInput
+
+            if (-not $validation.Valid) {
+                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                $StatusText.Opacity = 1
+                $StatusText.Foreground = $statusErrorBrush
+                $StatusText.Text = $validation.Error
+                $ApiKeyBox.SelectAll()
+                return
+            }
+
+            # Valid key! Save to memory & settings.json, lock, mask, and refresh gallery!
+            Set-SourceApiKey -Source $src -Key $rawInput
+            Update-GlobalApiKeyBoxState -Key $rawInput
+            if ($window) { $window.Focus() }
+
+            Load-Gallery
+        }
+    })
 }
 
 if ($SourceBingBtn) {
@@ -2786,6 +2987,22 @@ if ($DialogModalHost) {
 function Start-RefreshAnimation {
     if (-not $RefreshIcon) { return }
 
+    $src = $script:currentSource
+    if ($script:ApiKeySources.ContainsKey($src) -and $ApiKeyBox -and -not $ApiKeyBox.IsReadOnly) {
+        $raw = $ApiKeyBox.Text.Trim()
+        $val = Test-SourceApiKey -Source $src -Key $raw
+        if (-not $val.Valid) {
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $StatusText.Opacity = 1
+            $StatusText.Foreground = $statusErrorBrush
+            $StatusText.Text = $val.Error
+            $ApiKeyBox.SelectAll()
+            return
+        }
+        Set-SourceApiKey -Source $src -Key $raw
+        Update-GlobalApiKeyBoxState -Key $raw
+    }
+
     $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
     $spin = New-Object System.Windows.Media.Animation.DoubleAnimation
     $spin.From = 0
@@ -2824,12 +3041,7 @@ foreach ($c in $countries) {
     }
 }
 
-if ($WallhavenApiKeyBox -and $script:appSettings.WallhavenApiKey) {
-    $WallhavenApiKeyBox.Text = [string]$script:appSettings.WallhavenApiKey
-}
-if ($PexelsApiKeyBox -and $script:appSettings.PexelsApiKey) {
-    $PexelsApiKeyBox.Text = [string]$script:appSettings.PexelsApiKey
-}
+
 
 function Get-SelectedRegionCode {
     if ($RegionBox.SelectedItem -and $RegionBox.SelectedItem.Tag) {
@@ -2879,8 +3091,7 @@ else {
 
 $saveHandler = { Save-Settings }
 $RegionBox.Add_SelectionChanged($saveHandler)
-if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Add_LostFocus($saveHandler) }
-if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Add_LostFocus($saveHandler) }
+if ($ApiKeyBox) { $ApiKeyBox.Add_LostFocus($saveHandler) }
 $ResolutionBox.Add_SelectionChanged($saveHandler)
 $TargetBox.Add_SelectionChanged($saveHandler)
 $StyleBox.Add_SelectionChanged($saveHandler)
@@ -4230,7 +4441,7 @@ function Set-ToolbarCompact {
         if ($col) { $col.Margin = $colMargin }
     }
 
-    foreach ($box in @($RegionBox, $WallhavenApiKeyBox, $PexelsApiKeyBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
+    foreach ($box in @($RegionBox, $ApiKeyBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
         if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
     }
     if ($RefreshBtn) { $RefreshBtn.Width = $iconSize; $RefreshBtn.Height = $iconSize }
@@ -4247,8 +4458,7 @@ function Set-ToolbarCompact {
 
     $keyBoxWidth = if ($Compact) { 185 } else { 235 }
     if ($RegionBox) { $RegionBox.Width = $keyBoxWidth }
-    if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Width = $keyBoxWidth }
-    if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Width = $keyBoxWidth }
+    if ($ApiKeyBox) { $ApiKeyBox.Width = $keyBoxWidth }
     if ($ResolutionBox) { $ResolutionBox.Width = if ($Compact) { 95 } else { 110 } }
     if ($TargetBox) { $TargetBox.Width = if ($Compact) { 135 } else { 155 } }
     if ($StyleBox) { $StyleBox.Width = if ($Compact) { 105 } else { 125 } }
@@ -4683,6 +4893,19 @@ function Load-Gallery {
 
     $selectedRegion = Get-SelectedRegionCode
     $fetchSource = $script:currentSource
+
+    if ($script:ApiKeySources.ContainsKey($fetchSource)) {
+        $sourceKey = Get-SourceApiKey $fetchSource
+        $val = Test-SourceApiKey -Source $fetchSource -Key $sourceKey
+        if (-not $val.Valid) {
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $StatusText.Opacity = 1
+            $StatusText.Foreground = $statusErrorBrush
+            $StatusText.Text = $val.Error
+            $GalleryPanel.Children.Clear()
+            return
+        }
+    }
     $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
     
@@ -4767,7 +4990,8 @@ function Load-Gallery {
     [void]$ps.AddScript({
             param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 360, [string]$PexelsKey = '')
             try {
-                [System.Net.ServicePointManager]::DefaultConnectionLimit = 32
+                [System.Net.ServicePointManager]::DefaultConnectionLimit = 64
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls
                 if ($Source -eq 'Spotlight') {
                     # --- Fetch the latest batch from Peapix (cheap - small JSON,
                     # not the thumbnails themselves) ------------------------------
@@ -5245,12 +5469,29 @@ function Load-Gallery {
                         return @{ Success = $false; Error = "Please enter your Pexels API key in the toolbar."; Images = @() }
                     }
 
-                    $pexFetchCount = 60
-                    $pexShowCount = 60
+                    $pexFetchCount = 40
+                    $pexShowCount = 40
 
-                    $randomPage = Get-Random -Minimum 1 -Maximum 9
+                    # Curated premium landscape wallpaper queries requested by user
+                    $wallpaperQueries = @(
+                        'beautiful scenery',
+                        'beautiful view',
+                        'peaceful nature',
+                        'nature beauty',
+                        'mountain',
+                        'mountain landscape',
+                        'mountain lake',
+                        'lakes',
+                        'summer landscape',
+                        'autumn landscape',
+                        'autumn forest'
+                    )
+                    $query = Get-Random -InputObject $wallpaperQueries
+                    $escapedQuery = [System.Uri]::EscapeDataString($query)
+                    $randomPage = Get-Random -Minimum 1 -Maximum 4
 
-                    $uri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=$randomPage"
+                    # Orientation=landscape strictly eliminates 9:16 mobile phone crops
+                    $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&per_page=50&page=$randomPage"
 
                     $pwc = New-Object System.Net.WebClient
                     $pwc.Encoding = [System.Text.Encoding]::UTF8
@@ -5263,18 +5504,34 @@ function Load-Gallery {
                     }
                     catch {
                         $data = @()
+                        if ($_.Exception.Message -match '401' -or ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 401)) {
+                            return @{ Success = $false; Error = "Invalid Pexels API key (401 Unauthorized). Please check your key at pexels.com/api."; Images = @() }
+                        }
                     }
 
-                    if ($data.Count -eq 0 -and $randomPage -ne 1) {
-                        try {
-                            $fallbackUri = "https://api.pexels.com/v1/search?query=nature&orientation=landscape&per_page=60&page=1"
-                            $pjson = $pwc.DownloadString($fallbackUri)
-                            if ($pjson) { $data = @((ConvertFrom-Json -InputObject $pjson).photos) }
-                        } catch {}
+                    if ($data.Count -eq 0) {
+                        $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
+                        foreach ($fq in $fallbackQueries) {
+                            try {
+                                $fEsc = [System.Uri]::EscapeDataString($fq)
+                                $fallbackUri = "https://api.pexels.com/v1/search?query=$fEsc&orientation=landscape&per_page=50&page=1"
+                                $pwc2 = New-Object System.Net.WebClient
+                                $pwc2.Encoding = [System.Text.Encoding]::UTF8
+                                $pwc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                                $pwc2.Headers.Add("Authorization", $PexelsKey.Trim())
+                                $pjson = $pwc2.DownloadString($fallbackUri)
+                                $pwc2.Dispose()
+                                if ($pjson) {
+                                    $data = @((ConvertFrom-Json -InputObject $pjson).photos)
+                                    if ($data.Count -gt 0) { break }
+                                }
+                            } catch {}
+                        }
                     }
                     $pwc.Dispose()
 
-                    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini')
+                    # Rejection keywords to guarantee zero humans, portraits, or amateur macro closeups
+                    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini', 'insect', 'bug', 'larva', 'worm', 'macro')
 
                     $filteredPhotos = @()
                     foreach ($item in $data) {
@@ -5689,7 +5946,7 @@ function Load-Gallery {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
             }
-        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24).AddArgument($(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' })).AddArgument(360).AddArgument($(if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Text } else { '' }))
+        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24).AddArgument((Get-SourceApiKey 'Wallhaven')).AddArgument(360).AddArgument((Get-SourceApiKey 'Pexels'))
 
     $asyncOp = $ps.BeginInvoke()
 
@@ -5739,8 +5996,9 @@ function Load-Gallery {
                     return
                 }
 
+                $isPexelsOrWallhaven = ($script:currentSource -in @('Wallhaven', 'Pexels') -or $fetchSource -in @('Wallhaven', 'Pexels'))
                 $newImages = @()
-                if ($script:phase1Images -and $script:phase1Images.Count -gt 0) {
+                if (-not $isPexelsOrWallhaven -and $script:phase1Images -and $script:phase1Images.Count -gt 0) {
                     $existingUrlBases = New-Object System.Collections.Generic.HashSet[string]
                     foreach ($p1 in $script:phase1Images) { [void]$existingUrlBases.Add($p1.urlbase) }
                     
@@ -5753,10 +6011,10 @@ function Load-Gallery {
                     $newImages = @($images)
                 }
 
-                if ($newImages.Count -eq 0 -and $script:phase1Images.Count -gt 0) {
+                if (-not $isPexelsOrWallhaven -and $newImages.Count -eq 0 -and $script:phase1Images.Count -gt 0) {
                     Restore-StatusTextDefaultWithFade
                 } else {
-                    $isTopInsert = ($script:phase1Images -and $script:phase1Images.Count -gt 0)
+                    $isTopInsert = (-not $isPexelsOrWallhaven -and $script:phase1Images -and $script:phase1Images.Count -gt 0)
                     
                     if ($isTopInsert) {
                         Render-GalleryGrid -Images $newImages -ThumbCacheDir $ctx.ThumbCacheDir -InsertAtTop
@@ -5773,7 +6031,7 @@ function Load-Gallery {
                     $script:loadingStatusTimer.Add_Tick({
                             $script:loadingCounter++
                             if ($script:loadingCounter -le $script:loadingTotal) {
-                                $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } elseif ($script:currentSource -eq 'Wallhaven') { 'Wallhaven' } else { 'Bing' }
+                                $sourceName = if ($script:currentSource -eq 'Spotlight') { 'Windows Spotlight' } elseif ($script:currentSource -eq 'Wallhaven') { 'Wallhaven' } elseif ($script:currentSource -eq 'Pexels') { 'Pexels' } else { 'Bing' }
                                 $StatusText.Text = "Loading $($script:loadingCounter) of $($script:loadingTotal) wallpapers from $sourceName..."
                             }
                             else {
@@ -5851,10 +6109,10 @@ $UpdateBtn.Add_Click({
                 (Get-SpotlightImages | Select-Object -First 1)
             }
             elseif ($script:currentSource -eq 'Wallhaven') {
-                (Get-WallhavenImages -Count 1 -ApiKey $(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }) | Select-Object -First 1)
+                (Get-WallhavenImages -Count 1 -ApiKey (Get-SourceApiKey 'Wallhaven') | Select-Object -First 1)
             }
             elseif ($script:currentSource -eq 'Pexels') {
-                (Get-PexelsImages -Count 1 -ApiKey $(if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Text } else { '' }) | Select-Object -First 1)
+                (Get-PexelsImages -Count 1 -ApiKey (Get-SourceApiKey 'Pexels') | Select-Object -First 1)
             }
             else {
                 (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
@@ -5891,10 +6149,10 @@ $DownloadBtn.Add_Click({
                 (Get-SpotlightImages | Select-Object -First 1)
             }
             elseif ($script:currentSource -eq 'Wallhaven') {
-                (Get-WallhavenImages -Count 1 -ApiKey $(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' }) | Select-Object -First 1)
+                (Get-WallhavenImages -Count 1 -ApiKey (Get-SourceApiKey 'Wallhaven') | Select-Object -First 1)
             }
             elseif ($script:currentSource -eq 'Pexels') {
-                (Get-PexelsImages -Count 1 -ApiKey $(if ($PexelsApiKeyBox) { $PexelsApiKeyBox.Text } else { '' }) | Select-Object -First 1)
+                (Get-PexelsImages -Count 1 -ApiKey (Get-SourceApiKey 'Pexels') | Select-Object -First 1)
             }
             else {
                 (Get-BingImages -Region (Get-SelectedRegionCode) | Select-Object -First 1)
