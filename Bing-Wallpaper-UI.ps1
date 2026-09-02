@@ -24,13 +24,14 @@ function Write-TimingLog {
 }
 Write-TimingLog "SCRIPT: first line executing (in-process launch)"
 
-# Enforce modern security protocols
+# Enforce modern security protocols and higher concurrent connection limit
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
 }
 catch {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 }
+[Net.ServicePointManager]::DefaultConnectionLimit = 32
 
 # Load UI assemblies
 [void][System.Reflection.Assembly]::Load("PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
@@ -819,32 +820,47 @@ function Get-WallhavenImages {
     $tagQuery = [System.Uri]::EscapeDataString('+nature')
 
     # Wallpapers must be at least 4K. If that comes back too thin (fewer
-    # than $Count results - the +nature tag at 4K can be a small pool),
-    # fall back to at-least-1440p so there's still enough variety to fill
-    # the gallery, rather than showing a sparse/empty grid.
-    function local:Get-WallhavenSearchItems {
-        param([string]$AtLeast)
-        $uri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=$AtLeast&ratios=16x9"
-        if ($ApiKey) { $uri += "&apikey=$([System.Uri]::EscapeDataString($ApiKey))" }
-        $wc = New-Object System.Net.WebClient
-        $wc.Encoding = [System.Text.Encoding]::UTF8
-        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        try {
-            $json = $wc.DownloadString($uri)
-            if ($json) { @((ConvertFrom-Json -InputObject $json).data) } else { @() }
-        }
-        catch {
-            @()
-        }
-        finally {
-            $wc.Dispose()
-        }
+    # than $Count results), fall back to at-least-1440p. We run both queries
+    # concurrently in parallel via async tasks so there is zero extra wait for the fallback!
+    $uri4k = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=3840x2160&ratios=16x9"
+    $uri2k = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=2560x1440&ratios=16x9"
+    if ($ApiKey) {
+        $escapedKey = [System.Uri]::EscapeDataString($ApiKey)
+        $uri4k += "&apikey=$escapedKey"
+        $uri2k += "&apikey=$escapedKey"
     }
 
-    $items = @(Get-WallhavenSearchItems -AtLeast '3840x2160')
-    if ($items.Count -lt $Count) {
-        $fallbackItems = @(Get-WallhavenSearchItems -AtLeast '2560x1440')
-        if ($fallbackItems.Count -gt $items.Count) { $items = $fallbackItems }
+    $swc1 = New-Object System.Net.WebClient
+    $swc2 = New-Object System.Net.WebClient
+    $swc1.Encoding = [System.Text.Encoding]::UTF8
+    $swc2.Encoding = [System.Text.Encoding]::UTF8
+    $swc1.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    $swc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+    $task4k = $swc1.DownloadStringTaskAsync($uri4k)
+    $task2k = $swc2.DownloadStringTaskAsync($uri2k)
+    try {
+        [void][System.Threading.Tasks.Task]::WaitAll(@($task4k, $task2k))
+    }
+    catch {}
+
+    $items4k = if ($task4k.Status -eq 'RanToCompletion' -and $task4k.Result) {
+        try { @((ConvertFrom-Json -InputObject $task4k.Result).data) } catch { @() }
+    } else { @() }
+
+    $items2k = if ($task2k.Status -eq 'RanToCompletion' -and $task2k.Result) {
+        try { @((ConvertFrom-Json -InputObject $task2k.Result).data) } catch { @() }
+    } else { @() }
+
+    try { $swc1.Dispose() } catch {}
+    try { $swc2.Dispose() } catch {}
+
+    $items = if ($items4k.Count -ge $Count) {
+        $items4k
+    } elseif ($items2k.Count -gt $items4k.Count) {
+        $items2k
+    } else {
+        $items4k
     }
 
     $results = @()
@@ -4391,7 +4407,7 @@ function Render-GalleryGrid {
     }
 
     if ($InsertAtTop) {
-        $limit = if ($script:currentSource -eq 'Wallhaven') { 40 } else { 60 }
+        $limit = if ($script:currentSource -eq 'Wallhaven') { 60 } else { 360 }
         while ($GalleryPanel.Children.Count -gt $limit) {
             $lastIdx = $GalleryPanel.Children.Count - 1
             $GalleryPanel.Children.RemoveAt($lastIdx)
@@ -4479,7 +4495,7 @@ function Load-Gallery {
             if ($rawHistory) {
                 $cachedArray = @(ConvertFrom-Json -InputObject $rawHistory)
                 if ($cachedArray.Count -gt 0) {
-                    $limit = if ($fetchSource -eq 'Wallhaven') { 40 } else { 60 }
+                    $limit = if ($fetchSource -eq 'Wallhaven') { 60 } else { 360 }
                     $validItems = $cachedArray | Select-Object -First $limit
                     foreach ($img in $validItems) {
                         $script:phase1Images += [PSCustomObject]@{
@@ -4525,8 +4541,9 @@ function Load-Gallery {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 30)
+            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 360)
             try {
+                [System.Net.ServicePointManager]::DefaultConnectionLimit = 32
                 if ($Source -eq 'Spotlight') {
                     # --- Fetch the latest batch from Peapix (cheap - small JSON,
                     # not the thumbnails themselves) ------------------------------
@@ -4653,7 +4670,7 @@ function Load-Gallery {
                     # accent-extracted on the UI thread) and make the gallery
                     # slow to appear. Same $spotlightShowCount pattern as
                     # Wallhaven's cap. -------------------------------------
-                    $spotlightShowCount = 60
+                    $spotlightShowCount = 360
                     $cutoffUtc = $nowUtc.AddDays(-1 * [Math]::Abs($HistoryMaxDays))
                     $candidateImages = @(
                         $historyMap.Values | Where-Object {
@@ -4764,37 +4781,53 @@ function Load-Gallery {
                     # across runs up to $HistoryMaxDays, instead of resetting
                     # to 16 brand-new random wallpapers - and a fresh 16
                     # network+disk round trip - every single time.
-                    $whFetchCount = 16
-                    $whShowCount = 40
+                    $whFetchCount = 24
+                    $whShowCount = 60
                     $tagQuery = [System.Uri]::EscapeDataString('+nature')
-
-                    function Get-WallhavenSearchItems {
-                        param([string]$AtLeast)
-                        $searchUri = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=$AtLeast&ratios=16x9"
-                        if ($WallhavenKey) { $searchUri += "&apikey=$([System.Uri]::EscapeDataString($WallhavenKey))" }
-                        $swc = New-Object System.Net.WebClient
-                        $swc.Encoding = [System.Text.Encoding]::UTF8
-                        $swc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        try {
-                            $sjson = $swc.DownloadString($searchUri)
-                            if ($sjson) { @((ConvertFrom-Json -InputObject $sjson).data) } else { @() }
-                        }
-                        catch {
-                            @()
-                        }
-                        finally {
-                            $swc.Dispose()
-                        }
-                    }
 
                     # Wallpapers must be at least 4K. If that comes back too
                     # thin (fewer than $whFetchCount results), fall back to
-                    # at-least-1440p so there's still enough variety in this
-                    # batch.
-                    $items = @(Get-WallhavenSearchItems -AtLeast '3840x2160')
-                    if ($items.Count -lt $whFetchCount) {
-                        $fallbackItems = @(Get-WallhavenSearchItems -AtLeast '2560x1440')
-                        if ($fallbackItems.Count -gt $items.Count) { $items = $fallbackItems }
+                    # at-least-1440p. Both searches are executed concurrently in
+                    # parallel so there is zero extra wait for the fallback query!
+                    $uri4k = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=3840x2160&ratios=16x9"
+                    $uri2k = "https://wallhaven.cc/api/v1/search?q=$tagQuery&categories=100&purity=100&sorting=random&atleast=2560x1440&ratios=16x9"
+                    if ($WallhavenKey) {
+                        $escapedKey = [System.Uri]::EscapeDataString($WallhavenKey)
+                        $uri4k += "&apikey=$escapedKey"
+                        $uri2k += "&apikey=$escapedKey"
+                    }
+
+                    $swc1 = New-Object System.Net.WebClient
+                    $swc2 = New-Object System.Net.WebClient
+                    $swc1.Encoding = [System.Text.Encoding]::UTF8
+                    $swc2.Encoding = [System.Text.Encoding]::UTF8
+                    $swc1.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $swc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+                    $task4k = $swc1.DownloadStringTaskAsync($uri4k)
+                    $task2k = $swc2.DownloadStringTaskAsync($uri2k)
+                    try {
+                        [void][System.Threading.Tasks.Task]::WaitAll(@($task4k, $task2k))
+                    }
+                    catch {}
+
+                    $items4k = if ($task4k.Status -eq 'RanToCompletion' -and $task4k.Result) {
+                        try { @((ConvertFrom-Json -InputObject $task4k.Result).data) } catch { @() }
+                    } else { @() }
+
+                    $items2k = if ($task2k.Status -eq 'RanToCompletion' -and $task2k.Result) {
+                        try { @((ConvertFrom-Json -InputObject $task2k.Result).data) } catch { @() }
+                    } else { @() }
+
+                    try { $swc1.Dispose() } catch {}
+                    try { $swc2.Dispose() } catch {}
+
+                    $items = if ($items4k.Count -ge $whFetchCount) {
+                        $items4k
+                    } elseif ($items2k.Count -gt $items4k.Count) {
+                        $items2k
+                    } else {
+                        $items4k
                     }
                     $items = @($items | Select-Object -First $whFetchCount)
 
@@ -5102,7 +5135,7 @@ function Load-Gallery {
                 # --- Prune anything older than the retention window, then
                 # cap how many we render/download this load (same reasoning
                 # as Spotlight's cap above). ------------------------------
-                $bingShowCount = 60
+                $bingShowCount = 360
                 $cutoffUtc = $nowUtc.AddDays(-1 * [Math]::Abs($HistoryMaxDays))
                 $candidateImages = @(
                     $historyMap.Values | Where-Object {
@@ -5209,7 +5242,7 @@ function Load-Gallery {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
             }
-        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24).AddArgument($(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' })).AddArgument(30)
+        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24).AddArgument($(if ($WallhavenApiKeyBox) { $WallhavenApiKeyBox.Text } else { '' })).AddArgument(360)
 
     $asyncOp = $ps.BeginInvoke()
 
