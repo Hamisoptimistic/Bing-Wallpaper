@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -1184,9 +1184,9 @@ $xaml = @"
     
     <Window.Resources>
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#252525"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="ToolTipService.InitialShowDelay" Value="600"/>
@@ -1199,7 +1199,7 @@ $xaml = @"
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#333333"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1208,10 +1208,10 @@ $xaml = @"
         </Style>
 
         <Style x:Key="ModernIconButton" TargetType="Button">
-            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#1FFFFFFF"/>
+            <Setter Property="BorderBrush" Value="#35FFFFFF"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -1221,11 +1221,11 @@ $xaml = @"
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
                                 <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
                                 <Setter Property="Foreground" Value="#0078D4"/>
                             </Trigger>
@@ -1236,7 +1236,7 @@ $xaml = @"
         </Style>
 
         <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
-            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8">
+            <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#35FFFFFF" BorderThickness="1.5" CornerRadius="8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -1247,11 +1247,11 @@ $xaml = @"
             </Border>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
+                    <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                     <Setter TargetName="ArrowIcon" Property="Foreground" Value="#DDD"/>
                 </Trigger>
                 <Trigger Property="IsChecked" Value="True">
-                    <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                    <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
                     <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
                     <Setter TargetName="ArrowIcon" Property="Foreground" Value="#0078D4"/>
                 </Trigger>
@@ -1259,7 +1259,7 @@ $xaml = @"
         </ControlTemplate>
 
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Height" Value="38"/>
@@ -1297,7 +1297,7 @@ $xaml = @"
                                    AllowsTransparency="True"
                                    StaysOpen="False"
                                    Focusable="False">
-                                <Border Background="#1E1E1E" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
+                                <Border Background="Transparent" BorderBrush="#35FFFFFF" BorderThickness="1.5" CornerRadius="8" Margin="0,4,0,0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
                                     <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
@@ -1331,7 +1331,7 @@ $xaml = @"
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#2C2C2C"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="RevealBorder" Property="Background" Value="#0078D4"/>
@@ -1344,7 +1344,7 @@ $xaml = @"
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#2A2A2A"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Height" Value="38"/>
@@ -1354,7 +1354,7 @@ $xaml = @"
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#35FFFFFF" BorderThickness="1.5" CornerRadius="8">
                             <Grid>
                                 <ContentPresenter Content="{TemplateBinding Tag}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,0"/>
                                 <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
@@ -1362,10 +1362,10 @@ $xaml = @"
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                                <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
                                 <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -1598,12 +1598,12 @@ $xaml = @"
                 <StackPanel Name="ColAuto" Margin="0,0,16,16" VerticalAlignment="Bottom">
                     <TextBlock Name="LabelAuto" Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" Visibility="Collapsed"/>
                     
-                    <Border Name="AutoUnifiedButton" Background="#2A2A2A" BorderBrush="#1FFFFFFF" BorderThickness="1.5" CornerRadius="8" Height="38" Cursor="Hand">
+                    <Border Name="AutoUnifiedButton" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Height="38" Cursor="Hand">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#282828"/>
+                                        <Setter Property="Background" Value="#15FFFFFF"/>
                                     </Trigger>
                                 </Style.Triggers>
                             </Style>
@@ -1629,7 +1629,7 @@ $xaml = @"
     
                             <Button Name="SpotlightSetBtn" Width="30" Height="30" Margin="0,0,4,0" VerticalAlignment="Center"
                                     Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
-                                    Background="#2A2A2A" BorderBrush="#1FFFFFFF" BorderThickness="1.5" Foreground="#777">
+                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1.5" Foreground="#777">
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="Template">
@@ -1640,11 +1640,12 @@ $xaml = @"
                                                     </Border>
                                                     <ControlTemplate.Triggers>
                                                         <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#282828"/>
+                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
+                                                            <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#35FFFFFF"/>
                                                             <Setter Property="Foreground" Value="#DDD"/>
                                                         </Trigger>
                                                         <Trigger Property="IsPressed" Value="True">
-                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#242424"/>
+                                                            <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
                                                             <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
                                                             <Setter Property="Foreground" Value="#0078D4"/>
                                                         </Trigger>
@@ -1747,22 +1748,44 @@ $script:wpfApp.MainWindow = $window
 
 $script:revealElements = New-Object System.Collections.ArrayList
 
+function Test-IsInsideToolbar($visual) {
+    # Walks up the visual tree to see if $visual sits inside the main
+    # toolbar (Region/Resolution/Apply To/Style/Download Image To row).
+    $current = $visual
+    while ($current) {
+        if ($current -is [System.Windows.FrameworkElement] -and $current.Name -eq 'ToolbarWrap') {
+            return $true
+        }
+        $current = [System.Windows.Media.VisualTreeHelper]::GetParent($current)
+    }
+    return $false
+}
+
 function Find-RevealBorders($visual) {
     if (-not $visual) { return }
     if ($visual -is [System.Windows.Controls.Border] -and $visual.Name -eq "RevealBorder") {
-        $alreadyAdded = $false
-        foreach ($item in $script:revealElements) {
-            if ($item.Element -eq $visual) { $alreadyAdded = $true; break }
+        if (Test-IsInsideToolbar $visual) {
+            # Toolbar items always show a static border (same weight/opacity as
+            # the Bing/Spotlight/Wallhaven pill) instead of only revealing a
+            # border near the mouse cursor.
+            $visual.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(21, 255, 255, 255))
+            $visual.BorderThickness = New-Object System.Windows.Thickness(1)
         }
-        if (-not $alreadyAdded) {
-            $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
-            $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
-            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(60, 255, 255, 255), 0.0)))
-            $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
-            $revealBrush.RadiusX = 160
-            $revealBrush.RadiusY = 160
-            $visual.BorderBrush = $revealBrush
-            $script:revealElements.Add(@{ Element = $visual; Brush = $revealBrush }) | Out-Null
+        else {
+            $alreadyAdded = $false
+            foreach ($item in $script:revealElements) {
+                if ($item.Element -eq $visual) { $alreadyAdded = $true; break }
+            }
+            if (-not $alreadyAdded) {
+                $revealBrush = New-Object System.Windows.Media.RadialGradientBrush
+                $revealBrush.MappingMode = [System.Windows.Media.BrushMappingMode]::Absolute
+                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(60, 255, 255, 255), 0.0)))
+                $revealBrush.GradientStops.Add((New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]::FromArgb(0, 255, 255, 255), 1.0)))
+                $revealBrush.RadiusX = 160
+                $revealBrush.RadiusY = 160
+                $visual.BorderBrush = $revealBrush
+                $script:revealElements.Add(@{ Element = $visual; Brush = $revealBrush }) | Out-Null
+            }
         }
     }
     
