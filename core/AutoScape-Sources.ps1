@@ -936,9 +936,6 @@ namespace AutoScapeLocal
                             resY      = $item.Height
                             fileSize  = $item.FileSize
                             fileType  = $item.FileType
-                            accentR   = $item.R
-                            accentG   = $item.G
-                            accentB   = $item.B
                         }
                     }
                 }
@@ -961,9 +958,6 @@ namespace AutoScapeLocal
                             resY      = 0
                             fileSize  = $fi.Length
                             fileType  = $fi.Extension.TrimStart('.').ToUpperInvariant()
-                            accentR   = 70
-                            accentG   = 70
-                            accentB   = 70
                         }
                     }
                 }
