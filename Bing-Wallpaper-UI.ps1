@@ -1261,6 +1261,77 @@ function Get-PexelsImages {
     return $results
 }
 
+function Get-ResolutionDimensions {
+    param([string]$Resolution)
+    switch -Regex ($Resolution) {
+        '4K|UHD' { return @{ Width = 3840; Height = 2160 } }
+        '2K|1440' { return @{ Width = 2560; Height = 1440 } }
+        '1080' { return @{ Width = 1920; Height = 1080 } }
+        '720|1366|768' { return @{ Width = 1280; Height = 720 } }
+        default { return @{ Width = 3840; Height = 2160 } }
+    }
+}
+
+function Resize-WallpaperToResolution {
+    param(
+        [Parameter(Mandatory = $true)][string]$InputPath,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [Parameter(Mandatory = $true)][int]$TargetWidth,
+        [Parameter(Mandatory = $true)][int]$TargetHeight
+    )
+
+    Add-Type -AssemblyName System.Drawing
+
+    $source = $null
+    $bitmap = $null
+    $graphics = $null
+    try {
+        $source = [System.Drawing.Image]::FromFile($InputPath)
+
+        # Crop to the selected aspect ratio, then resize to exact target pixels.
+        $targetRatio = [double]$TargetWidth / [double]$TargetHeight
+        $sourceRatio = [double]$source.Width / [double]$source.Height
+
+        if ($sourceRatio -gt $targetRatio) {
+            $cropHeight = $source.Height
+            $cropWidth = [int][Math]::Round($source.Height * $targetRatio)
+            $cropX = [int][Math]::Round(($source.Width - $cropWidth) / 2)
+            $cropY = 0
+        }
+        else {
+            $cropWidth = $source.Width
+            $cropHeight = [int][Math]::Round($source.Width / $targetRatio)
+            $cropX = 0
+            $cropY = [int][Math]::Round(($source.Height - $cropHeight) / 2)
+        }
+
+        $bitmap = New-Object System.Drawing.Bitmap($TargetWidth, $TargetHeight)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+
+        $srcRect = New-Object System.Drawing.Rectangle($cropX, $cropY, $cropWidth, $cropHeight)
+        $dstRect = New-Object System.Drawing.Rectangle(0, 0, $TargetWidth, $TargetHeight)
+        $graphics.DrawImage($source, $dstRect, $srcRect, [System.Drawing.GraphicsUnit]::Pixel)
+
+        $jpegCodec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() |
+        Where-Object { $_.MimeType -eq 'image/jpeg' } | Select-Object -First 1
+        $encoderParams = New-Object System.Drawing.Imaging.EncoderParameters(1)
+        $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter(
+            [System.Drawing.Imaging.Encoder]::Quality, [long]95
+        )
+        $bitmap.Save($OutputPath, $jpegCodec, $encoderParams)
+        return $true
+    }
+    finally {
+        if ($graphics) { $graphics.Dispose() }
+        if ($bitmap) { $bitmap.Dispose() }
+        if ($source) { $source.Dispose() }
+    }
+}
+
 function Get-BingImageUri {
     param(
         $Image,
@@ -3619,16 +3690,26 @@ function Apply-WallpaperAsync {
     $tempPath = "$cachePath.tmp"
 
     $fnLockScreenCode = "function Set-LockScreenImageIsolated { " + ${function:Set-LockScreenImageIsolated}.ToString() + " }"
+    $fnResizeCode = "function Resize-WallpaperToResolution { " + ${function:Resize-WallpaperToResolution}.ToString() + " }"
+    $resolutionSize = Get-ResolutionDimensions -Resolution $Resolution
+    $needsLocalResize = ($Image.source -ne 'Bing')
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam, [string]$LockScreenFnCode)
+            param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam, [string]$LockScreenFnCode, [string]$ResizeFnCode, [bool]$NeedsLocalResize, [int]$TargetWidth, [int]$TargetHeight)
             try {
                 $wc = New-Object System.Net.WebClient
                 $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 $wc.DownloadFile($Uri, $Temp)
                 $wc.Dispose()
                 if (Test-Path -LiteralPath $Temp) {
+                    if ($NeedsLocalResize) {
+                        Invoke-Expression $ResizeFnCode
+                        $resizedTemp = "$Temp.resized.jpg"
+                        Resize-WallpaperToResolution -InputPath $Temp -OutputPath $resizedTemp -TargetWidth $TargetWidth -TargetHeight $TargetHeight | Out-Null
+                        Remove-Item -LiteralPath $Temp -Force -ErrorAction SilentlyContinue
+                        Move-Item -LiteralPath $resizedTemp -Destination $Temp -Force
+                    }
                     if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
                     Move-Item -LiteralPath $Temp -Destination $Dest -Force
                 }
@@ -3665,7 +3746,7 @@ function Apply-WallpaperAsync {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Dest = $Dest }
             }
-        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style).AddArgument($fnLockScreenCode)
+        }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($cachePath).AddArgument($Target).AddArgument($Style).AddArgument($fnLockScreenCode).AddArgument($fnResizeCode).AddArgument($needsLocalResize).AddArgument($resolutionSize.Width).AddArgument($resolutionSize.Height)
 
     $asyncOp = $ps.BeginInvoke()
     $script:applyContext = @{ PS = $ps; AsyncOp = $asyncOp; Target = $Target }
@@ -6779,6 +6860,8 @@ $DownloadBtn.Add_Click({
         }
 
         $imageUri = Get-BingImageUri -Image $targetImage -Resolution $ResolutionBox.SelectedItem
+        $resolutionSize = Get-ResolutionDimensions -Resolution $ResolutionBox.SelectedItem
+        $needsLocalResize = ($targetImage.source -ne 'Bing')
         $imageDate = if ($targetImage.enddate -and ($targetImage.enddate -match '^\d{8}$')) { $targetImage.enddate } else { (Get-Date).ToString('yyyyMMdd') }
         $cleanTitle = ($actionTitle -replace '[\\/:*?"<>|\x00-\x1F]', '').Trim()
         $cleanTitle = ($cleanTitle -replace '\s+', ' ').Trim()
@@ -6787,15 +6870,24 @@ $DownloadBtn.Add_Click({
         $downloadPath = Join-Path $downloadFolder $fileName
         $tempPath = "$downloadPath.tmp"
 
+        $fnResizeCode = "function Resize-WallpaperToResolution { " + ${function:Resize-WallpaperToResolution}.ToString() + " }"
+
         $ps = [powershell]::Create()
         [void]$ps.AddScript({
-                param([string]$Uri, [string]$Temp, [string]$Dest)
+                param([string]$Uri, [string]$Temp, [string]$Dest, [string]$ResizeFnCode, [bool]$NeedsLocalResize, [int]$TargetWidth, [int]$TargetHeight)
                 try {
                     $wc = New-Object System.Net.WebClient
                     $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     $wc.DownloadFile($Uri, $Temp)
                     $wc.Dispose()
                     if (Test-Path -LiteralPath $Temp) {
+                        if ($NeedsLocalResize) {
+                            Invoke-Expression $ResizeFnCode
+                            $resizedTemp = "$Temp.resized.jpg"
+                            Resize-WallpaperToResolution -InputPath $Temp -OutputPath $resizedTemp -TargetWidth $TargetWidth -TargetHeight $TargetHeight | Out-Null
+                            Remove-Item -LiteralPath $Temp -Force -ErrorAction SilentlyContinue
+                            Move-Item -LiteralPath $resizedTemp -Destination $Temp -Force
+                        }
                         if (Test-Path -LiteralPath $Dest) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
                         Move-Item -LiteralPath $Temp -Destination $Dest -Force
                     }
@@ -6804,7 +6896,7 @@ $DownloadBtn.Add_Click({
                 catch {
                     return @{ Success = $false; Error = $_.Exception.Message }
                 }
-            }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath)
+            }).AddArgument($imageUri).AddArgument($tempPath).AddArgument($downloadPath).AddArgument($fnResizeCode).AddArgument($needsLocalResize).AddArgument($resolutionSize.Width).AddArgument($resolutionSize.Height)
 
         $asyncOp = $ps.BeginInvoke()
         $script:dlContext = @{ PS = $ps; AsyncOp = $asyncOp; TargetCard = $targetCard }
