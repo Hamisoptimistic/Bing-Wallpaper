@@ -1836,14 +1836,19 @@ $xaml = @"
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Name="HeaderGrid" Margin="0,0,0,24">
-                <StackPanel Name="HeaderTitlePanel" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Border Name="LogoBorder" Background="Transparent" Width="36" Height="36" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="AutoScape" FontSize="24" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
+            <Grid Name="HeaderGrid" Margin="0,0,0,22">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Name="HeaderTitlePanel" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Border Name="LogoBorder" Background="Transparent" Width="24" Height="24" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Name="AppTitleText" Text="AutoScape" FontSize="18" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Bing / Spotlight / Wallhaven / Pexels source toggle pill centered in header -->
-                <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center"
+                <Border Name="SourceTogglePill" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
                     <StackPanel Orientation="Horizontal">
                         <Grid>
@@ -3049,6 +3054,8 @@ $LabelRefresh = $window.FindName('LabelRefresh')
 $HeaderGrid = $window.FindName('HeaderGrid')
 $MainContent = $window.FindName('MainContent')
 $SourceTogglePill = $window.FindName('SourceTogglePill')
+$HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
+$AppTitleText = $window.FindName('AppTitleText')
 
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
@@ -4490,12 +4497,18 @@ function Update-ToolbarCompactState {
         if ($width -lt 860) {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 1)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 12, 0, 0)
+            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
+            if ($HeaderTitlePanel) {
+                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+            }
         }
         else {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 0)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
+            if ($HeaderTitlePanel) {
+                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Left
+            }
         }
     }
 
