@@ -856,20 +856,19 @@ namespace AutoScapeLocal
                 } catch {}
             }
             # Fast safe file discovery (<20ms for 20,000 files)
-            $foundFiles = if ('AutoScapeLocal.Helper' -as [type]) {
-                [AutoScapeLocal.Helper]::SafeScanFiles($LocalFolder, 0)
+            if ('AutoScapeLocal.Helper' -as [type]) {
+                $foundFiles = [AutoScapeLocal.Helper]::SafeScanFiles($LocalFolder, 0)
             }
             else {
                 $exts = @('.jpg', '.jpeg', '.png', '.bmp', '.webp')
-                $lst = New-Object System.Collections.Generic.List[string]
+                $foundFiles = New-Object System.Collections.Generic.List[string]
                 try {
                     $raw = [System.IO.Directory]::GetFiles($LocalFolder, '*.*', [System.IO.SearchOption]::AllDirectories)
                     foreach ($p in $raw) {
                         $ext = [System.IO.Path]::GetExtension($p)
-                        if ($exts -contains $ext.ToLowerInvariant()) { $lst.Add($p) }
+                        if ($exts -contains $ext.ToLowerInvariant()) { $foundFiles.Add($p) }
                     }
                 } catch {}
-                $lst
             }
 
             if (-not $foundFiles -or $foundFiles.Count -eq 0) {
