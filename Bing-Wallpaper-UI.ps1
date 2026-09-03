@@ -5550,7 +5550,7 @@ function Load-Gallery {
                     # to 16 brand-new random wallpapers - and a fresh 16
                     # network+disk round trip - every single time.
                     $whFetchCount = 24
-                    $whShowCount = 60
+                    $whShowCount = 24
                     $tagQuery = [System.Uri]::EscapeDataString('+nature')
 
                     # Wallpapers must be at least 4K. If that comes back too
@@ -5879,8 +5879,8 @@ function Load-Gallery {
                         return @{ Success = $false; Error = "Please enter your Pexels API key in the toolbar."; Images = @() }
                     }
 
-                    $pexFetchCount = 24
-                    $pexShowCount = 24
+                    $pexFetchCount = 80
+                    $pexShowCount = 80
 
                     # Curated premium landscape wallpaper queries requested by user
                     $wallpaperQueries = @(
