@@ -451,17 +451,36 @@ public static class BingWallpaperNativeExtra
         void Compare(IShellItem psi, uint hint, out int piOrder);
     }
 
+    [DllImport("shell32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern int SHCreateItemFromParsingName(
+        [MarshalAs(UnmanagedType.LPWStr)] string pszPath,
+        IntPtr pbc,
+        ref Guid riid,
+        [MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
+
     private const uint FOS_PICKFOLDERS = 0x00000020;
+    private const uint FOS_FORCEFILESYSTEM = 0x00000040;
     private const uint SIGDN_FILESYSPATH = 0x80058000;
 
-    public static string PickFolder(IntPtr owner, string title)
+    public static string PickFolder(IntPtr owner, string title, string initialPath = null)
     {
         IFileOpenDialog dialog = null;
         try
         {
             dialog = (IFileOpenDialog)new FileOpenDialogRCW();
-            dialog.SetOptions(FOS_PICKFOLDERS);
+            dialog.SetOptions(FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
             if (!string.IsNullOrEmpty(title)) dialog.SetTitle(title);
+            dialog.SetOkButtonLabel("Select Folder");
+
+            if (!string.IsNullOrEmpty(initialPath) && System.IO.Directory.Exists(initialPath))
+            {
+                Guid riid = new Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE");
+                IShellItem folderItem;
+                if (SHCreateItemFromParsingName(initialPath, IntPtr.Zero, ref riid, out folderItem) == 0 && folderItem != null)
+                {
+                    dialog.SetFolder(folderItem);
+                }
+            }
 
             int hr = dialog.Show(owner);
             if (hr != 0) return null;
@@ -481,6 +500,178 @@ public static class BingWallpaperNativeExtra
         finally
         {
             if (dialog != null) Marshal.ReleaseComObject(dialog);
+        }
+    }
+}
+
+namespace AutoScapeLocal
+{
+    public class LocalItem
+    {
+        public string SourcePath;
+        public string ThumbPath;
+        public string SafeKey;
+        public string Title;
+        public string Folder;
+        public string FileType;
+        public int Width;
+        public int Height;
+        public long FileSize;
+        public byte R;
+        public byte G;
+        public byte B;
+    }
+
+    public static class Helper
+    {
+        private static readonly HashSet<string> Extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".bmp", ".webp"
+        };
+
+        public static List<string> SafeScanFiles(string rootFolder, int maxCount)
+        {
+            var results = new List<string>();
+            if (string.IsNullOrEmpty(rootFolder) || !Directory.Exists(rootFolder))
+                return results;
+
+            var queue = new Queue<string>();
+            queue.Enqueue(rootFolder);
+
+            while (queue.Count > 0)
+            {
+                string dir = queue.Dequeue();
+                try
+                {
+                    foreach (string f in Directory.EnumerateFiles(dir))
+                    {
+                        string ext = Path.GetExtension(f);
+                        if (Extensions.Contains(ext))
+                        {
+                            results.Add(f);
+                            if (maxCount > 0 && results.Count >= maxCount)
+                                return results;
+                        }
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    foreach (string sub in Directory.EnumerateDirectories(dir))
+                    {
+                        try
+                        {
+                            var attr = File.GetAttributes(sub);
+                            if ((attr & (FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint)) != 0)
+                                continue;
+                            queue.Enqueue(sub);
+                        }
+                        catch {}
+                    }
+                }
+                catch {}
+            }
+            return results;
+        }
+
+        public static List<LocalItem> ProcessBatch(string[] filePaths, string cacheDir, int decodeWidth)
+        {
+            var results = new LocalItem[filePaths.Length];
+
+            Parallel.For(0, filePaths.Length, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
+            {
+                string path = filePaths[i];
+                var item = new LocalItem();
+                item.SourcePath = path;
+                item.Title = Path.GetFileNameWithoutExtension(path);
+                item.Folder = Path.GetFileName(Path.GetDirectoryName(path));
+                string ext = Path.GetExtension(path);
+                item.FileType = string.IsNullOrEmpty(ext) ? "JPG" : ext.TrimStart('.').ToUpperInvariant();
+
+                try
+                {
+                    var fi = new FileInfo(path);
+                    item.FileSize = fi.Length;
+
+                    uint hash = (uint)path.ToLowerInvariant().GetHashCode();
+                    item.SafeKey = "local_" + hash.ToString();
+                    item.ThumbPath = Path.Combine(cacheDir, item.SafeKey + "_thumb.jpg");
+
+                    using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                        if (decoder.Frames.Count > 0)
+                        {
+                            item.Width = decoder.Frames[0].PixelWidth;
+                            item.Height = decoder.Frames[0].PixelHeight;
+                        }
+                    }
+
+                    if (!File.Exists(item.ThumbPath))
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(path);
+                        bmp.DecodePixelWidth = decodeWidth;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+
+                        string dir = Path.GetDirectoryName(item.ThumbPath);
+                        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                        var encoder = new JpegBitmapEncoder();
+                        encoder.QualityLevel = 80;
+                        encoder.Frames.Add(BitmapFrame.Create(bmp));
+                        using (var fs = File.Open(item.ThumbPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            encoder.Save(fs);
+                        }
+
+                        try
+                        {
+                            var frame = new TransformedBitmap(bmp, new ScaleTransform(32.0 / bmp.PixelWidth, 32.0 / bmp.PixelHeight));
+                            var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                            int w = converted.PixelWidth, h = converted.PixelHeight;
+                            int stride = w * 4;
+                            byte[] pixels = new byte[h * stride];
+                            converted.CopyPixels(pixels, stride, 0);
+
+                            long r = 0, g = 0, b = 0;
+                            int count = 0;
+                            for (int p = 0; p < pixels.Length; p += 4)
+                            {
+                                byte bb = pixels[p], gg = pixels[p + 1], rr = pixels[p + 2];
+                                int lum = (rr + gg + bb) / 3;
+                                if (lum < 18 || lum > 238) continue;
+                                r += rr; g += gg; b += bb;
+                                count++;
+                            }
+                            if (count == 0) count = 1;
+                            item.R = (byte)(r / count);
+                            item.G = (byte)(g / count);
+                            item.B = (byte)(b / count);
+                        }
+                        catch
+                        {
+                            item.R = 70; item.G = 70; item.B = 70;
+                        }
+                    }
+                    else
+                    {
+                        item.R = 70; item.G = 70; item.B = 70;
+                    }
+                }
+                catch
+                {
+                    item.R = 70; item.G = 70; item.B = 70;
+                }
+
+                results[i] = item;
+            });
+
+            return new List<LocalItem>(results);
         }
     }
 }
@@ -2546,22 +2737,32 @@ function Update-LocalFolderVisual {
 }
 
 function Select-LocalWallpaperFolder {
-    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
-    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dialog.Description = "Select a folder containing wallpaper images"
-    $dialog.ShowNewFolderButton = $false
-    $dialog.AutoUpgradeEnabled = $true
-    if ($script:localFolderPath -and (Test-Path -LiteralPath $script:localFolderPath)) {
-        $dialog.SelectedPath = $script:localFolderPath
+    [void](Wait-NativeExtraCompile)
+    $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+
+    [BingWallpaperNativeExtra]::EnableDarkDialogs()
+
+    $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+    $darkTimer.Add_Tick({
+            $hwnd = [BingWallpaperNativeExtra]::GetForegroundWindow()
+            if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNativeExtra]::IsDialogWindow($hwnd)) {
+                [BingWallpaperNativeExtra]::ForceDarkDialog($hwnd)
+            }
+        })
+    $darkTimer.Start()
+
+    $picked = $null
+    try {
+        $picked = [BingWallpaperNativeExtra]::PickFolder($helper.Handle, 'Select Wallpaper Folder', $script:localFolderPath)
+    }
+    catch {}
+    finally {
+        $darkTimer.Stop()
     }
 
-    $hwnd = (New-Object System.Windows.Interop.WindowInteropHelper($window)).Handle
-    $wrapper = New-Object -TypeName System.Windows.Forms.NativeWindow
-    $wrapper.AssignHandle($hwnd)
-
-    $result = $dialog.ShowDialog($wrapper)
-    if ($result -eq [System.Windows.Forms.DialogResult]::OK -and -not [string]::IsNullOrWhiteSpace($dialog.SelectedPath)) {
-        $script:localFolderPath = $dialog.SelectedPath
+    if ($picked -and (Test-Path -LiteralPath $picked)) {
+        $script:localFolderPath = $picked
         Save-Settings
         Update-LocalFolderVisual
         Load-Gallery
@@ -4451,16 +4652,18 @@ function Render-GalleryGrid {
         }
 
         try {
+            $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
+            $thumbCachePath = Join-Path $ThumbCacheDir "${safeName}_thumb.jpg"
+
             $imagePathToLoad = $null
-            if ($image.source -eq 'Local' -and (Test-Path -LiteralPath $image.url)) {
-                $imagePathToLoad = $image.url
+            if (Test-Path -LiteralPath $thumbCachePath) {
+                $imagePathToLoad = $thumbCachePath
             }
-            else {
-                $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
-                $thumbCachePath = Join-Path $ThumbCacheDir "${safeName}_thumb.jpg"
-                if (Test-Path -LiteralPath $thumbCachePath) {
-                    $imagePathToLoad = $thumbCachePath
-                }
+            elseif ($image.thumbUrl -and (Test-Path -LiteralPath $image.thumbUrl)) {
+                $imagePathToLoad = $image.thumbUrl
+            }
+            elseif ($image.source -ne 'Local' -and $image.url -and (Test-Path -LiteralPath $image.url)) {
+                $imagePathToLoad = $image.url
             }
 
             if ($imagePathToLoad -and (Test-Path -LiteralPath $imagePathToLoad)) {
@@ -4473,7 +4676,16 @@ function Render-GalleryGrid {
                 $bitmap.Freeze()
 
                 $imageControl.Source = $bitmap
-                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $imagePathToLoad))
+
+                # Use pre-computed accent color from background worker (ZERO UI freeze!)
+                if ($image.accentR -ne $null -and $image.accentG -ne $null -and $image.accentB -ne $null) {
+                    $accentBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, [byte]$image.accentR, [byte]$image.accentG, [byte]$image.accentB))
+                    $accentBrush.Freeze()
+                    $card.Resources.Add('ImageAccentBrush', $accentBrush)
+                }
+                else {
+                    $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $imagePathToLoad))
+                }
                 [void]$script:galleryImageControls.Add($imageControl)
             }
             else {
