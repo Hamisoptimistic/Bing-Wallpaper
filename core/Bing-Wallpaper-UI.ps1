@@ -1837,21 +1837,13 @@ $xaml = @"
             </Grid.RowDefinitions>
 
             <Grid Name="HeaderGrid" Margin="0,0,0,24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <StackPanel Name="HeaderTitlePanel" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Border Name="LogoBorder" Background="Transparent" Width="46" Height="46" Margin="0,0,14,0" VerticalAlignment="Center"/>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="AutoScape" FontSize="26" FontWeight="SemiBold" Foreground="#FAFAFA" LineHeight="29" Margin="0,0,0,2"/>
-                        <TextBlock Name="AppSubtitleText" Text="Bing wallpapers, delivered daily" FontSize="12.5" Foreground="#9E9E9E" FontWeight="Normal" LineHeight="16"/>
-                    </StackPanel>
+                <StackPanel Name="HeaderTitlePanel" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Border Name="LogoBorder" Background="Transparent" Width="36" Height="36" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="AutoScape" FontSize="24" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Bing / Spotlight / Wallhaven / Pexels source toggle pill centered in header -->
-                <Border Name="SourceTogglePill" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
                     <StackPanel Orientation="Horizontal">
                         <Grid>
@@ -2722,7 +2714,6 @@ $LocalFolderBtn = $window.FindName('LocalFolderBtn')
 $LocalFolderLabel = $window.FindName('LocalFolderLabel')
 $LocalEmptyStatePanel = $window.FindName('LocalEmptyStatePanel')
 $EmptyStateSelectFolderBtn = $window.FindName('EmptyStateSelectFolderBtn')
-$AppSubtitleText = $window.FindName('AppSubtitleText')
 
 $script:currentSource = 'Bing'
 
@@ -2849,10 +2840,6 @@ function Update-SourceToggleVisual {
     if ($SourceWallhavenIndicator) { $SourceWallhavenIndicator.Opacity = if ($isWallhaven) { 1 } else { 0 } }
     if ($SourcePexelsIndicator) { $SourcePexelsIndicator.Opacity = if ($isPexels) { 1 } else { 0 } }
     if ($SourceLocalIndicator) { $SourceLocalIndicator.Opacity = if ($isLocal) { 1 } else { 0 } }
-
-    if ($AppSubtitleText) {
-        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } elseif ($isPexels) { 'Pexels 4K nature photography' } elseif ($isLocal) { 'Your local wallpaper collection' } else { 'Bing wallpapers, delivered daily' }
-    }
 
     if ($isLocal) {
         if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Collapsed }
