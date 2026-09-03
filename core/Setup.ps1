@@ -157,6 +157,12 @@ try {
     }
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
     Copy-Item -Path (Join-Path $sourceRoot '*') -Destination $installDir -Recurse -Force -ErrorAction Stop
+    if (-not (Test-Path -LiteralPath (Join-Path $installDir 'assets'))) {
+        $parentAssets = Join-Path (Split-Path -Parent $sourceRoot) 'assets'
+        if (Test-Path -LiteralPath $parentAssets) {
+            Copy-Item -Path $parentAssets -Destination (Join-Path $installDir 'assets') -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
     Write-SetupLog "SETUP: copied app files to $installDir"
 }
 catch {

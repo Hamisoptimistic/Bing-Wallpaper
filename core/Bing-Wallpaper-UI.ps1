@@ -246,6 +246,9 @@ function Write-NativeLoadLog {
 
 # --- Auto-Updater Subsystem --------------------------------------------
 $updaterModulePath = Join-Path $PSScriptRoot 'AutoScape-Updater.ps1'
+if (-not (Test-Path -LiteralPath $updaterModulePath)) {
+    $updaterModulePath = Join-Path $PSScriptRoot 'core\AutoScape-Updater.ps1'
+}
 if (Test-Path -LiteralPath $updaterModulePath) {
     . $updaterModulePath
 }
@@ -691,7 +694,7 @@ function Wait-NativeExtraCompile {
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.275'
+$script:appVersion = [Version]'1.0.276'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
@@ -887,6 +890,9 @@ function Set-DownloadFolderDisplay {
 
 # --- Wallpaper Source Engines (Bing, Spotlight, Wallhaven, Pexels) ----
 $sourcesModulePath = Join-Path $PSScriptRoot 'AutoScape-Sources.ps1'
+if (-not (Test-Path -LiteralPath $sourcesModulePath)) {
+    $sourcesModulePath = Join-Path $PSScriptRoot 'core\AutoScape-Sources.ps1'
+}
 if (Test-Path -LiteralPath $sourcesModulePath) {
     . $sourcesModulePath
 }
@@ -5167,6 +5173,9 @@ $GalleryPanel.Add_SizeChanged({ Update-GalleryViewportHeight })
 
 # --- User Guide & Shortcuts Modal --------------------------------------
 $guideModalPath = Join-Path $PSScriptRoot 'AutoScape-UserGuideModal.ps1'
+if (-not (Test-Path -LiteralPath $guideModalPath)) {
+    $guideModalPath = Join-Path $PSScriptRoot 'core\AutoScape-UserGuideModal.ps1'
+}
 if (Test-Path -LiteralPath $guideModalPath) {
     . $guideModalPath
 }
@@ -5259,4 +5268,6 @@ Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStop
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
 [Environment]::Exit(0)
+
+
 

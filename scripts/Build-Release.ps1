@@ -19,21 +19,23 @@ if (-not $scriptDir) {
 $rootFolder = Split-Path -Parent $scriptDir
 
 # Fallback if someone runs the script from repo root instead of scripts folder
-if (-not (Test-Path -LiteralPath (Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'))) {
+if (-not (Test-Path -LiteralPath (Join-Path $rootFolder 'core\Bing-Wallpaper-UI.ps1')) -and -not (Test-Path -LiteralPath (Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'))) {
     $rootFolder = $scriptDir
 }
 
-$uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
-$setupPs1Path = Join-Path $rootFolder 'Setup.ps1'
+$coreFolder = Join-Path $rootFolder 'core'
+$uiPath = if (Test-Path -LiteralPath (Join-Path $coreFolder 'Bing-Wallpaper-UI.ps1')) { Join-Path $coreFolder 'Bing-Wallpaper-UI.ps1' } else { Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1' }
+$setupPs1Path = if (Test-Path -LiteralPath (Join-Path $coreFolder 'Setup.ps1')) { Join-Path $coreFolder 'Setup.ps1' } else { Join-Path $rootFolder 'Setup.ps1' }
 $setupBatPath = Join-Path $rootFolder 'Setup.bat'
-$userGuideModalPath = Join-Path $rootFolder 'AutoScape-UserGuideModal.ps1'
-$updaterModulePath = Join-Path $rootFolder 'AutoScape-Updater.ps1'
-$sourcesModulePath = Join-Path $rootFolder 'AutoScape-Sources.ps1'
+$userGuideModalPath = if (Test-Path -LiteralPath (Join-Path $coreFolder 'AutoScape-UserGuideModal.ps1')) { Join-Path $coreFolder 'AutoScape-UserGuideModal.ps1' } else { Join-Path $rootFolder 'AutoScape-UserGuideModal.ps1' }
+$updaterModulePath = if (Test-Path -LiteralPath (Join-Path $coreFolder 'AutoScape-Updater.ps1')) { Join-Path $coreFolder 'AutoScape-Updater.ps1' } else { Join-Path $rootFolder 'AutoScape-Updater.ps1' }
+$sourcesModulePath = if (Test-Path -LiteralPath (Join-Path $coreFolder 'AutoScape-Sources.ps1')) { Join-Path $coreFolder 'AutoScape-Sources.ps1' } else { Join-Path $rootFolder 'AutoScape-Sources.ps1' }
 $zipPath = Join-Path $rootFolder 'AutoScape.zip'
 $zipShaPath = Join-Path $rootFolder 'AutoScape.zip.sha256'
 
 $iconCandidates = @(
     (Join-Path $rootFolder 'assets\app.ico'),
+    (Join-Path $coreFolder 'assets\app.ico'),
     (Join-Path $rootFolder 'app.ico'),
     (Join-Path $rootFolder 'assets\bing.ico'),
     (Join-Path $rootFolder 'bing.ico')
@@ -43,6 +45,7 @@ $iconPath = $iconCandidates | Where-Object { Test-Path -LiteralPath $_ } | Selec
 
 $logoCandidates = @(
     (Join-Path $rootFolder 'assets\logo.png'),
+    (Join-Path $coreFolder 'assets\logo.png'),
     (Join-Path $rootFolder 'logo.png'),
     (Join-Path $rootFolder 'assets\logo.svg'),
     (Join-Path $rootFolder 'logo.svg')
@@ -111,22 +114,27 @@ $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ("AutoScapePkg_" + [Gu
 New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
 
 try {
-    Copy-Item -LiteralPath $uiPath -Destination (Join-Path $stagingDir 'Bing-Wallpaper-UI.ps1') -Force
-    Copy-Item -LiteralPath $userGuideModalPath -Destination (Join-Path $stagingDir 'AutoScape-UserGuideModal.ps1') -Force
-    Copy-Item -LiteralPath $updaterModulePath -Destination (Join-Path $stagingDir 'AutoScape-Updater.ps1') -Force
-    Copy-Item -LiteralPath $sourcesModulePath -Destination (Join-Path $stagingDir 'AutoScape-Sources.ps1') -Force
-    Copy-Item -LiteralPath $setupPs1Path -Destination (Join-Path $stagingDir 'Setup.ps1') -Force
+    # The root of the zip contains ONLY Setup.bat
     Copy-Item -LiteralPath $setupBatPath -Destination (Join-Path $stagingDir 'Setup.bat') -Force
 
+    # All scripts, modules, and assets live neatly inside the 'core' folder
+    $stagingCore = Join-Path $stagingDir 'core'
+    New-Item -ItemType Directory -Path $stagingCore -Force | Out-Null
+
+    Copy-Item -LiteralPath $uiPath -Destination (Join-Path $stagingCore 'Bing-Wallpaper-UI.ps1') -Force
+    Copy-Item -LiteralPath $userGuideModalPath -Destination (Join-Path $stagingCore 'AutoScape-UserGuideModal.ps1') -Force
+    Copy-Item -LiteralPath $updaterModulePath -Destination (Join-Path $stagingCore 'AutoScape-Updater.ps1') -Force
+    Copy-Item -LiteralPath $sourcesModulePath -Destination (Join-Path $stagingCore 'AutoScape-Sources.ps1') -Force
+    Copy-Item -LiteralPath $setupPs1Path -Destination (Join-Path $stagingCore 'Setup.ps1') -Force
+
+    $stagingAssets = Join-Path $stagingCore 'assets'
+    New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
+
     if ($iconPath) {
-        $stagingAssets = Join-Path $stagingDir 'assets'
-        New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
         Copy-Item -LiteralPath $iconPath -Destination (Join-Path $stagingAssets 'app.ico') -Force
     }
 
     if ($logoPath) {
-        $stagingAssets = Join-Path $stagingDir 'assets'
-        New-Item -ItemType Directory -Path $stagingAssets -Force | Out-Null
         $logoExt = [System.IO.Path]::GetExtension($logoPath)
         Copy-Item -LiteralPath $logoPath -Destination (Join-Path $stagingAssets "logo$logoExt") -Force
     }

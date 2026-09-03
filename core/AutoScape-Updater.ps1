@@ -396,7 +396,8 @@ try {
                 Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction Stop
             }
             New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-            Copy-Item -Path (Join-Path $stagingDir '*') -Destination $InstallDir -Recurse -Force -ErrorAction Stop
+            $copySource = if (Test-Path -LiteralPath (Join-Path $stagingDir 'core\Bing-Wallpaper-UI.ps1')) { Join-Path $stagingDir 'core\*' } else { Join-Path $stagingDir '*' }
+            Copy-Item -Path $copySource -Destination $InstallDir -Recurse -Force -ErrorAction Stop
             $done = $true
             break
         } catch {
@@ -506,3 +507,4 @@ $($_.ScriptStackTrace)" `
             -Title "Update check error"
     }
 }
+

@@ -41,7 +41,9 @@ echo.
 :: ============================================================
 
 set "LOGFILE=%TEMP%\autoscape_setup.log"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Setup.ps1" > "%LOGFILE%" 2>&1
+set "SETUP_SCRIPT=%~dp0core\Setup.ps1"
+if not exist "%SETUP_SCRIPT%" set "SETUP_SCRIPT=%~dp0Setup.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SETUP_SCRIPT%" > "%LOGFILE%" 2>&1
 set "PS_EXIT=%ERRORLEVEL%"
 
 if not "%PS_EXIT%"=="0" (
