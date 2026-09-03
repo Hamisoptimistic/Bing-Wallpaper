@@ -337,6 +337,7 @@ public static class BingWallpaperNative
 # Only this half needs the WPF imaging / HttpClient assemblies.
 $script:nativeCsSourceExtra = @'
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -954,7 +955,8 @@ function Set-LockScreenImageIsolated {
                         try {
                             $p = $_.GetParameters()
                             return ($p.Length -eq 1 -and $p[0].ParameterType.Name -eq 'IAsyncOperation`1')
-                        } catch { return $false }
+                        }
+                        catch { return $false }
                     })[0]
 
                 function Await($WinRtTask, $ResultType) {
@@ -969,7 +971,8 @@ function Set-LockScreenImageIsolated {
                         try {
                             $p = $_.GetParameters()
                             return ($p.Length -eq 1 -and $p[0].ParameterType.Name -eq 'IAsyncAction')
-                        } catch { return $false }
+                        }
+                        catch { return $false }
                     })[0]
 
                 function AwaitAction($WinRtTask) {
@@ -1456,7 +1459,8 @@ if ($AutoApply) {
                     if (-not $images -or $images.Count -eq 0) { throw "No wallpaper was returned by Bing." }
                     Set-BingImage -Image $images[0] -Resolution $Resolution -Target 'Both' -Style $Style | Out-Null
                     $applySuccess = $true
-                } catch {
+                }
+                catch {
                     $errors += "AutoApply Both: $($_.Exception.Message)"
                 }
             }
@@ -1467,7 +1471,8 @@ if ($AutoApply) {
                     if (-not $images -or $images.Count -eq 0) { throw "No wallpaper was found in the local folder." }
                     Set-BingImage -Image $images[0] -Resolution $Resolution -Target 'Both' -Style $Style | Out-Null
                     $applySuccess = $true
-                } catch {
+                }
+                catch {
                     $errors += "AutoApply Both Local: $($_.Exception.Message)"
                 }
             }
@@ -1495,24 +1500,25 @@ if ($AutoApply) {
         try {
             $existing = Load-Settings
             $settingsObj = @{
-                Region               = if ($existing -and $existing.Region) { $existing.Region } else { "auto" }
-                Resolution           = if ($existing -and $existing.Resolution) { $existing.Resolution } else { "4K" }
-                Target               = if ($existing -and $existing.Target) { $existing.Target } else { "Both" }
-                Style                = if ($existing -and $existing.Style) { $existing.Style } else { "Fit" }
-                SaveFolder           = if ($existing -and $existing.SaveFolder) { $existing.SaveFolder } else { (Get-DownloadFolder) }
-                AutoDesktopSource    = $desktopSource
-                AutoLockScreenSource = $lockSource
-                AutoSchedule         = if ($existing -and $existing.AutoSchedule) { $existing.AutoSchedule } else { 'Daily' }
-                SpotlightEnabled     = if ($existing -and $null -ne $existing.SpotlightEnabled) { [bool]$existing.SpotlightEnabled } else { $true }
-                WallhavenApiKey      = if ($existing -and $existing.WallhavenApiKey) { $existing.WallhavenApiKey } else { '' }
-                PexelsApiKey         = if ($existing -and $existing.PexelsApiKey) { $existing.PexelsApiKey } else { '' }
-                LocalFolderPath      = if ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
-                LastAutoAppliedDate  = $todayStamp
-                LastAutoDesktopSource= $desktopSource
-                LastAutoLockSource   = $lockSource
+                Region                = if ($existing -and $existing.Region) { $existing.Region } else { "auto" }
+                Resolution            = if ($existing -and $existing.Resolution) { $existing.Resolution } else { "4K" }
+                Target                = if ($existing -and $existing.Target) { $existing.Target } else { "Both" }
+                Style                 = if ($existing -and $existing.Style) { $existing.Style } else { "Fit" }
+                SaveFolder            = if ($existing -and $existing.SaveFolder) { $existing.SaveFolder } else { (Get-DownloadFolder) }
+                AutoDesktopSource     = $desktopSource
+                AutoLockScreenSource  = $lockSource
+                AutoSchedule          = if ($existing -and $existing.AutoSchedule) { $existing.AutoSchedule } else { 'Daily' }
+                SpotlightEnabled      = if ($existing -and $null -ne $existing.SpotlightEnabled) { [bool]$existing.SpotlightEnabled } else { $true }
+                WallhavenApiKey       = if ($existing -and $existing.WallhavenApiKey) { $existing.WallhavenApiKey } else { '' }
+                PexelsApiKey          = if ($existing -and $existing.PexelsApiKey) { $existing.PexelsApiKey } else { '' }
+                LocalFolderPath       = if ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
+                LastAutoAppliedDate   = $todayStamp
+                LastAutoDesktopSource = $desktopSource
+                LastAutoLockSource    = $lockSource
             }
             $settingsObj | ConvertTo-Json -Depth 2 | Set-Content -LiteralPath $script:settingsPath
-        } catch {}
+        }
+        catch {}
 
         [Environment]::Exit(0)
     }
@@ -2572,21 +2578,21 @@ function Save-Settings {
     try {
         $existing = Load-Settings
         $settingsObj = @{
-            Region               = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
-            Resolution           = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "4K" }
-            Target               = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
-            Style                = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
-            SaveFolder           = $script:DownloadFolderPath
-            AutoDesktopSource    = if ($AutoDesktopSourceBox -and $AutoDesktopSourceBox.SelectedItem) { [string]$AutoDesktopSourceBox.SelectedItem } else { 'Bing' }
-            AutoLockScreenSource = if ($AutoLockScreenSourceBox -and $AutoLockScreenSourceBox.SelectedItem) { [string]$AutoLockScreenSourceBox.SelectedItem } else { 'Bing' }
-            AutoSchedule         = if ($AutoScheduleBox -and $AutoScheduleBox.SelectedItem) { [string]$AutoScheduleBox.SelectedItem.Tag } else { 'Daily' }
-            SpotlightEnabled     = [bool]$script:SpotlightEnabled
-            WallhavenApiKey      = (Get-SourceApiKey 'Wallhaven')
-            PexelsApiKey         = (Get-SourceApiKey 'Pexels')
-            LocalFolderPath      = if ($script:localFolderPath) { $script:localFolderPath } elseif ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
-            LastAutoAppliedDate  = if ($existing -and $existing.LastAutoAppliedDate) { [string]$existing.LastAutoAppliedDate } else { '' }
-            LastAutoDesktopSource= if ($existing -and $existing.LastAutoDesktopSource) { [string]$existing.LastAutoDesktopSource } else { '' }
-            LastAutoLockSource   = if ($existing -and $existing.LastAutoLockSource) { [string]$existing.LastAutoLockSource } else { '' }
+            Region                = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
+            Resolution            = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "4K" }
+            Target                = if ($TargetBox.SelectedItem) { $TargetBox.SelectedItem } else { "Both" }
+            Style                 = if ($StyleBox.SelectedItem) { $StyleBox.SelectedItem } else { "Fit" }
+            SaveFolder            = $script:DownloadFolderPath
+            AutoDesktopSource     = if ($AutoDesktopSourceBox -and $AutoDesktopSourceBox.SelectedItem) { [string]$AutoDesktopSourceBox.SelectedItem } else { 'Bing' }
+            AutoLockScreenSource  = if ($AutoLockScreenSourceBox -and $AutoLockScreenSourceBox.SelectedItem) { [string]$AutoLockScreenSourceBox.SelectedItem } else { 'Bing' }
+            AutoSchedule          = if ($AutoScheduleBox -and $AutoScheduleBox.SelectedItem) { [string]$AutoScheduleBox.SelectedItem.Tag } else { 'Daily' }
+            SpotlightEnabled      = [bool]$script:SpotlightEnabled
+            WallhavenApiKey       = (Get-SourceApiKey 'Wallhaven')
+            PexelsApiKey          = (Get-SourceApiKey 'Pexels')
+            LocalFolderPath       = if ($script:localFolderPath) { $script:localFolderPath } elseif ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
+            LastAutoAppliedDate   = if ($existing -and $existing.LastAutoAppliedDate) { [string]$existing.LastAutoAppliedDate } else { '' }
+            LastAutoDesktopSource = if ($existing -and $existing.LastAutoDesktopSource) { [string]$existing.LastAutoDesktopSource } else { '' }
+            LastAutoLockSource    = if ($existing -and $existing.LastAutoLockSource) { [string]$existing.LastAutoLockSource } else { '' }
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -2737,28 +2743,59 @@ function Update-LocalFolderVisual {
 }
 
 function Select-LocalWallpaperFolder {
-    [void](Wait-NativeExtraCompile)
-    $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
-
-    [BingWallpaperNativeExtra]::EnableDarkDialogs()
-
-    $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
-    $darkTimer.Add_Tick({
-            $hwnd = [BingWallpaperNativeExtra]::GetForegroundWindow()
-            if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNativeExtra]::IsDialogWindow($hwnd)) {
-                [BingWallpaperNativeExtra]::ForceDarkDialog($hwnd)
-            }
-        })
-    $darkTimer.Start()
-
     $picked = $null
+    $modernFailed = $false
+
+    [void](Wait-NativeExtraCompile)
+
     try {
-        $picked = [BingWallpaperNativeExtra]::PickFolder($helper.Handle, 'Select Wallpaper Folder', $script:localFolderPath)
+        $dialog = New-Object Microsoft.Win32.OpenFolderDialog
+        $dialog.Title = 'Select Wallpaper Folder'
+        if ($script:localFolderPath -and (Test-Path -LiteralPath $script:localFolderPath)) {
+            $dialog.InitialDirectory = $script:localFolderPath
+        }
+
+        if ('BingWallpaperNativeExtra' -as [type]) {
+            [BingWallpaperNativeExtra]::EnableDarkDialogs()
+        }
+
+        $darkTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $darkTimer.Interval = [TimeSpan]::FromMilliseconds(30)
+        $darkTimer.Add_Tick({
+                if ('BingWallpaperNativeExtra' -as [type]) {
+                    $hwnd = [BingWallpaperNativeExtra]::GetForegroundWindow()
+                    if ($hwnd -ne [IntPtr]::Zero -and [BingWallpaperNativeExtra]::IsDialogWindow($hwnd)) {
+                        [BingWallpaperNativeExtra]::ForceDarkDialog($hwnd)
+                    }
+                }
+            })
+
+        $darkTimer.Start()
+        try {
+            if ($dialog.ShowDialog($window) -eq $true) {
+                $picked = $dialog.FolderName
+            }
+        }
+        finally {
+            $darkTimer.Stop()
+        }
     }
-    catch {}
-    finally {
-        $darkTimer.Stop()
+    catch {
+        $modernFailed = $true
+    }
+
+    if ($modernFailed) {
+        $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+        $legacyRes = $null
+        try {
+            if ('BingWallpaperNativeExtra' -as [type]) {
+                $legacyRes = [BingWallpaperNativeExtra]::PickFolder($helper.Handle, 'Select Wallpaper Folder', $script:localFolderPath)
+            }
+        }
+        catch {}
+        if (-not [string]::IsNullOrEmpty($legacyRes)) {
+            $picked = $legacyRes
+        }
     }
 
     if ($picked -and (Test-Path -LiteralPath $picked)) {
@@ -5079,7 +5116,7 @@ function Load-Gallery {
                         $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
                         $StatusText.Opacity = 1
                         $StatusText.Foreground = $statusErrorBrush
-                        if ($ctx.Source -eq 'Local') {
+                        if ($ctx.Source -eq 'Local' -or $fetchSource -eq 'Local' -or $script:currentSource -eq 'Local') {
                             $StatusText.Text = if ($item.Error) { $item.Error } else { "No wallpaper images found in this folder." }
                         }
                         else {
@@ -5151,7 +5188,7 @@ function Load-Gallery {
                     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
                     $StatusText.Opacity = 1
                     $StatusText.Foreground = $statusErrorBrush
-                    if ($fetchSource -eq 'Local') {
+                    if ($fetchSource -eq 'Local' -or ($ctx -and $ctx.Source -eq 'Local') -or $script:currentSource -eq 'Local') {
                         $StatusText.Text = if ($errorMsg) { $errorMsg } else { "No supported images found in the selected folder." }
                     }
                     else {
@@ -5806,6 +5843,7 @@ Write-TimingLog "SCRIPT: Window Ready, about to call Show() ($($script:startStop
 $window.Show()
 [System.Windows.Threading.Dispatcher]::Run()
 [Environment]::Exit(0)
+
 
 
 
