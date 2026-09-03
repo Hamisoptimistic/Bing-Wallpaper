@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -2677,19 +2677,6 @@ $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 if ($GalleryScrollViewer -and ('AutoScapeSmoothScroll' -as [type])) {
     [AutoScapeSmoothScroll]::Attach($GalleryScrollViewer)
 }
-if ($GalleryScrollViewer) {
-    $GalleryScrollViewer.Add_ScrollChanged({
-            param($scSender, $scArgs)
-            if ($script:currentSource -ne 'Pexels') { return }
-            if (-not $script:pexelsLazyQueue -or $script:pexelsLazyQueue.Count -eq 0) { return }
-            if ($script:isPexelsLazyLoading) { return }
-
-            $distanceFromBottom = $scSender.ScrollableHeight - $scSender.VerticalOffset
-            if ($distanceFromBottom -le 350) {
-                Load-NextPexelsLazyBatch
-            }
-        })
-}
 $StatusText = $window.FindName('StatusText')
 $InfoBtn = $window.FindName('InfoBtn')
 Enable-StrictToolTipDelay $InfoBtn
@@ -5152,7 +5139,7 @@ function Render-GalleryGrid {
     }
 
     if ($InsertAtTop) {
-        $limit = if ($script:currentSource -eq 'Wallhaven') { 60 } elseif ($script:currentSource -eq 'Pexels') { 120 } else { 360 }
+        $limit = if ($script:currentSource -in @('Wallhaven', 'Pexels')) { 60 } else { 360 }
         while ($GalleryPanel.Children.Count -gt $limit) {
             $lastIdx = $GalleryPanel.Children.Count - 1
             $GalleryPanel.Children.RemoveAt($lastIdx)
@@ -5192,86 +5179,6 @@ function Render-GalleryGrid {
     $script:qualityUpgradeTimer.Start()
 }
 
-$script:pexelsLazyQueue = $null
-$script:pexelsLazyThumbDir = $null
-$script:pexelsLazyTotal = 0
-$script:isPexelsLazyLoading = $false
-
-function Load-NextPexelsLazyBatch {
-    if ($script:isPexelsLazyLoading) { return }
-    if ($script:currentSource -ne 'Pexels') { return }
-    if (-not $script:pexelsLazyQueue -or $script:pexelsLazyQueue.Count -eq 0) { return }
-
-    $script:isPexelsLazyLoading = $true
-
-    $batchSize = 8
-    $nextBatch = @()
-    while ($script:pexelsLazyQueue.Count -gt 0 -and $nextBatch.Count -lt $batchSize) {
-        $nextBatch += $script:pexelsLazyQueue.Dequeue()
-    }
-
-    if ($nextBatch.Count -eq 0) {
-        $script:isPexelsLazyLoading = $false
-        return
-    }
-
-    $thumbDir = $script:pexelsLazyThumbDir
-    $total = $script:pexelsLazyTotal
-
-    $curCount = $GalleryPanel.Children.Count + $nextBatch.Count
-    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-    $StatusText.Opacity = 1
-    $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
-    $StatusText.Text = "Loading $curCount of $total wallpapers from Pexels..."
-
-    [System.Threading.Tasks.Task]::Run([Action]{
-            try {
-                $chunkUrls = [string[]]($nextBatch | ForEach-Object { [string]$_.thumbUrl })
-                $chunkTargets = [string[]]($nextBatch | ForEach-Object {
-                        $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
-                        Join-Path $thumbDir "${safe}_thumb.jpg"
-                    })
-
-                if ('BingWallpaper.FastDownloader' -as [type]) {
-                    [BingWallpaper.FastDownloader]::DownloadUrlsParallel($chunkUrls, $chunkTargets, 8)
-                }
-                else {
-                    $wc = New-Object System.Net.WebClient
-                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    for ($k = 0; $k -lt $nextBatch.Count; $k++) {
-                        $tgt = $chunkTargets[$k]
-                        $u = $chunkUrls[$k]
-                        if (-not (Test-Path -LiteralPath $tgt) -and $u) {
-                            try { $wc.DownloadFile($u, $tgt) } catch {}
-                        }
-                    }
-                    $wc.Dispose()
-                }
-            }
-            catch {}
-
-            [System.Windows.Application]::Current.Dispatcher.BeginInvoke([Action]{
-                    if ($script:currentSource -ne 'Pexels') {
-                        $script:isPexelsLazyLoading = $false
-                        return
-                    }
-
-                    $valid = @($nextBatch | Where-Object {
-                            $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
-                            $target = Join-Path $thumbDir "${safe}_thumb.jpg"
-                            (Test-Path -LiteralPath $target) -and ((Get-Item -LiteralPath $target).Length -gt 0)
-                        })
-
-                    if ($valid.Count -gt 0) {
-                        Render-GalleryGrid -Images $valid -ThumbCacheDir $thumbDir -Append
-                    }
-
-                    Restore-StatusTextDefaultWithFade
-                    $script:isPexelsLazyLoading = $false
-                })
-        })
-}
-
 function Load-Gallery {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     [CmdletBinding()]
@@ -5286,8 +5193,6 @@ function Load-Gallery {
         $script:galleryTimer.Stop()
         $script:galleryTimer = $null
     }
-    $script:pexelsLazyQueue = $null
-    $script:isPexelsLazyLoading = $false
     if ($script:galleryRunspaceContext) {
         $oldCtx = $script:galleryRunspaceContext
         $script:galleryRunspaceContext = $null
@@ -5350,7 +5255,7 @@ function Load-Gallery {
             if ($rawHistory) {
                 $cachedArray = @(ConvertFrom-Json -InputObject $rawHistory)
                 if ($cachedArray.Count -gt 0) {
-                    $limit = if ($fetchSource -eq 'Wallhaven') { 60 } elseif ($fetchSource -eq 'Pexels') { 120 } else { 360 }
+                    $limit = if ($fetchSource -in @('Wallhaven', 'Pexels')) { 60 } else { 360 }
                     $validItems = $cachedArray | Select-Object -First $limit
                     foreach ($img in $validItems) {
                         $pAuthor = if ($img.photographer) { [string]$img.photographer }
@@ -5974,8 +5879,8 @@ function Load-Gallery {
                         return @{ Success = $false; Error = "Please enter your Pexels API key in the toolbar."; Images = @() }
                     }
 
-                    $pexFetchCount = 90
-                    $pexShowCount = 90
+                    $pexFetchCount = 24
+                    $pexShowCount = 24
 
                     # Curated premium landscape wallpaper queries requested by user
                     $wallpaperQueries = @(
@@ -5996,16 +5901,16 @@ function Load-Gallery {
 
                     # Multi-query parallel sampling: select multiple distinct categories
                     # and fetch in parallel so wallpapers are a balanced, shuffled mix across themes
-                    $queryCount = [Math]::Min(10, $wallpaperQueries.Count)
+                    $queryCount = [Math]::Min(8, $wallpaperQueries.Count)
                     $chosenQueries = @($wallpaperQueries | Get-Random -Count $queryCount)
-                    $perQueryTarget = [Math]::Max(10, [Math]::Ceiling($pexFetchCount / $chosenQueries.Count))
+                    $perQueryTarget = [Math]::Max(3, [Math]::Ceiling($pexFetchCount / $chosenQueries.Count))
 
                     $clients = @()
                     $tasks = @()
                     foreach ($q in $chosenQueries) {
                         $escQ = [System.Uri]::EscapeDataString($q)
                         $rndPage = Get-Random -Minimum 1 -Maximum 4
-                        $qUri = "https://api.pexels.com/v1/search?query=$escQ&orientation=landscape&per_page=20&page=$rndPage"
+                        $qUri = "https://api.pexels.com/v1/search?query=$escQ&orientation=landscape&per_page=15&page=$rndPage"
                         $c = New-Object System.Net.WebClient
                         $c.Encoding = [System.Text.Encoding]::UTF8
                         $c.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
@@ -6078,14 +5983,13 @@ function Load-Gallery {
                         $pooled += @($leftoverBucket | Select-Object -First $needed)
                     }
 
-                    # If multi-queries returned fewer than target (or failed), top up with fallback queries
-                    if ($pooled.Count -lt $pexFetchCount) {
-                        $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes', 'peaceful nature')
+                    # If all multi-queries failed (e.g. timeout), attempt fallback single query
+                    if ($pooled.Count -eq 0) {
+                        $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
                         foreach ($fq in $fallbackQueries) {
-                            if ($pooled.Count -ge $pexFetchCount) { break }
                             try {
                                 $fEsc = [System.Uri]::EscapeDataString($fq)
-                                $fallbackUri = "https://api.pexels.com/v1/search?query=$fEsc&orientation=landscape&per_page=80&page=1"
+                                $fallbackUri = "https://api.pexels.com/v1/search?query=$fEsc&orientation=landscape&per_page=50&page=1"
                                 $pwc2 = New-Object System.Net.WebClient
                                 $pwc2.Encoding = [System.Text.Encoding]::UTF8
                                 $pwc2.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
@@ -6106,8 +6010,8 @@ function Load-Gallery {
                                         }
                                         if ($hasH) { continue }
                                         $pooled += $rp
-                                        if ($pooled.Count -ge $pexFetchCount) { break }
                                     }
+                                    if ($pooled.Count -gt 0) { break }
                                 }
                             }
                             catch {}
@@ -6229,11 +6133,10 @@ function Load-Gallery {
 
                     if ($BatchQueue) {
                         $batchSize = 8
-                        $initialDisplayCount = [Math]::Min(16, $candidateImages.Count)
                         $allValidImages = @()
-                        for ($i = 0; $i -lt $initialDisplayCount; $i += $batchSize) {
+                        for ($i = 0; $i -lt $candidateImages.Count; $i += $batchSize) {
                             if ($CancelToken -and $CancelToken.Cancelled) { break }
-                            $chunkCount = [Math]::Min($batchSize, $initialDisplayCount - $i)
+                            $chunkCount = [Math]::Min($batchSize, $candidateImages.Count - $i)
                             $chunkCandidates = @($candidateImages | Select-Object -Skip $i -First $chunkCount)
 
                             if ('BingWallpaper.FastDownloader' -as [type]) {
@@ -6276,7 +6179,6 @@ function Load-Gallery {
                                         source       = 'Pexels'
                                         urlbase      = [string]$img.urlbase
                                         url          = [string]$img.url
-                                        thumbUrl     = [string]$img.thumbUrl
                                         title        = [string]$img.title
                                         copyright    = [string]$img.copyright
                                         photographer = $pAuthor
@@ -6296,7 +6198,7 @@ function Load-Gallery {
                                         Images     = $chunkResult
                                         Total      = $candidateImages.Count
                                         IsFirst    = ($i -eq 0)
-                                        IsLast     = ($i + $batchSize -ge $candidateImages.Count)
+                                        IsLast     = (($i + $batchSize) -ge $candidateImages.Count)
                                     })
                             }
                         }
@@ -6309,41 +6211,8 @@ function Load-Gallery {
                             return @{ Success = $false; Error = "Unable to download Pexels wallpapers."; Images = @() }
                         }
 
-                        # Queue remaining candidate images (items 16 to 89) for on-demand lazy loading upon scroll
-                        if ($candidateImages.Count -gt $initialDisplayCount -and (-not ($CancelToken -and $CancelToken.Cancelled))) {
-                            $remainingCandidates = @($candidateImages | Select-Object -Skip $initialDisplayCount)
-                            $remainingList = @()
-                            foreach ($img in $remainingCandidates) {
-                                $pAuthor = if ($img.photographer) { [string]$img.photographer }
-                                elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
-                                elseif ($img.copyright) { [string]$img.copyright }
-                                else { '' }
-                                $remainingList += [PSCustomObject]@{
-                                    source       = 'Pexels'
-                                    urlbase      = [string]$img.urlbase
-                                    url          = [string]$img.url
-                                    thumbUrl     = [string]$img.thumbUrl
-                                    title        = [string]$img.title
-                                    copyright    = [string]$img.copyright
-                                    photographer = $pAuthor
-                                    enddate      = ''
-                                    resX         = $img.resX
-                                    resY         = $img.resY
-                                    fileSize     = 0
-                                    fileType     = 'image/jpeg'
-                                }
-                            }
-
-                            $BatchQueue.Enqueue([PSCustomObject]@{
-                                    Type            = 'LazyPending'
-                                    Source          = 'Pexels'
-                                    RemainingImages = $remainingList
-                                    Total           = $candidateImages.Count
-                                })
-                        }
-
                         try {
-                            $candidateImages | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $historyPath -Encoding UTF8
+                            $allValidImages | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $historyPath -Encoding UTF8
                         }
                         catch {}
 
@@ -6715,15 +6584,6 @@ function Load-Gallery {
                             $StatusText.Opacity = 1
                         }
                         break
-                    }
-                    elseif ($item.Type -eq 'LazyPending') {
-                        $script:pexelsLazyQueue = [System.Collections.Generic.Queue[psobject]]::new()
-                        foreach ($rem in $item.RemainingImages) {
-                            $script:pexelsLazyQueue.Enqueue($rem)
-                        }
-                        $script:pexelsLazyThumbDir = $ctx.ThumbCacheDir
-                        $script:pexelsLazyTotal = $item.Total
-                        $script:isPexelsLazyLoading = $false
                     }
                     elseif ($item.Type -eq 'Done') {
                         $ctx.StreamingDone = $true
