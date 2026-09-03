@@ -1244,22 +1244,40 @@ if ($AutoApply) {
             Set-BingImage -Image $images[0] -Resolution $Resolution -Target $Target -Style $Style | Out-Null
         }
 
-        $errors = @()
-        if ($desktopSource -eq 'Bing' -and $lockSource -eq 'Bing') {
-            try {
-                $images = Get-BingImages -Region $Region
-                if (-not $images -or $images.Count -eq 0) { throw "No wallpaper was returned by Bing." }
-                Set-BingImage -Image $images[0] -Resolution $Resolution -Target 'Both' -Style $Style | Out-Null
-            } catch {
-                $errors += "AutoApply Both: $($_.Exception.Message)"
+        $applySuccess = $false
+        $lastApplyError = $null
+
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            $errors = @()
+            if ($desktopSource -eq 'Bing' -and $lockSource -eq 'Bing') {
+                try {
+                    $images = Get-BingImages -Region $Region
+                    if (-not $images -or $images.Count -eq 0) { throw "No wallpaper was returned by Bing." }
+                    Set-BingImage -Image $images[0] -Resolution $Resolution -Target 'Both' -Style $Style | Out-Null
+                    $applySuccess = $true
+                } catch {
+                    $errors += "AutoApply Both: $($_.Exception.Message)"
+                }
+            }
+            else {
+                try { Invoke-AutoSource -Source $desktopSource -Target 'Desktop' } catch { $errors += "Desktop: $($_.Exception.Message)" }
+                try { Invoke-AutoSource -Source $lockSource -Target 'Lock screen' } catch { $errors += "Lock screen: $($_.Exception.Message)" }
+                if ($errors.Count -eq 0) { $applySuccess = $true }
+            }
+
+            if ($applySuccess) {
+                break
+            }
+
+            $lastApplyError = ($errors -join '; ')
+            if ($attempt -lt 5) {
+                Start-Sleep -Seconds 60
             }
         }
-        else {
-            try { Invoke-AutoSource -Source $desktopSource -Target 'Desktop' } catch { $errors += "Desktop: $($_.Exception.Message)" }
-            try { Invoke-AutoSource -Source $lockSource -Target 'Lock screen' } catch { $errors += "Lock screen: $($_.Exception.Message)" }
-        }
 
-        if ($errors.Count -gt 0) { throw ($errors -join '; ') }
+        if (-not $applySuccess) {
+            throw $lastApplyError
+        }
 
         # Mark successful auto-apply for today
         try {
@@ -3578,15 +3596,15 @@ function Update-SpotlightScheduledTaskAsync {
                     $workingDir = Split-Path -Parent $ScriptPath
 
                     $action = New-ScheduledTaskAction -Execute $conhostExe -Argument $fullArgs -WorkingDirectory $workingDir
-                    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+                    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2) -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
                     if ($Schedule -eq 'Test1Minute') {
                         # Temporary test mode: repeat once per minute so Auto can be verified quickly.
                         $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
                     }
                     else {
                         # Daily starting at local midnight, repeating every hour for 24h.
-                        # If the PC is asleep at 12:00 AM, WakeToRun wakes the timer;
-                        # if sleep policy prevents wake, the hourly repetition catches up within 1 hour of waking!
+                        # PC is never woken up from sleep. If asleep at midnight, it catches up when awake,
+                        # and retries 5 times with a 1-minute gap if missed or network is unavailable.
                         $trigger = New-ScheduledTaskTrigger -Daily -At '12:00AM'
                         $trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Days 1)).Repetition
                     }
