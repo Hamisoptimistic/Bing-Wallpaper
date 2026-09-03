@@ -27,6 +27,8 @@ $uiPath = Join-Path $rootFolder 'Bing-Wallpaper-UI.ps1'
 $setupPs1Path = Join-Path $rootFolder 'Setup.ps1'
 $setupBatPath = Join-Path $rootFolder 'Setup.bat'
 $userGuideModalPath = Join-Path $rootFolder 'AutoScape-UserGuideModal.ps1'
+$updaterModulePath = Join-Path $rootFolder 'AutoScape-Updater.ps1'
+$sourcesModulePath = Join-Path $rootFolder 'AutoScape-Sources.ps1'
 $zipPath = Join-Path $rootFolder 'AutoScape.zip'
 $zipShaPath = Join-Path $rootFolder 'AutoScape.zip.sha256'
 
@@ -53,6 +55,12 @@ if (-not (Test-Path -LiteralPath $uiPath)) {
 }
 if (-not (Test-Path -LiteralPath $userGuideModalPath)) {
     throw "Cannot find AutoScape-UserGuideModal.ps1 at $userGuideModalPath"
+}
+if (-not (Test-Path -LiteralPath $updaterModulePath)) {
+    throw "Cannot find AutoScape-Updater.ps1 at $updaterModulePath"
+}
+if (-not (Test-Path -LiteralPath $sourcesModulePath)) {
+    throw "Cannot find AutoScape-Sources.ps1 at $sourcesModulePath"
 }
 if (-not (Test-Path -LiteralPath $setupPs1Path)) {
     throw "Cannot find Setup.ps1 at $setupPs1Path"
@@ -105,6 +113,8 @@ New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
 try {
     Copy-Item -LiteralPath $uiPath -Destination (Join-Path $stagingDir 'Bing-Wallpaper-UI.ps1') -Force
     Copy-Item -LiteralPath $userGuideModalPath -Destination (Join-Path $stagingDir 'AutoScape-UserGuideModal.ps1') -Force
+    Copy-Item -LiteralPath $updaterModulePath -Destination (Join-Path $stagingDir 'AutoScape-Updater.ps1') -Force
+    Copy-Item -LiteralPath $sourcesModulePath -Destination (Join-Path $stagingDir 'AutoScape-Sources.ps1') -Force
     Copy-Item -LiteralPath $setupPs1Path -Destination (Join-Path $stagingDir 'Setup.ps1') -Force
     Copy-Item -LiteralPath $setupBatPath -Destination (Join-Path $stagingDir 'Setup.bat') -Force
 
