@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -908,23 +908,112 @@ function Get-PexelsImages {
         'autumn landscape',
         'autumn forest'
     )
-    $query = Get-Random -InputObject $wallpaperQueries
-    $escapedQuery = [System.Uri]::EscapeDataString($query)
-    $randomPage = Get-Random -Minimum 1 -Maximum 4
+    # Rejection keywords to guarantee zero humans, portraits, or amateur macro closeups
+    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini', 'insect', 'bug', 'larva', 'worm', 'macro')
 
-    # Orientation=landscape strictly eliminates 9:16 mobile phone crops
-    $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&per_page=50&page=$randomPage"
-
-    $wc = New-Object System.Net.WebClient
-    $wc.Encoding = [System.Text.Encoding]::UTF8
-    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-    $wc.Headers.Add("Authorization", $ApiKey.Trim())
     $data = @()
-    try {
-        $json = $wc.DownloadString($uri)
-        if ($json) { $data = @((ConvertFrom-Json -InputObject $json).photos) }
+
+    if ($Count -le 2) {
+        # Fast path for automated background wallpaper rotation (1 query, 1 request)
+        $query = Get-Random -InputObject $wallpaperQueries
+        $escapedQuery = [System.Uri]::EscapeDataString($query)
+        $randomPage = Get-Random -Minimum 1 -Maximum 4
+        $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&per_page=15&page=$randomPage"
+
+        $wc = New-Object System.Net.WebClient
+        $wc.Encoding = [System.Text.Encoding]::UTF8
+        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        $wc.Headers.Add("Authorization", $ApiKey.Trim())
+        try {
+            $json = $wc.DownloadString($uri)
+            if ($json) { $data = @((ConvertFrom-Json -InputObject $json).photos) }
+        }
+        catch {}
+        finally {
+            $wc.Dispose()
+        }
     }
-    catch {}
+    else {
+        # Multi-query parallel sampling: select multiple distinct categories
+        # and fetch in parallel so wallpapers are a balanced, shuffled mix across themes
+        $queryCount = [Math]::Min(8, $wallpaperQueries.Count)
+        $chosenQueries = @($wallpaperQueries | Get-Random -Count $queryCount)
+        $perQueryTarget = [Math]::Max(3, [Math]::Ceiling($Count / $chosenQueries.Count))
+
+        $clients = @()
+        $tasks = @()
+        foreach ($q in $chosenQueries) {
+            $escQ = [System.Uri]::EscapeDataString($q)
+            $rndPage = Get-Random -Minimum 1 -Maximum 4
+            $qUri = "https://api.pexels.com/v1/search?query=$escQ&orientation=landscape&per_page=15&page=$rndPage"
+            $c = New-Object System.Net.WebClient
+            $c.Encoding = [System.Text.Encoding]::UTF8
+            $c.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            $c.Headers.Add("Authorization", $ApiKey.Trim())
+            $clients += $c
+            $tasks += [PSCustomObject]@{
+                Query  = $q
+                Client = $c
+                Task   = $c.DownloadStringTaskAsync($qUri)
+            }
+        }
+
+        try {
+            [void][System.Threading.Tasks.Task]::WaitAll(@($tasks | ForEach-Object { $_.Task }), 8000)
+        }
+        catch {}
+
+        $categoryBuckets = @()
+        $leftoverBucket = @()
+
+        foreach ($t in $tasks) {
+            $catPhotos = @()
+            if ($t.Task.Status -eq 'RanToCompletion' -and $t.Task.Result) {
+                try {
+                    $parsed = ConvertFrom-Json -InputObject $t.Task.Result
+                    if ($parsed -and $parsed.photos) {
+                        foreach ($p in $parsed.photos) {
+                            if (-not $p.src) { continue }
+                            $w = if ($p.width) { [int]$p.width } else { 0 }
+                            $h = if ($p.height) { [int]$p.height } else { 0 }
+                            if ($w -lt 1920 -or $h -lt 1080 -or $w -le $h) { continue }
+                            $alt = if ($p.alt) { [string]$p.alt } else { '' }
+                            $hasH = $false
+                            foreach ($hk in $humanKeywords) {
+                                if ($alt -match "\b$hk\b") { $hasH = $true; break }
+                            }
+                            if ($hasH) { continue }
+                            $catPhotos += $p
+                        }
+                    }
+                }
+                catch {}
+            }
+
+            $taken = @($catPhotos | Select-Object -First $perQueryTarget)
+            $categoryBuckets += $taken
+            $excess = @($catPhotos | Select-Object -Skip $perQueryTarget)
+            if ($excess.Count -gt 0) { $leftoverBucket += $excess }
+        }
+
+        foreach ($c in $clients) {
+            try { $c.Dispose() } catch {}
+        }
+
+        # Pool from category buckets, and top-up from leftover buffer if needed
+        $pooled = @($categoryBuckets)
+        if ($pooled.Count -lt $Count -and $leftoverBucket.Count -gt 0) {
+            $needed = $Count - $pooled.Count
+            $pooled += @($leftoverBucket | Select-Object -First $needed)
+        }
+
+        # Thoroughly shuffle the pooled candidates across categories
+        $data = if ($pooled.Count -gt 1) {
+            @($pooled | Get-Random -Count $pooled.Count)
+        } else {
+            @($pooled)
+        }
+    }
 
     if ($data.Count -eq 0) {
         $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
@@ -945,10 +1034,6 @@ function Get-PexelsImages {
             } catch {}
         }
     }
-    $wc.Dispose()
-
-    # Rejection keywords to guarantee zero humans, portraits, or amateur macro closeups
-    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini', 'insect', 'bug', 'larva', 'worm', 'macro')
 
     $results = @()
     foreach ($item in $data) {
@@ -5486,30 +5571,95 @@ function Load-Gallery {
                         'autumn landscape',
                         'autumn forest'
                     )
-                    $query = Get-Random -InputObject $wallpaperQueries
-                    $escapedQuery = [System.Uri]::EscapeDataString($query)
-                    $randomPage = Get-Random -Minimum 1 -Maximum 4
+                    # Rejection keywords to guarantee zero humans, portraits, or amateur macro closeups
+                    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini', 'insect', 'bug', 'larva', 'worm', 'macro')
 
-                    # Orientation=landscape strictly eliminates 9:16 mobile phone crops
-                    $uri = "https://api.pexels.com/v1/search?query=$escapedQuery&orientation=landscape&per_page=50&page=$randomPage"
+                    # Multi-query parallel sampling: select multiple distinct categories
+                    # and fetch in parallel so wallpapers are a balanced, shuffled mix across themes
+                    $queryCount = [Math]::Min(8, $wallpaperQueries.Count)
+                    $chosenQueries = @($wallpaperQueries | Get-Random -Count $queryCount)
+                    $perQueryTarget = [Math]::Max(3, [Math]::Ceiling($pexFetchCount / $chosenQueries.Count))
 
-                    $pwc = New-Object System.Net.WebClient
-                    $pwc.Encoding = [System.Text.Encoding]::UTF8
-                    $pwc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    $pwc.Headers.Add("Authorization", $PexelsKey.Trim())
-                    $data = @()
-                    try {
-                        $pjson = $pwc.DownloadString($uri)
-                        if ($pjson) { $data = @((ConvertFrom-Json -InputObject $pjson).photos) }
-                    }
-                    catch {
-                        $data = @()
-                        if ($_.Exception.Message -match '401' -or ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 401)) {
-                            return @{ Success = $false; Error = "Invalid Pexels API key (401 Unauthorized). Please check your key at pexels.com/api."; Images = @() }
+                    $clients = @()
+                    $tasks = @()
+                    foreach ($q in $chosenQueries) {
+                        $escQ = [System.Uri]::EscapeDataString($q)
+                        $rndPage = Get-Random -Minimum 1 -Maximum 4
+                        $qUri = "https://api.pexels.com/v1/search?query=$escQ&orientation=landscape&per_page=15&page=$rndPage"
+                        $c = New-Object System.Net.WebClient
+                        $c.Encoding = [System.Text.Encoding]::UTF8
+                        $c.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        $c.Headers.Add("Authorization", $PexelsKey.Trim())
+                        $clients += $c
+                        $tasks += [PSCustomObject]@{
+                            Query  = $q
+                            Client = $c
+                            Task   = $c.DownloadStringTaskAsync($qUri)
                         }
                     }
 
-                    if ($data.Count -eq 0) {
+                    try {
+                        [void][System.Threading.Tasks.Task]::WaitAll(@($tasks | ForEach-Object { $_.Task }), 8000)
+                    }
+                    catch {}
+
+                    # Check for 401 Unauthorized across responses
+                    foreach ($t in $tasks) {
+                        if ($t.Task.IsFaulted) {
+                            $err = $t.Task.Exception.ToString()
+                            if ($err -match '401' -or $err -match 'Unauthorized') {
+                                foreach ($c in $clients) { try { $c.Dispose() } catch {} }
+                                return @{ Success = $false; Error = "Invalid Pexels API key (401 Unauthorized). Please check your key at pexels.com/api."; Images = @() }
+                            }
+                        }
+                    }
+
+                    $categoryBuckets = @()
+                    $leftoverBucket = @()
+
+                    foreach ($t in $tasks) {
+                        $catPhotos = @()
+                        if ($t.Task.Status -eq 'RanToCompletion' -and $t.Task.Result) {
+                            try {
+                                $parsed = ConvertFrom-Json -InputObject $t.Task.Result
+                                if ($parsed -and $parsed.photos) {
+                                    foreach ($p in $parsed.photos) {
+                                        if (-not $p.src) { continue }
+                                        $w = if ($p.width) { [int]$p.width } else { 0 }
+                                        $h = if ($p.height) { [int]$p.height } else { 0 }
+                                        if ($w -lt 1920 -or $h -lt 1080 -or $w -le $h) { continue }
+                                        $alt = if ($p.alt) { [string]$p.alt } else { '' }
+                                        $hasH = $false
+                                        foreach ($hk in $humanKeywords) {
+                                            if ($alt -match "\b$hk\b") { $hasH = $true; break }
+                                        }
+                                        if ($hasH) { continue }
+                                        $catPhotos += $p
+                                    }
+                                }
+                            }
+                            catch {}
+                        }
+
+                        $taken = @($catPhotos | Select-Object -First $perQueryTarget)
+                        $categoryBuckets += $taken
+                        $excess = @($catPhotos | Select-Object -Skip $perQueryTarget)
+                        if ($excess.Count -gt 0) { $leftoverBucket += $excess }
+                    }
+
+                    foreach ($c in $clients) {
+                        try { $c.Dispose() } catch {}
+                    }
+
+                    # Pool from category buckets, and top-up from leftover buffer if needed
+                    $pooled = @($categoryBuckets)
+                    if ($pooled.Count -lt $pexFetchCount -and $leftoverBucket.Count -gt 0) {
+                        $needed = $pexFetchCount - $pooled.Count
+                        $pooled += @($leftoverBucket | Select-Object -First $needed)
+                    }
+
+                    # If all multi-queries failed (e.g. timeout), attempt fallback single query
+                    if ($pooled.Count -eq 0) {
                         $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
                         foreach ($fq in $fallbackQueries) {
                             try {
@@ -5522,33 +5672,31 @@ function Load-Gallery {
                                 $pjson = $pwc2.DownloadString($fallbackUri)
                                 $pwc2.Dispose()
                                 if ($pjson) {
-                                    $data = @((ConvertFrom-Json -InputObject $pjson).photos)
-                                    if ($data.Count -gt 0) { break }
+                                    $rawPhotos = @((ConvertFrom-Json -InputObject $pjson).photos)
+                                    foreach ($rp in $rawPhotos) {
+                                        if (-not $rp.src) { continue }
+                                        $w = if ($rp.width) { [int]$rp.width } else { 0 }
+                                        $h = if ($rp.height) { [int]$rp.height } else { 0 }
+                                        if ($w -lt 1920 -or $h -lt 1080 -or $w -le $h) { continue }
+                                        $alt = if ($rp.alt) { [string]$rp.alt } else { '' }
+                                        $hasH = $false
+                                        foreach ($hk in $humanKeywords) {
+                                            if ($alt -match "\b$hk\b") { $hasH = $true; break }
+                                        }
+                                        if ($hasH) { continue }
+                                        $pooled += $rp
+                                    }
+                                    if ($pooled.Count -gt 0) { break }
                                 }
                             } catch {}
                         }
                     }
-                    $pwc.Dispose()
 
-                    # Rejection keywords to guarantee zero humans, portraits, or amateur macro closeups
-                    $humanKeywords = @('woman', 'man', 'person', 'people', 'girl', 'boy', 'model', 'portrait', 'selfie', 'posing', 'couple', 'crowd', 'face', 'bikini', 'insect', 'bug', 'larva', 'worm', 'macro')
-
-                    $filteredPhotos = @()
-                    foreach ($item in $data) {
-                        if (-not $item.src) { continue }
-                        $w = if ($item.width) { [int]$item.width } else { 0 }
-                        $h = if ($item.height) { [int]$item.height } else { 0 }
-                        if ($w -lt 1920 -or $h -lt 1080 -or $w -le $h) { continue }
-
-                        $altText = if ($item.alt) { [string]$item.alt } else { '' }
-                        $hasHuman = $false
-                        foreach ($hk in $humanKeywords) {
-                            if ($altText -match "\b$hk\b") { $hasHuman = $true; break }
-                        }
-                        if ($hasHuman) { continue }
-
-                        $filteredPhotos += $item
-                        if ($filteredPhotos.Count -ge $pexFetchCount) { break }
+                    # Thoroughly shuffle the pooled candidates across categories
+                    $filteredPhotos = if ($pooled.Count -gt 1) {
+                        @($pooled | Get-Random -Count $pooled.Count)
+                    } else {
+                        @($pooled)
                     }
 
                     $historyPath = Join-Path $CacheDir '_history.json'
@@ -5596,14 +5744,9 @@ function Load-Gallery {
                     foreach ($item in $filteredPhotos) {
                         if (-not $item.id) { continue }
                         $urlbase = "pexels_$($item.id)"
-                        $firstSeen = if ($historyMap.ContainsKey($urlbase) -and $historyMap[$urlbase].firstSeenUtc) {
-                            [string]$historyMap[$urlbase].firstSeenUtc
-                        }
-                        else {
-                            $stamp = $nowUtc.AddMilliseconds(-1 * $newBatchIndex)
-                            $newBatchIndex++
-                            $stamp.ToString('o')
-                        }
+                        $stamp = $nowUtc.AddMilliseconds(-1 * $newBatchIndex)
+                        $newBatchIndex++
+                        $firstSeen = $stamp.ToString('o')
 
                         $fullUrl = if ($item.src.original) { [string]$item.src.original } elseif ($item.src.large2x) { [string]$item.src.large2x } else { [string]$item.src.large }
                         $thumbUrl = if ($item.src.medium) { [string]$item.src.medium } else { [string]$item.src.small }
