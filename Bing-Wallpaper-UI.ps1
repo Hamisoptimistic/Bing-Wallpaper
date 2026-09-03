@@ -702,7 +702,7 @@ function Wait-NativeExtraCompile {
 }
 
 # Dynamically detect executable version
-$script:appVersion = [Version]'1.0.214'
+$script:appVersion = [Version]'1.0.273'
 try {
     $currentProc = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     if ($currentProc -and $currentProc -notmatch '^(?i:powershell|pwsh)(?:\.exe)?$' -and (Test-Path -LiteralPath $currentProc)) {
