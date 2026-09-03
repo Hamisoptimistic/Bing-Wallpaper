@@ -1535,7 +1535,7 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 $xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AutoScape" Height="780" Width="1100" MinWidth="820" MinHeight="560"
+        Title="" Height="780" Width="1100" MinWidth="820" MinHeight="560"
         Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
     <Window.Resources>
@@ -2388,10 +2388,54 @@ function Set-AutoScapeIcon {
 
 $script:taskbarIconPath = Set-AutoScapeIcon -TargetWindow $window
 
+if (-not ('AutoScapeTitleBarHelper' -as [type])) {
+    try {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class AutoScapeTitleBarHelper
+{
+    [DllImport("user32.dll")]
+    public static extern int GetWindowLong(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll")]
+    public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(IntPtr hwnd, IntPtr hwndInsertAfter, int x, int y, int width, int height, uint flags);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    public const int GWL_EXSTYLE = -20;
+    public const int WS_EX_DLGMODALFRAME = 0x0001;
+    public const uint SWP_FRAMECHANGED = 0x0020;
+    public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint WM_SETICON = 0x0080;
+
+    public static void RemoveTitleBarIcon(IntPtr hwnd)
+    {
+        try {
+            SendMessage(hwnd, WM_SETICON, new IntPtr(0), IntPtr.Zero);
+            SendMessage(hwnd, WM_SETICON, new IntPtr(1), IntPtr.Zero);
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_DLGMODALFRAME);
+            SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        } catch {}
+    }
+}
+"@ -ErrorAction SilentlyContinue
+    } catch {}
+}
+
 $applyDarkTitleBar = {
     try {
         $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
         if ($helper.Handle -ne [IntPtr]::Zero) {
+            try { [AutoScapeTitleBarHelper]::RemoveTitleBarIcon($helper.Handle) } catch {}
             [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, -1)
 
             # Explicitly require Windows 11 (Build 22000+) to prevent the pitch-black Transparent bug on Win10
