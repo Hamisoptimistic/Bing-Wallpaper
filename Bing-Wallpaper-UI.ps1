@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -1531,11 +1531,12 @@ $xaml = @"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
                                    VerticalOffset="8"
+                                   PopupAnimation="None"
                                    AllowsTransparency="True"
                                    StaysOpen="False"
                                    Focusable="False">
                                 <Border Background="#F21E1E1E" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Margin="0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
-                                    <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Auto">
+                                    <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
                                 </Border>
@@ -1555,6 +1556,7 @@ $xaml = @"
         </Style>
 
         <Style TargetType="ComboBoxItem">
+            <Setter Property="Focusable" Value="False"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="Cursor" Value="Hand"/>
