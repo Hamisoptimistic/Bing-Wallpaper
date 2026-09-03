@@ -759,9 +759,11 @@ function Set-LockScreenImageIsolated {
                 try { Add-Type -AssemblyName System.Runtime.WindowsRuntime } catch {}
 
                 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-                        $_.Name -eq 'AsTask' -and
-                        $_.GetParameters().Count -eq 1 -and
-                        $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
+                        if ($_.Name -ne 'AsTask') { return $false }
+                        try {
+                            $p = $_.GetParameters()
+                            return ($p.Length -eq 1 -and $p[0].ParameterType.Name -eq 'IAsyncOperation`1')
+                        } catch { return $false }
                     })[0]
 
                 function Await($WinRtTask, $ResultType) {
@@ -772,9 +774,11 @@ function Set-LockScreenImageIsolated {
                 }
 
                 $asTaskAction = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-                        $_.Name -eq 'AsTask' -and
-                        $_.GetParameters().Count -eq 1 -and
-                        $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncAction'
+                        if ($_.Name -ne 'AsTask') { return $false }
+                        try {
+                            $p = $_.GetParameters()
+                            return ($p.Length -eq 1 -and $p[0].ParameterType.Name -eq 'IAsyncAction')
+                        } catch { return $false }
                     })[0]
 
                 function AwaitAction($WinRtTask) {
@@ -1198,6 +1202,15 @@ if ($AutoApply) {
         $desktopSource = if ($savedSettings -and $savedSettings.AutoDesktopSource) { [string]$savedSettings.AutoDesktopSource } else { 'Bing' }
         $lockSource = if ($savedSettings -and $savedSettings.AutoLockScreenSource) { [string]$savedSettings.AutoLockScreenSource } else { 'Bing' }
 
+        $todayStamp = Get-Date -Format 'yyyyMMdd'
+        if ($savedSettings -and 
+            $savedSettings.LastAutoAppliedDate -eq $todayStamp -and 
+            $savedSettings.LastAutoDesktopSource -eq $desktopSource -and 
+            $savedSettings.LastAutoLockSource -eq $lockSource) {
+            # Already applied for today, exit quietly without redundant work
+            [Environment]::Exit(0)
+        }
+
         function Invoke-AutoSource {
             param([string]$Source, [string]$Target)
 
@@ -1232,10 +1245,44 @@ if ($AutoApply) {
         }
 
         $errors = @()
-        try { Invoke-AutoSource -Source $desktopSource -Target 'Desktop' } catch { $errors += "Desktop: $($_.Exception.Message)" }
-        try { Invoke-AutoSource -Source $lockSource -Target 'Lock screen' } catch { $errors += "Lock screen: $($_.Exception.Message)" }
+        if ($desktopSource -eq 'Bing' -and $lockSource -eq 'Bing') {
+            try {
+                $images = Get-BingImages -Region $Region
+                if (-not $images -or $images.Count -eq 0) { throw "No wallpaper was returned by Bing." }
+                Set-BingImage -Image $images[0] -Resolution $Resolution -Target 'Both' -Style $Style | Out-Null
+            } catch {
+                $errors += "AutoApply Both: $($_.Exception.Message)"
+            }
+        }
+        else {
+            try { Invoke-AutoSource -Source $desktopSource -Target 'Desktop' } catch { $errors += "Desktop: $($_.Exception.Message)" }
+            try { Invoke-AutoSource -Source $lockSource -Target 'Lock screen' } catch { $errors += "Lock screen: $($_.Exception.Message)" }
+        }
 
         if ($errors.Count -gt 0) { throw ($errors -join '; ') }
+
+        # Mark successful auto-apply for today
+        try {
+            $existing = Load-Settings
+            $settingsObj = @{
+                Region               = if ($existing -and $existing.Region) { $existing.Region } else { "auto" }
+                Resolution           = if ($existing -and $existing.Resolution) { $existing.Resolution } else { "4K" }
+                Target               = if ($existing -and $existing.Target) { $existing.Target } else { "Both" }
+                Style                = if ($existing -and $existing.Style) { $existing.Style } else { "Fit" }
+                SaveFolder           = if ($existing -and $existing.SaveFolder) { $existing.SaveFolder } else { (Get-DownloadFolder) }
+                AutoDesktopSource    = $desktopSource
+                AutoLockScreenSource = $lockSource
+                AutoSchedule         = if ($existing -and $existing.AutoSchedule) { $existing.AutoSchedule } else { 'Daily' }
+                SpotlightEnabled     = if ($existing -and $null -ne $existing.SpotlightEnabled) { [bool]$existing.SpotlightEnabled } else { $true }
+                WallhavenApiKey      = if ($existing -and $existing.WallhavenApiKey) { $existing.WallhavenApiKey } else { '' }
+                PexelsApiKey         = if ($existing -and $existing.PexelsApiKey) { $existing.PexelsApiKey } else { '' }
+                LastAutoAppliedDate  = $todayStamp
+                LastAutoDesktopSource= $desktopSource
+                LastAutoLockSource   = $lockSource
+            }
+            $settingsObj | ConvertTo-Json -Depth 2 | Set-Content -LiteralPath $script:settingsPath
+        } catch {}
+
         [Environment]::Exit(0)
     }
     catch {
@@ -2233,6 +2280,7 @@ function Get-MaskedApiKey([string]$Key) {
 
 function Save-Settings {
     try {
+        $existing = Load-Settings
         $settingsObj = @{
             Region               = if ($RegionBox.SelectedItem) { $RegionBox.SelectedItem.Tag } else { "auto" }
             Resolution           = if ($ResolutionBox.SelectedItem) { $ResolutionBox.SelectedItem } else { "4K" }
@@ -2245,6 +2293,9 @@ function Save-Settings {
             SpotlightEnabled     = [bool]$script:SpotlightEnabled
             WallhavenApiKey      = (Get-SourceApiKey 'Wallhaven')
             PexelsApiKey         = (Get-SourceApiKey 'Pexels')
+            LastAutoAppliedDate  = if ($existing -and $existing.LastAutoAppliedDate) { [string]$existing.LastAutoAppliedDate } else { '' }
+            LastAutoDesktopSource= if ($existing -and $existing.LastAutoDesktopSource) { [string]$existing.LastAutoDesktopSource } else { '' }
+            LastAutoLockSource   = if ($existing -and $existing.LastAutoLockSource) { [string]$existing.LastAutoLockSource } else { '' }
         }
         $dir = Split-Path -Parent $script:settingsPath
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -3527,14 +3578,17 @@ function Update-SpotlightScheduledTaskAsync {
                     $workingDir = Split-Path -Parent $ScriptPath
 
                     $action = New-ScheduledTaskAction -Execute $conhostExe -Argument $fullArgs -WorkingDirectory $workingDir
-                    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+                    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 2)
                     if ($Schedule -eq 'Test1Minute') {
                         # Temporary test mode: repeat once per minute so Auto can be verified quickly.
                         $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
                     }
                     else {
-                        # Normal production behavior: once per day at local midnight.
+                        # Daily starting at local midnight, repeating every hour for 24h.
+                        # If the PC is asleep at 12:00 AM, WakeToRun wakes the timer;
+                        # if sleep policy prevents wake, the hourly repetition catches up within 1 hour of waking!
                         $trigger = New-ScheduledTaskTrigger -Daily -At '12:00AM'
+                        $trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Days 1)).Repetition
                     }
 
                     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
@@ -5177,6 +5231,18 @@ $window.Add_ContentRendered({
         Start-DeferredNativeExtraCompile
         $RegionBox.Add_SelectionChanged({ Load-Gallery })
         Load-Gallery
+
+        # Auto-Wallpaper catch-up: if auto daily is enabled and today's wallpaper hasn't been applied yet, catch up immediately!
+        if ($script:SpotlightEnabled) {
+            $today = Get-Date -Format 'yyyyMMdd'
+            $currentSettings = Load-Settings
+            if (-not $currentSettings.LastAutoAppliedDate -or $currentSettings.LastAutoAppliedDate -ne $today) {
+                $scriptPath = if ($PSCommandPath) { $PSCommandPath } else { (Join-Path $PSScriptRoot 'Bing-Wallpaper-UI.ps1') }
+                $powershellExe = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+                $conhostExe = Join-Path $env:WINDIR 'System32\conhost.exe'
+                Start-Process -FilePath $conhostExe -ArgumentList "--headless `"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -AutoApply" -WindowStyle Hidden
+            }
+        }
     })
 
 $RefreshBtn.Add_Click({
