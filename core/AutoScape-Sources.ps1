@@ -751,7 +751,7 @@ namespace AutoScapeLocal
             return results;
         }
 
-        public static List<LocalItem> ProcessBatch(string[] filePaths, string cacheDir, int decodeWidth)
+        public static List<LocalItem> ProcessBatch(string[] filePaths, string cacheDir, int decodeWidth, System.Collections.Concurrent.ConcurrentDictionary<string, string> metadataCache)
         {
             var results = new LocalItem[filePaths.Length];
 
@@ -767,76 +767,101 @@ namespace AutoScapeLocal
 
                 try
                 {
-                    var fi = new FileInfo(path);
-                    item.FileSize = fi.Length;
-
                     uint hash = (uint)path.ToLowerInvariant().GetHashCode();
                     item.SafeKey = "local_" + hash.ToString();
                     item.ThumbPath = Path.Combine(cacheDir, item.SafeKey + "_thumb.jpg");
 
-                    using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    bool hasMeta = false;
+                    if (metadataCache != null && metadataCache.TryGetValue(item.SafeKey, out string metaStr))
                     {
-                        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
-                        if (decoder.Frames.Count > 0)
+                        var parts = metaStr.Split(',');
+                        if (parts.Length == 6)
                         {
-                            item.Width = decoder.Frames[0].PixelWidth;
-                            item.Height = decoder.Frames[0].PixelHeight;
+                            int.TryParse(parts[0], out item.Width);
+                            int.TryParse(parts[1], out item.Height);
+                            long.TryParse(parts[2], out item.FileSize);
+                            byte.TryParse(parts[3], out item.R);
+                            byte.TryParse(parts[4], out item.G);
+                            byte.TryParse(parts[5], out item.B);
+                            hasMeta = true;
                         }
                     }
 
-                    if (!File.Exists(item.ThumbPath))
+                    if (!hasMeta || !File.Exists(item.ThumbPath))
                     {
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.UriSource = new Uri(path);
-                        bmp.DecodePixelWidth = decodeWidth;
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.EndInit();
-                        bmp.Freeze();
+                        var fi = new FileInfo(path);
+                        item.FileSize = fi.Length;
 
-                        string dir = Path.GetDirectoryName(item.ThumbPath);
-                        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
-                        var encoder = new JpegBitmapEncoder();
-                        encoder.QualityLevel = 80;
-                        encoder.Frames.Add(BitmapFrame.Create(bmp));
-                        using (var fs = File.Open(item.ThumbPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                         {
-                            encoder.Save(fs);
-                        }
-
-                        try
-                        {
-                            var frame = new TransformedBitmap(bmp, new ScaleTransform(32.0 / bmp.PixelWidth, 32.0 / bmp.PixelHeight));
-                            var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
-                            int w = converted.PixelWidth, h = converted.PixelHeight;
-                            int stride = w * 4;
-                            byte[] pixels = new byte[h * stride];
-                            converted.CopyPixels(pixels, stride, 0);
-
-                            long r = 0, g = 0, b = 0;
-                            int count = 0;
-                            for (int p = 0; p < pixels.Length; p += 4)
+                            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                            if (decoder.Frames.Count > 0)
                             {
-                                byte bb = pixels[p], gg = pixels[p + 1], rr = pixels[p + 2];
-                                int lum = (rr + gg + bb) / 3;
-                                if (lum < 18 || lum > 238) continue;
-                                r += rr; g += gg; b += bb;
-                                count++;
+                                item.Width = decoder.Frames[0].PixelWidth;
+                                item.Height = decoder.Frames[0].PixelHeight;
                             }
-                            if (count == 0) count = 1;
-                            item.R = (byte)(r / count);
-                            item.G = (byte)(g / count);
-                            item.B = (byte)(b / count);
                         }
-                        catch
+
+                        if (!File.Exists(item.ThumbPath))
+                        {
+                            var bmp = new BitmapImage();
+                            bmp.BeginInit();
+                            bmp.UriSource = new Uri(path);
+                            bmp.DecodePixelWidth = decodeWidth;
+                            bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.EndInit();
+                            bmp.Freeze();
+
+                            string dir = Path.GetDirectoryName(item.ThumbPath);
+                            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                            var encoder = new JpegBitmapEncoder();
+                            encoder.QualityLevel = 80;
+                            encoder.Frames.Add(BitmapFrame.Create(bmp));
+                            using (var fs = File.Open(item.ThumbPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                encoder.Save(fs);
+                            }
+
+                            try
+                            {
+                                var frame = new TransformedBitmap(bmp, new ScaleTransform(32.0 / bmp.PixelWidth, 32.0 / bmp.PixelHeight));
+                                var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                                int w = converted.PixelWidth, h = converted.PixelHeight;
+                                int stride = w * 4;
+                                byte[] pixels = new byte[h * stride];
+                                converted.CopyPixels(pixels, stride, 0);
+
+                                long r = 0, g = 0, b = 0;
+                                int count = 0;
+                                for (int p = 0; p < pixels.Length; p += 4)
+                                {
+                                    byte bb = pixels[p], gg = pixels[p + 1], rr = pixels[p + 2];
+                                    int lum = (rr + gg + bb) / 3;
+                                    if (lum < 18 || lum > 238) continue;
+                                    r += rr; g += gg; b += bb;
+                                    count++;
+                                }
+                                if (count == 0) count = 1;
+                                item.R = (byte)(r / count);
+                                item.G = (byte)(g / count);
+                                item.B = (byte)(b / count);
+                            }
+                            catch
+                            {
+                                item.R = 70; item.G = 70; item.B = 70;
+                            }
+                        }
+                        else
                         {
                             item.R = 70; item.G = 70; item.B = 70;
                         }
-                    }
-                    else
-                    {
-                        item.R = 70; item.G = 70; item.B = 70;
+
+                        if (metadataCache != null)
+                        {
+                            string newMeta = string.Format("{0},{1},{2},{3},{4},{5}", item.Width, item.Height, item.FileSize, item.R, item.G, item.B);
+                            metadataCache[item.SafeKey] = newMeta;
+                        }
                     }
                 }
                 catch
@@ -855,20 +880,39 @@ namespace AutoScapeLocal
                     Add-Type -TypeDefinition $helperCode -ReferencedAssemblies @('PresentationCore', 'WindowsBase', 'System.Xaml') -ErrorAction SilentlyContinue
                 } catch {}
             }
-            # Fast safe file discovery (<20ms for 20,000 files)
-            if ('AutoScapeLocal.Helper' -as [type]) {
-                $foundFiles = [AutoScapeLocal.Helper]::SafeScanFiles($LocalFolder, 0)
-            }
-            else {
-                $exts = @('.jpg', '.jpeg', '.png', '.bmp', '.webp')
-                $foundFiles = New-Object System.Collections.Generic.List[string]
+            # Fast safe file discovery & caching
+            $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+            $foundFiles = $null
+            if (Test-Path -LiteralPath $indexPath) {
                 try {
-                    $raw = [System.IO.Directory]::GetFiles($LocalFolder, '*.*', [System.IO.SearchOption]::AllDirectories)
-                    foreach ($p in $raw) {
-                        $ext = [System.IO.Path]::GetExtension($p)
-                        if ($exts -contains $ext.ToLowerInvariant()) { $foundFiles.Add($p) }
+                    $cachedPaths = Get-Content -LiteralPath $indexPath -Encoding UTF8 | ConvertFrom-Json
+                    if ($cachedPaths -and $cachedPaths.Count -gt 0) {
+                        $foundFiles = New-Object System.Collections.Generic.List[string]
+                        foreach ($p in $cachedPaths) { $foundFiles.Add($p) }
                     }
                 } catch {}
+            }
+
+            if (-not $foundFiles) {
+                if ('AutoScapeLocal.Helper' -as [type]) {
+                    $foundFiles = [AutoScapeLocal.Helper]::SafeScanFiles($LocalFolder, 0)
+                }
+                else {
+                    $exts = @('.jpg', '.jpeg', '.png', '.bmp', '.webp')
+                    $foundFiles = New-Object System.Collections.Generic.List[string]
+                    try {
+                        $raw = [System.IO.Directory]::GetFiles($LocalFolder, '*.*', [System.IO.SearchOption]::AllDirectories)
+                        foreach ($p in $raw) {
+                            $ext = [System.IO.Path]::GetExtension($p)
+                            if ($exts -contains $ext.ToLowerInvariant()) { $foundFiles.Add($p) }
+                        }
+                    } catch {}
+                }
+                if ($foundFiles -and $foundFiles.Count -gt 0) {
+                    try {
+                        $foundFiles.ToArray() | ConvertTo-Json -Depth 1 -Compress | Set-Content -LiteralPath $indexPath -Encoding UTF8 -Force
+                    } catch {}
+                }
             }
 
             if (-not $foundFiles -or $foundFiles.Count -eq 0) {
@@ -895,74 +939,104 @@ namespace AutoScapeLocal
             $totalCount = $foundFiles.Count
             $allResultImages = @()
 
-            for ($i = 0; $i -lt $totalCount; $i += $batchSize) {
-                if ($CancelToken -and $CancelToken.Cancelled) { break }
-                $chunkCount = [Math]::Min($batchSize, $totalCount - $i)
-                $chunkFiles = $foundFiles.GetRange($i, $chunkCount)
-
-                $chunkResult = @()
-                if ('AutoScapeLocal.Helper' -as [type]) {
-                    # Fast parallel batch processing in C# (header reads + 360px thumbs + accents)
-                    $processedItems = [AutoScapeLocal.Helper]::ProcessBatch($chunkFiles.ToArray(), $CacheDir, 360)
-                    foreach ($item in $processedItems) {
-                        $chunkResult += [PSCustomObject]@{
-                            source    = 'Local'
-                            urlbase   = $item.SafeKey
-                            url       = $item.SourcePath
-                            thumbUrl  = $item.ThumbPath
-                            title     = $item.Title
-                            copyright = $item.Folder
-                            enddate   = ''
-                            resX      = $item.Width
-                            resY      = $item.Height
-                            fileSize  = $item.FileSize
-                            fileType  = $item.FileType
-                            accentR   = $item.R
-                            accentG   = $item.G
-                            accentB   = $item.B
+            $metaPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_metadata.json'
+            $metadataCache = $null
+            if ('AutoScapeLocal.Helper' -as [type]) {
+                $metadataCache = New-Object 'System.Collections.Concurrent.ConcurrentDictionary[string, string]'
+                if (Test-Path -LiteralPath $metaPath) {
+                    try {
+                        $metaObj = Get-Content -LiteralPath $metaPath -Encoding UTF8 -ErrorAction SilentlyContinue | ConvertFrom-Json
+                        if ($metaObj) {
+                            foreach ($prop in $metaObj.psobject.properties) {
+                                $metadataCache[$prop.Name] = [string]$prop.Value
+                            }
                         }
-                    }
-                }
-                else {
-                    # Fallback if native helper not compiled yet
-                    foreach ($filePath in $chunkFiles) {
-                        $fi = New-Object System.IO.FileInfo($filePath)
-                        $cleanTitle = [System.IO.Path]::GetFileNameWithoutExtension($filePath)
-                        $parentFolder = $fi.Directory.Name
-                        $hash = [System.Math]::Abs($filePath.ToLowerInvariant().GetHashCode()).ToString()
-                        $chunkResult += [PSCustomObject]@{
-                            source    = 'Local'
-                            urlbase   = "local_$hash"
-                            url       = $filePath
-                            thumbUrl  = $filePath
-                            title     = $cleanTitle
-                            copyright = $parentFolder
-                            enddate   = ''
-                            resX      = 0
-                            resY      = 0
-                            fileSize  = $fi.Length
-                            fileType  = $fi.Extension.TrimStart('.').ToUpperInvariant()
-                            accentR   = 70
-                            accentG   = 70
-                            accentB   = 70
-                        }
-                    }
-                }
-
-                $allResultImages += $chunkResult
-
-                if ($BatchQueue) {
-                    $BatchQueue.Enqueue([PSCustomObject]@{
-                        Type       = 'Batch'
-                        Source     = 'Local'
-                        BatchIndex = [int]($i / $batchSize)
-                        Images     = $chunkResult
-                        Total      = $totalCount
-                        IsFirst    = ($i -eq 0)
-                        IsLast     = (($i + $batchSize) -ge $totalCount)
-                    })
+                    } catch {}
                 }
             }
+
+            try {
+                for ($i = 0; $i -lt $totalCount; $i += $batchSize) {
+                    if ($CancelToken -and $CancelToken.Cancelled) { break }
+                    $chunkCount = [Math]::Min($batchSize, $totalCount - $i)
+                    $chunkFiles = $foundFiles.GetRange($i, $chunkCount)
+
+                    $chunkResult = @()
+                    if ('AutoScapeLocal.Helper' -as [type]) {
+                        # Fast parallel batch processing in C# (header reads + 360px thumbs + accents)
+                        $processedItems = [AutoScapeLocal.Helper]::ProcessBatch($chunkFiles.ToArray(), $CacheDir, 360, $metadataCache)
+                        foreach ($item in $processedItems) {
+                            $chunkResult += [PSCustomObject]@{
+                                source    = 'Local'
+                                urlbase   = $item.SafeKey
+                                url       = $item.SourcePath
+                                thumbUrl  = $item.ThumbPath
+                                title     = $item.Title
+                                copyright = $item.Folder
+                                enddate   = ''
+                                resX      = $item.Width
+                                resY      = $item.Height
+                                fileSize  = $item.FileSize
+                                fileType  = $item.FileType
+                                accentR   = $item.R
+                                accentG   = $item.G
+                                accentB   = $item.B
+                            }
+                        }
+                    }
+                    else {
+                        # Fallback if native helper not compiled yet
+                        foreach ($filePath in $chunkFiles) {
+                            $fi = New-Object System.IO.FileInfo($filePath)
+                            $cleanTitle = [System.IO.Path]::GetFileNameWithoutExtension($filePath)
+                            $parentFolder = $fi.Directory.Name
+                            $hash = [System.Math]::Abs($filePath.ToLowerInvariant().GetHashCode()).ToString()
+                            $chunkResult += [PSCustomObject]@{
+                                source    = 'Local'
+                                urlbase   = "local_$hash"
+                                url       = $filePath
+                                thumbUrl  = $filePath
+                                title     = $cleanTitle
+                                copyright = $parentFolder
+                                enddate   = ''
+                                resX      = 0
+                                resY      = 0
+                                fileSize  = $fi.Length
+                                fileType  = $fi.Extension.TrimStart('.').ToUpperInvariant()
+                                accentR   = 70
+                                accentG   = 70
+                                accentB   = 70
+                            }
+                        }
+                    }
+
+                    $allResultImages += $chunkResult
+
+                    if ($BatchQueue) {
+                        $BatchQueue.Enqueue([PSCustomObject]@{
+                            Type       = 'Batch'
+                            Source     = 'Local'
+                            BatchIndex = [int]($i / $batchSize)
+                            Images     = $chunkResult
+                            Total      = $totalCount
+                            IsFirst    = ($i -eq 0)
+                            IsLast     = (($i + $batchSize) -ge $totalCount)
+                        })
+                    }
+                }
+            }
+            finally {
+                if ($metadataCache -and $metadataCache.Count -gt 0) {
+                    try {
+                        $hashTable = @{}
+                        foreach ($kvp in $metadataCache) {
+                            $hashTable[$kvp.Key] = $kvp.Value
+                        }
+                        $hashTable | ConvertTo-Json -Depth 1 -Compress | Set-Content -LiteralPath $metaPath -Encoding UTF8 -Force
+                    } catch {}
+                }
+            }
+
 
             if ($BatchQueue) {
                 $BatchQueue.Enqueue([PSCustomObject]@{

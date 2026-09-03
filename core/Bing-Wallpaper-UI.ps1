@@ -2799,6 +2799,10 @@ function Select-LocalWallpaperFolder {
     }
 
     if ($picked -and (Test-Path -LiteralPath $picked)) {
+        if ($script:localFolderPath -ne $picked) {
+            $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+            if (Test-Path -LiteralPath $indexPath) { Remove-Item -LiteralPath $indexPath -Force -ErrorAction SilentlyContinue }
+        }
         $script:localFolderPath = $picked
         Save-Settings
         Update-LocalFolderVisual
@@ -3465,6 +3469,10 @@ function Start-RefreshAnimation {
             $finishedRotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
             $finishedRotation.Angle = 0
             try {
+                if ($script:currentSource -eq 'Local') {
+                    $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+                    if (Test-Path -LiteralPath $indexPath) { Remove-Item -LiteralPath $indexPath -Force -ErrorAction SilentlyContinue }
+                }
                 Load-Gallery
             }
             finally {
