@@ -670,8 +670,191 @@ $script:GalleryFetchWorkerScriptBlock = {
                 return @{ Success = $false; Error = "Please select a valid local folder."; Images = @() }
             }
 
-            [void](Ensure-AutoScapeLocalHelper)
+            if (-not ('AutoScapeLocal.Helper' -as [type])) {
+                try {
+                    $helperCode = @"
+using System;
+using System.IO;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
+namespace AutoScapeLocal
+{
+    public class LocalItem
+    {
+        public string SourcePath;
+        public string ThumbPath;
+        public string SafeKey;
+        public string Title;
+        public string Folder;
+        public string FileType;
+        public int Width;
+        public int Height;
+        public long FileSize;
+        public byte R;
+        public byte G;
+        public byte B;
+    }
+
+    public static class Helper
+    {
+        private static readonly HashSet<string> Extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".bmp", ".webp"
+        };
+
+        public static List<string> SafeScanFiles(string rootFolder, int maxCount)
+        {
+            var results = new List<string>();
+            if (string.IsNullOrEmpty(rootFolder) || !Directory.Exists(rootFolder))
+                return results;
+
+            var queue = new Queue<string>();
+            queue.Enqueue(rootFolder);
+
+            while (queue.Count > 0)
+            {
+                string dir = queue.Dequeue();
+                try
+                {
+                    foreach (string f in Directory.EnumerateFiles(dir))
+                    {
+                        string ext = Path.GetExtension(f);
+                        if (Extensions.Contains(ext))
+                        {
+                            results.Add(f);
+                            if (maxCount > 0 && results.Count >= maxCount)
+                                return results;
+                        }
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    foreach (string sub in Directory.EnumerateDirectories(dir))
+                    {
+                        try
+                        {
+                            var attr = File.GetAttributes(sub);
+                            if ((attr & (FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint)) != 0)
+                                continue;
+                            queue.Enqueue(sub);
+                        }
+                        catch {}
+                    }
+                }
+                catch {}
+            }
+            return results;
+        }
+
+        public static List<LocalItem> ProcessBatch(string[] filePaths, string cacheDir, int decodeWidth)
+        {
+            var results = new LocalItem[filePaths.Length];
+
+            Parallel.For(0, filePaths.Length, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
+            {
+                string path = filePaths[i];
+                var item = new LocalItem();
+                item.SourcePath = path;
+                item.Title = Path.GetFileNameWithoutExtension(path);
+                item.Folder = Path.GetFileName(Path.GetDirectoryName(path));
+                string ext = Path.GetExtension(path);
+                item.FileType = string.IsNullOrEmpty(ext) ? "JPG" : ext.TrimStart('.').ToUpperInvariant();
+
+                try
+                {
+                    var fi = new FileInfo(path);
+                    item.FileSize = fi.Length;
+
+                    uint hash = (uint)path.ToLowerInvariant().GetHashCode();
+                    item.SafeKey = "local_" + hash.ToString();
+                    item.ThumbPath = Path.Combine(cacheDir, item.SafeKey + "_thumb.jpg");
+
+                    using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                        if (decoder.Frames.Count > 0)
+                        {
+                            item.Width = decoder.Frames[0].PixelWidth;
+                            item.Height = decoder.Frames[0].PixelHeight;
+                        }
+                    }
+
+                    if (!File.Exists(item.ThumbPath))
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(path);
+                        bmp.DecodePixelWidth = decodeWidth;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+
+                        string dir = Path.GetDirectoryName(item.ThumbPath);
+                        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+                        var encoder = new JpegBitmapEncoder();
+                        encoder.QualityLevel = 80;
+                        encoder.Frames.Add(BitmapFrame.Create(bmp));
+                        using (var fs = File.Open(item.ThumbPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            encoder.Save(fs);
+                        }
+
+                        try
+                        {
+                            var frame = new TransformedBitmap(bmp, new ScaleTransform(32.0 / bmp.PixelWidth, 32.0 / bmp.PixelHeight));
+                            var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                            int w = converted.PixelWidth, h = converted.PixelHeight;
+                            int stride = w * 4;
+                            byte[] pixels = new byte[h * stride];
+                            converted.CopyPixels(pixels, stride, 0);
+
+                            long r = 0, g = 0, b = 0;
+                            int count = 0;
+                            for (int p = 0; p < pixels.Length; p += 4)
+                            {
+                                byte bb = pixels[p], gg = pixels[p + 1], rr = pixels[p + 2];
+                                int lum = (rr + gg + bb) / 3;
+                                if (lum < 18 || lum > 238) continue;
+                                r += rr; g += gg; b += bb;
+                                count++;
+                            }
+                            if (count == 0) count = 1;
+                            item.R = (byte)(r / count);
+                            item.G = (byte)(g / count);
+                            item.B = (byte)(b / count);
+                        }
+                        catch
+                        {
+                            item.R = 70; item.G = 70; item.B = 70;
+                        }
+                    }
+                    else
+                    {
+                        item.R = 70; item.G = 70; item.B = 70;
+                    }
+                }
+                catch
+                {
+                    item.R = 70; item.G = 70; item.B = 70;
+                }
+
+                results[i] = item;
+            });
+
+            return new List<LocalItem>(results);
+        }
+    }
+}
+"@
+                    Add-Type -TypeDefinition $helperCode -ReferencedAssemblies @('PresentationCore', 'WindowsBase', 'System.Xaml') -ErrorAction SilentlyContinue
+                } catch {}
+            }
             # Fast safe file discovery (<20ms for 20,000 files)
             $foundFiles = if ('AutoScapeLocal.Helper' -as [type]) {
                 [AutoScapeLocal.Helper]::SafeScanFiles($LocalFolder, 0)
@@ -1986,6 +2169,14 @@ $script:GalleryFetchWorkerScriptBlock = {
         return @{ Success = $true; Error = $null; Images = $resultImages }
     }
     catch {
-        return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
+        $errMsg = $_.Exception.Message
+        $stack = $_.ScriptStackTrace
+        if ($Source -eq 'Local') {
+            try {
+                $logPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_error.log'
+                Add-Content -Path $logPath -Value "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] ERROR fetching Local Gallery:`n$errMsg`n$stack`n------------------------"
+            } catch {}
+        }
+        return @{ Success = $false; Error = $errMsg; Images = @() }
     }
 }
