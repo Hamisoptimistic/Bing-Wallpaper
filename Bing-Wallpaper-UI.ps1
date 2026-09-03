@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -4840,16 +4840,6 @@ function Render-GalleryGrid {
         $card.CornerRadius = New-Object System.Windows.CornerRadius(12)
         $card.BorderThickness = New-Object System.Windows.Thickness(0)
         $card.ClipToBounds = $true
-        # GalleryPanel is a plain (non-virtualized) UniformGrid, so every card's
-        # rounded corners + image + text are fully re-rasterized on every single
-        # scroll frame unless we tell WPF it can reuse a cached bitmap of the
-        # whole card and just re-composite/translate that - this is the same
-        # trick as CSS's "will-change: transform" and is what actually removes
-        # the per-frame CPU/GPU cost that causes stutter during the glide.
-        $cardCache = New-Object System.Windows.Media.BitmapCache
-        $cardCache.EnableClearType = $false
-        $cardCache.SnapsToDevicePixels = $true
-        $card.CacheMode = $cardCache
         $cardClip = New-Object System.Windows.Media.RectangleGeometry
         $cardClip.RadiusX = 12
         $cardClip.RadiusY = 12
