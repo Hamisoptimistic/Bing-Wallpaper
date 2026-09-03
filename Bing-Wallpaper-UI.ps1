@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -38,6 +38,181 @@ catch {
 [void][System.Reflection.Assembly]::Load("PresentationCore, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
 [void][System.Reflection.Assembly]::Load("WindowsBase, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35")
 Write-TimingLog "SCRIPT: PresentationFramework/Core/WindowsBase loaded ($($script:startStopwatch.ElapsedMilliseconds)ms since script start)"
+
+# Native WPF physics-based inertial smooth scrolling (Windows 11 Settings style).
+#
+# The old implementation kicked off a brand-new fixed-duration DoubleAnimation
+# (280ms, CircleEase) on every single wheel notch. That explains the "flows but
+# doesn't glide" feeling:
+#   1. It's driven by WPF's animation/timing clock and has to be torn down and
+#      rebuilt (SnapshotAndReplace) on every notch - each restart is a tiny
+#      discontinuity in velocity.
+#   2. Duration is fixed regardless of how fast you're flicking, so quick
+#      successive notches never build real momentum.
+#
+# Windows 11 Settings (and inertial trackpad/touch scrolling generally) is a
+# velocity + friction physics model: each wheel notch adds an *impulse* to a
+# running velocity, and velocity decays smoothly (exponentially) over time -
+# so it keeps gliding after you stop turning the wheel, and stacking notches
+# quickly makes it glide further and faster, exactly like Settings.
+#
+# This drives that model directly off CompositionTarget.Rendering (the actual
+# per-frame render tick) with frame-time-independent integration, so the curve
+# looks identical whether frames are landing at 60Hz, 120Hz, or a variable
+# refresh rate - and it unhooks itself the instant it comes to rest, per
+# Microsoft's own guidance not to leave CompositionTarget.Rendering attached
+# when nothing is moving.
+$script:smoothScrollCsSource = @'
+using System;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+
+public static class AutoScapeSmoothScroll
+{
+    private static ScrollViewer _sv;
+    private static double _offset;      // our own precise (sub-pixel) offset
+    private static double _velocity;    // pixels / second, +down / -up
+    private static bool _hooked;
+    private static readonly Stopwatch _clock = new Stopwatch();
+    private static long _lastTicks;
+
+    // Tuned to match the Windows 11 Settings feel:
+    private const double WheelImpulse = 500.0;     // px/sec added per wheel notch
+    private const double MaxVelocity = 9000.0;      // px/sec safety clamp
+    private const double FrictionPerSec = 5.0;      // exponential decay rate
+    private const double StopThreshold = 3.0;       // px/sec - below this we snap & stop
+    private const double MaxFrameDelta = 1.0 / 20.0; // guard vs. huge dt after a stall
+
+    public static void Attach(ScrollViewer sv)
+    {
+        if (sv == null) return;
+        _sv = sv;
+        _offset = sv.ContentVerticalOffset;
+        _velocity = 0;
+
+        sv.PreviewMouseWheel += (s, e) =>
+        {
+            double max = sv.ScrollableHeight;
+            if (max <= 0) return;
+
+            e.Handled = true;
+
+            // Resync from the live offset if we weren't already gliding (covers
+            // programmatic scrolls, scrollbar drags, etc. that happened meanwhile).
+            if (Math.Abs(_velocity) < StopThreshold)
+            {
+                _offset = sv.ContentVerticalOffset;
+            }
+
+            double direction = e.Delta > 0 ? -1.0 : 1.0;
+            double notches = Math.Abs(e.Delta) / 120.0;
+            if (notches <= 0) notches = 1.0;
+
+            _velocity += direction * WheelImpulse * notches;
+            if (_velocity > MaxVelocity) _velocity = MaxVelocity;
+            if (_velocity < -MaxVelocity) _velocity = -MaxVelocity;
+
+            StartRendering();
+        };
+
+        // Any manual interaction (click, drag, keyboard) should kill the glide
+        // immediately rather than fight the user for control.
+        sv.PreviewMouseDown += (s, e) => StopGliding();
+        sv.PreviewKeyDown += (s, e) => StopGliding();
+        sv.PreviewStylusDown += (s, e) => StopGliding();
+
+        sv.ScrollChanged += (s, e) =>
+        {
+            // If something else moved the offset (scrollbar thumb drag, resize,
+            // ScrollToTop, etc.) while we're not actively gliding, stay in sync.
+            if (!_hooked && Math.Abs(e.VerticalChange) > 0.0001)
+            {
+                _offset = sv.ContentVerticalOffset;
+            }
+        };
+    }
+
+    private static void StopGliding()
+    {
+        _velocity = 0;
+        if (_sv != null) _offset = _sv.ContentVerticalOffset;
+        StopRendering();
+    }
+
+    private static void StartRendering()
+    {
+        if (_hooked) return;
+        _hooked = true;
+        if (!_clock.IsRunning) _clock.Start();
+        _lastTicks = _clock.ElapsedTicks;
+        CompositionTarget.Rendering += OnRendering;
+    }
+
+    private static void StopRendering()
+    {
+        if (!_hooked) return;
+        _hooked = false;
+        CompositionTarget.Rendering -= OnRendering;
+    }
+
+    // Runs once per composition frame (tracks whatever cadence the render
+    // thread actually lands at) for as long as there's momentum left, then
+    // unhooks itself so it never spins while the list is at rest.
+    private static void OnRendering(object sender, EventArgs e)
+    {
+        if (_sv == null) { StopRendering(); return; }
+
+        long now = _clock.ElapsedTicks;
+        double dt = (now - _lastTicks) / (double)Stopwatch.Frequency;
+        _lastTicks = now;
+        if (dt <= 0 || dt > MaxFrameDelta) dt = 1.0 / 60.0;
+
+        double max = _sv.ScrollableHeight;
+
+        _offset += _velocity * dt;
+
+        if (_offset < 0.0)
+        {
+            _offset = 0.0;
+            _velocity = 0.0;
+        }
+        else if (_offset > max)
+        {
+            _offset = max;
+            _velocity = 0.0;
+        }
+
+        // Frame-rate-independent exponential friction (same decay curve at any fps).
+        _velocity *= Math.Exp(-FrictionPerSec * dt);
+
+        _sv.ScrollToVerticalOffset(_offset);
+
+        if (Math.Abs(_velocity) < StopThreshold)
+        {
+            _velocity = 0.0;
+            StopRendering();
+        }
+    }
+
+    public static void Reset()
+    {
+        _velocity = 0.0;
+        _offset = 0.0;
+        StopRendering();
+        if (_sv != null) _sv.ScrollToVerticalOffset(0.0);
+    }
+}
+'@
+
+try {
+    Add-Type -TypeDefinition $script:smoothScrollCsSource -ReferencedAssemblies @('PresentationCore', 'PresentationFramework', 'WindowsBase', 'System.Xaml') -Language CSharp -ErrorAction Stop
+}
+catch {
+    Write-TimingLog "WARN: AutoScapeSmoothScroll compile: $($_.Exception.Message)"
+}
 
 function Show-AppErrorDialog {
     param(
@@ -2049,7 +2224,7 @@ $xaml = @"
             </WrapPanel>
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
-                <ScrollViewer Name="GalleryScrollViewer" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Top" FocusVisualStyle="{x:Null}">
+                <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Top" FocusVisualStyle="{x:Null}">
                     <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
                 </ScrollViewer>
             </Border>
@@ -2499,6 +2674,9 @@ Enable-StrictToolTipDelay $RefreshBtn
 $RefreshIcon = $window.FindName('RefreshIcon')
 $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
+if ($GalleryScrollViewer -and ('AutoScapeSmoothScroll' -as [type])) {
+    [AutoScapeSmoothScroll]::Attach($GalleryScrollViewer)
+}
 $StatusText = $window.FindName('StatusText')
 $InfoBtn = $window.FindName('InfoBtn')
 Enable-StrictToolTipDelay $InfoBtn
@@ -4662,6 +4840,16 @@ function Render-GalleryGrid {
         $card.CornerRadius = New-Object System.Windows.CornerRadius(12)
         $card.BorderThickness = New-Object System.Windows.Thickness(0)
         $card.ClipToBounds = $true
+        # GalleryPanel is a plain (non-virtualized) UniformGrid, so every card's
+        # rounded corners + image + text are fully re-rasterized on every single
+        # scroll frame unless we tell WPF it can reuse a cached bitmap of the
+        # whole card and just re-composite/translate that - this is the same
+        # trick as CSS's "will-change: transform" and is what actually removes
+        # the per-frame CPU/GPU cost that causes stutter during the glide.
+        $cardCache = New-Object System.Windows.Media.BitmapCache
+        $cardCache.EnableClearType = $false
+        $cardCache.SnapsToDevicePixels = $true
+        $card.CacheMode = $cardCache
         $cardClip = New-Object System.Windows.Media.RectangleGeometry
         $cardClip.RadiusX = 12
         $cardClip.RadiusY = 12
@@ -4760,6 +4948,7 @@ function Render-GalleryGrid {
 
         $imageControl = New-Object System.Windows.Controls.Image
         $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
+        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::Fant)
         $imgBorder.Child = $imageControl
         $stack.Children.Add($imgBorder)
 
@@ -4789,11 +4978,11 @@ function Render-GalleryGrid {
                 $bitmap.BeginInit()
                 $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
                 $bitmap.DecodePixelWidth = 360
+                $bitmap.CreateOptions = [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
                 $bitmap.Freeze()
 
-                [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::LowQuality)
                 $imageControl.Source = $bitmap
                 $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
                 [void]$script:galleryImageControls.Add($imageControl)
@@ -4962,29 +5151,8 @@ function Render-GalleryGrid {
     }
 
     Update-GalleryViewportHeight
+    if ('AutoScapeSmoothScroll' -as [type]) { [AutoScapeSmoothScroll]::Reset() }
     if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
-
-    $upgradeDelay = [System.Math]::Min($total * 35 + 200, 1200)
-    $script:qualityUpgradeTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:qualityUpgradeTimer.Interval = [TimeSpan]::FromMilliseconds($upgradeDelay)
-    $localPanel = $GalleryPanel
-    $script:qualityUpgradeTimer.Add_Tick({
-            param($qtSender, $qtArgs)
-            $qtSender.Stop()
-            foreach ($c in $localPanel.Children) {
-                $grid = $c.Child
-                if ($grid) {
-                    $st = $grid.Children | Where-Object { $_ -is [System.Windows.Controls.StackPanel] } | Select-Object -First 1
-                    if ($st -and $st.Children.Count -gt 0) {
-                        $ib = $st.Children[0]
-                        if ($ib -and $ib.Child -is [System.Windows.Controls.Image]) {
-                            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($ib.Child, [System.Windows.Media.BitmapScalingMode]::HighQuality)
-                        }
-                    }
-                }
-            }
-        })
-    $script:qualityUpgradeTimer.Start()
 }
 
 function Load-Gallery {
@@ -4995,6 +5163,7 @@ function Load-Gallery {
     if ($script:fadeTimer) { $script:fadeTimer.Stop() }
     if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
     if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
+    if ('AutoScapeSmoothScroll' -as [type]) { [AutoScapeSmoothScroll]::Reset() }
 
     if ($script:galleryTimer) {
         $script:galleryTimer.Stop()
@@ -6230,46 +6399,6 @@ function Load-Gallery {
         })
     $script:galleryTimer.Start()
 }
-
-$script:isScrolling = $false
-$script:scrollIdleTimer = New-Object System.Windows.Threading.DispatcherTimer
-$script:scrollIdleTimer.Interval = [TimeSpan]::FromMilliseconds(150)
-$script:scrollIdleTimer.Add_Tick({
-        param($sit, $sia)
-        $sit.Stop()
-        $script:isScrolling = $false
-        if ($script:galleryCards) {
-            foreach ($c in $script:galleryCards) {
-                $c.CacheMode = $null
-            }
-        }
-        if ($script:galleryImageControls) {
-            foreach ($img in $script:galleryImageControls) {
-                [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::HighQuality)
-            }
-        }
-    })
-
-$GalleryScrollViewer.Add_ScrollChanged({
-        param($scSender, $scArgs)
-        if ($scArgs.VerticalChange -eq 0) { return }
-        if (-not $script:isScrolling) {
-            $script:isScrolling = $true
-            if ($script:galleryCards) {
-                $bmpCache = New-Object System.Windows.Media.BitmapCache
-                foreach ($c in $script:galleryCards) {
-                    $c.CacheMode = $bmpCache
-                }
-            }
-            if ($script:galleryImageControls) {
-                foreach ($img in $script:galleryImageControls) {
-                    [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($img, [System.Windows.Media.BitmapScalingMode]::LowQuality)
-                }
-            }
-        }
-        $script:scrollIdleTimer.Stop()
-        $script:scrollIdleTimer.Start()
-    })
 
 $UpdateBtn.Add_Click({
         $targetImage = $null
