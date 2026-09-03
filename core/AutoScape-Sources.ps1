@@ -604,7 +604,8 @@ namespace AutoScapeLocal
 }
 "@
         Add-Type -TypeDefinition $helperCode -ReferencedAssemblies @('PresentationCore', 'WindowsBase', 'System.Xaml') -ErrorAction SilentlyContinue
-    } catch {}
+    }
+    catch {}
     return [bool]('AutoScapeLocal.HelperV2' -as [type])
 }
 
@@ -663,9 +664,9 @@ $script:GalleryFetchWorkerScriptBlock = {
             if ([string]::IsNullOrWhiteSpace($LocalFolder) -or (-not (Test-Path -LiteralPath $LocalFolder -PathType Container))) {
                 if ($BatchQueue) {
                     $BatchQueue.Enqueue([PSCustomObject]@{
-                        Type  = 'Error'
-                        Error = "Please select a valid local folder."
-                    })
+                            Type  = 'Error'
+                            Error = "Please select a valid local folder."
+                        })
                 }
                 return @{ Success = $false; Error = "Please select a valid local folder."; Images = @() }
             }
@@ -853,7 +854,8 @@ namespace AutoScapeLocal
 }
 "@
                     Add-Type -TypeDefinition $helperCode -ReferencedAssemblies @('PresentationCore', 'WindowsBase', 'System.Xaml') -ErrorAction SilentlyContinue
-                } catch {}
+                }
+                catch {}
             }
             # Fast safe file discovery & caching
             $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
@@ -865,7 +867,8 @@ namespace AutoScapeLocal
                         $foundFiles = New-Object System.Collections.Generic.List[string]
                         foreach ($p in $cachedPaths) { $foundFiles.Add($p) }
                     }
-                } catch {}
+                }
+                catch {}
             }
 
             if (-not $foundFiles) {
@@ -881,21 +884,23 @@ namespace AutoScapeLocal
                             $ext = [System.IO.Path]::GetExtension($p)
                             if ($exts -contains $ext.ToLowerInvariant()) { $foundFiles.Add($p) }
                         }
-                    } catch {}
+                    }
+                    catch {}
                 }
                 if ($foundFiles -and $foundFiles.Count -gt 0) {
                     try {
                         $foundFiles.ToArray() | ConvertTo-Json -Depth 1 -Compress | Set-Content -LiteralPath $indexPath -Encoding UTF8 -Force
-                    } catch {}
+                    }
+                    catch {}
                 }
             }
 
             if (-not $foundFiles -or $foundFiles.Count -eq 0) {
                 if ($BatchQueue) {
                     $BatchQueue.Enqueue([PSCustomObject]@{
-                        Type  = 'Error'
-                        Error = "No wallpaper images found in this folder."
-                    })
+                            Type  = 'Error'
+                            Error = "No wallpaper images found in this folder."
+                        })
                 }
                 return @{ Success = $false; Error = "No wallpaper images found in this folder."; Images = @() }
             }
@@ -936,6 +941,9 @@ namespace AutoScapeLocal
                             resY      = $item.Height
                             fileSize  = $item.FileSize
                             fileType  = $item.FileType
+                            accentR   = $item.R
+                            accentG   = $item.G
+                            accentB   = $item.B
                         }
                     }
                 }
@@ -958,6 +966,9 @@ namespace AutoScapeLocal
                             resY      = 0
                             fileSize  = $fi.Length
                             fileType  = $fi.Extension.TrimStart('.').ToUpperInvariant()
+                            accentR   = 70
+                            accentG   = 70
+                            accentB   = 70
                         }
                     }
                 }
@@ -966,22 +977,22 @@ namespace AutoScapeLocal
 
                 if ($BatchQueue) {
                     $BatchQueue.Enqueue([PSCustomObject]@{
-                        Type       = 'Batch'
-                        Source     = 'Local'
-                        BatchIndex = [int]($i / $batchSize)
-                        Images     = $chunkResult
-                        Total      = $totalCount
-                        IsFirst    = ($i -eq 0)
-                        IsLast     = (($i + $batchSize) -ge $totalCount)
-                    })
+                            Type       = 'Batch'
+                            Source     = 'Local'
+                            BatchIndex = [int]($i / $batchSize)
+                            Images     = $chunkResult
+                            Total      = $totalCount
+                            IsFirst    = ($i -eq 0)
+                            IsLast     = (($i + $batchSize) -ge $totalCount)
+                        })
                 }
             }
 
 
             if ($BatchQueue) {
                 $BatchQueue.Enqueue([PSCustomObject]@{
-                    Type = 'Done'
-                })
+                        Type = 'Done'
+                    })
                 return @{ Success = $true; Error = $null; Images = @() }
             }
 
@@ -2188,7 +2199,8 @@ namespace AutoScapeLocal
             try {
                 $logPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_error.log'
                 Add-Content -Path $logPath -Value "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] ERROR fetching Local Gallery:`n$errMsg`n$stack`n------------------------"
-            } catch {}
+            }
+            catch {}
         }
         return @{ Success = $false; Error = $errMsg; Images = @() }
     }

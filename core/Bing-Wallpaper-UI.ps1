@@ -1836,15 +1836,15 @@ $xaml = @"
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Name="HeaderGrid" Margin="0,0,0,22">
+            <Grid Name="HeaderGrid" Margin="0,0,0,24">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <StackPanel Name="HeaderTitlePanel" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Border Name="LogoBorder" Background="Transparent" Width="24" Height="24" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <TextBlock Name="AppTitleText" Text="AutoScape" FontSize="18" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
+                    <Border Name="LogoBorder" Background="Transparent" Width="42" Height="42" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="AutoScape" FontSize="25" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Bing / Spotlight / Wallhaven / Pexels source toggle pill centered in header -->
@@ -2719,6 +2719,7 @@ $LocalFolderBtn = $window.FindName('LocalFolderBtn')
 $LocalFolderLabel = $window.FindName('LocalFolderLabel')
 $LocalEmptyStatePanel = $window.FindName('LocalEmptyStatePanel')
 $EmptyStateSelectFolderBtn = $window.FindName('EmptyStateSelectFolderBtn')
+$AppSubtitleText = $window.FindName('AppSubtitleText')
 
 $script:currentSource = 'Bing'
 
@@ -2845,6 +2846,10 @@ function Update-SourceToggleVisual {
     if ($SourceWallhavenIndicator) { $SourceWallhavenIndicator.Opacity = if ($isWallhaven) { 1 } else { 0 } }
     if ($SourcePexelsIndicator) { $SourcePexelsIndicator.Opacity = if ($isPexels) { 1 } else { 0 } }
     if ($SourceLocalIndicator) { $SourceLocalIndicator.Opacity = if ($isLocal) { 1 } else { 0 } }
+
+    if ($AppSubtitleText) {
+        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } elseif ($isPexels) { 'Pexels 4K nature photography' } elseif ($isLocal) { 'Your local wallpaper collection' } else { 'Bing wallpapers, delivered daily' }
+    }
 
     if ($isLocal) {
         if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Collapsed }
@@ -3054,8 +3059,6 @@ $LabelRefresh = $window.FindName('LabelRefresh')
 $HeaderGrid = $window.FindName('HeaderGrid')
 $MainContent = $window.FindName('MainContent')
 $SourceTogglePill = $window.FindName('SourceTogglePill')
-$HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
-$AppTitleText = $window.FindName('AppTitleText')
 
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
@@ -4497,18 +4500,12 @@ function Update-ToolbarCompactState {
         if ($width -lt 860) {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 1)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
-            if ($HeaderTitlePanel) {
-                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            }
+            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 12, 0, 0)
         }
         else {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 0)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
-            if ($HeaderTitlePanel) {
-                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Left
-            }
         }
     }
 
