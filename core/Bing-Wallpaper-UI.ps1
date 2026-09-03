@@ -2953,16 +2953,40 @@ function Start-RefreshAnimation {
     }
 
     $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
-    $spin = New-Object System.Windows.Media.Animation.DoubleAnimation
-    $spin.From = 0
-    $spin.To = 360
-    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(560))
+    
+    # 0 -> accelerate -> fast rotation -> slow down -> 366° -> gently settle -> 360°
+    $spin = New-Object System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
+    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(700))
     $spin.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
     [System.Windows.Media.Animation.Timeline]::SetDesiredFrameRate($spin, 60)
+
+    # Keyframe 1: 0° -> accelerate -> fast rotation -> slow down -> 366° (EaseInOut)
+    $kf1 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame
+    $kf1.KeyTime = [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::FromMilliseconds(520))
+    $kf1.Value = 366
+    $ease1 = New-Object System.Windows.Media.Animation.CubicEase
+    $ease1.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
+    $kf1.EasingFunction = $ease1
+    [void]$spin.KeyFrames.Add($kf1)
+
+    # Keyframe 2: 366° -> gently settle -> 360° (EaseOut)
+    $kf2 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame
+    $kf2.KeyTime = [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::FromMilliseconds(700))
+    $kf2.Value = 360
+    $ease2 = New-Object System.Windows.Media.Animation.CubicEase
+    $ease2.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $kf2.EasingFunction = $ease2
+    [void]$spin.KeyFrames.Add($kf2)
+
     $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin, [System.Windows.Media.Animation.HandoffBehavior]::SnapshotAndReplace)
 
+    if ($script:refreshDelayTimer) {
+        $script:refreshDelayTimer.Stop()
+        $script:refreshDelayTimer = $null
+    }
+
     $script:refreshDelayTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(560)
+    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(700)
     $script:refreshDelayTimer.Add_Tick({
             $script:refreshDelayTimer.Stop()
             $script:refreshDelayTimer = $null
