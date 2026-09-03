@@ -1403,7 +1403,9 @@ if ($AutoApply) {
         $lockSource = if ($savedSettings -and $savedSettings.AutoLockScreenSource) { [string]$savedSettings.AutoLockScreenSource } else { 'Bing' }
 
         $todayStamp = Get-Date -Format 'yyyyMMdd'
-        if ($savedSettings -and 
+        $scheduleMode = if ($savedSettings -and $savedSettings.AutoSchedule) { [string]$savedSettings.AutoSchedule } else { 'Daily' }
+        if ($scheduleMode -ne 'Test1Minute' -and
+            $savedSettings -and 
             $savedSettings.LastAutoAppliedDate -eq $todayStamp -and 
             $savedSettings.LastAutoDesktopSource -eq $desktopSource -and 
             $savedSettings.LastAutoLockSource -eq $lockSource) {
@@ -1512,7 +1514,7 @@ if ($AutoApply) {
                 WallhavenApiKey       = if ($existing -and $existing.WallhavenApiKey) { $existing.WallhavenApiKey } else { '' }
                 PexelsApiKey          = if ($existing -and $existing.PexelsApiKey) { $existing.PexelsApiKey } else { '' }
                 LocalFolderPath       = if ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
-                LastAutoAppliedDate   = $todayStamp
+                LastAutoAppliedDate   = if ($scheduleMode -eq 'Test1Minute') { '' } else { $todayStamp }
                 LastAutoDesktopSource = $desktopSource
                 LastAutoLockSource    = $lockSource
             }
