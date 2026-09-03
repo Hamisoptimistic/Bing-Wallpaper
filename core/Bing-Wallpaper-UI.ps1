@@ -3059,6 +3059,7 @@ $LabelRefresh = $window.FindName('LabelRefresh')
 $HeaderGrid = $window.FindName('HeaderGrid')
 $MainContent = $window.FindName('MainContent')
 $SourceTogglePill = $window.FindName('SourceTogglePill')
+$HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
 
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
@@ -4500,12 +4501,18 @@ function Update-ToolbarCompactState {
         if ($width -lt 860) {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 1)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 12, 0, 0)
+            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
+            if ($HeaderTitlePanel) {
+                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+            }
         }
         else {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 0)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
+            if ($HeaderTitlePanel) {
+                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Left
+            }
         }
     }
 
