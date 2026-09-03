@@ -384,6 +384,10 @@ function Get-BingImageUri {
         if ($Image.url) { return $Image.url }
         throw "Invalid Pexels image data - missing image URL."
     }
+    if ($Image.source -eq 'Local') {
+        if ($Image.url) { return $Image.url }
+        throw "Invalid Local image data - missing file path."
+    }
 
     $urlBase = $Image.urlbase
     if (-not $urlBase -or -not ($urlBase -match '^/th\?id=')) {
@@ -416,16 +420,184 @@ function Get-CleanImageTitle {
     return $t.Trim()
 }
 
+function Get-LocalImages {
+    param(
+        [string]$FolderPath,
+        [int]$Count = 1
+    )
+    if ([string]::IsNullOrWhiteSpace($FolderPath) -or (-not (Test-Path -LiteralPath $FolderPath -PathType Container))) {
+        return @()
+    }
+    $extensions = @('.jpg', '.jpeg', '.png', '.bmp', '.webp')
+    $files = @(Get-ChildItem -LiteralPath $FolderPath -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $extensions -contains $_.Extension.ToLowerInvariant() -and $_.Length -gt 0 })
+    if ($files.Count -eq 0) { return @() }
+
+    $picked = @($files | Get-Random -Count ([Math]::Min($Count, $files.Count)))
+    $res = @()
+    foreach ($f in $picked) {
+        $res += [PSCustomObject]@{
+            source    = 'Local'
+            urlbase   = "local_" + [System.Math]::Abs($f.FullName.GetHashCode()).ToString()
+            url       = $f.FullName
+            thumbUrl  = $f.FullName
+            title     = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
+            copyright = $f.Directory.Name
+            enddate   = ''
+            fileSize  = $f.Length
+            fileType  = $f.Extension.TrimStart('.').ToUpperInvariant()
+        }
+    }
+    return $res
+}
+
 # ---------------------------------------------------------------------
 # Gallery Background Worker ScriptBlock
 # Executed in a background runspace to fetch, cache, and stream thumbnails
 # for Bing, Windows Spotlight, Wallhaven, and Pexels.
 # ---------------------------------------------------------------------
 $script:GalleryFetchWorkerScriptBlock = {
-    param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 360, [string]$PexelsKey = '', [System.Collections.Queue]$BatchQueue = $null, [hashtable]$CancelToken = $null)
+    param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 360, [string]$PexelsKey = '', [System.Collections.Queue]$BatchQueue = $null, [hashtable]$CancelToken = $null, [string]$LocalFolder = '')
     try {
         [System.Net.ServicePointManager]::DefaultConnectionLimit = 64
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls
+
+        if ($Source -eq 'Local') {
+            if ([string]::IsNullOrWhiteSpace($LocalFolder) -or (-not (Test-Path -LiteralPath $LocalFolder -PathType Container))) {
+                if ($BatchQueue) {
+                    $BatchQueue.Enqueue([PSCustomObject]@{
+                        Type  = 'Error'
+                        Error = "Please select a valid local folder."
+                    })
+                }
+                return @{ Success = $false; Error = "Please select a valid local folder."; Images = @() }
+            }
+
+            # Enumerate image files recursively
+            $extensions = @('.jpg', '.jpeg', '.png', '.bmp', '.webp')
+            $foundFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+
+            try {
+                $dirInfo = New-Object System.IO.DirectoryInfo($LocalFolder)
+                $enumFiles = $dirInfo.EnumerateFiles('*.*', [System.IO.SearchOption]::AllDirectories)
+                foreach ($f in $enumFiles) {
+                    if ($CancelToken -and $CancelToken.Cancelled) { break }
+                    if ($extensions -contains $f.Extension.ToLowerInvariant()) {
+                        if ($f.Length -gt 0) {
+                            $foundFiles.Add($f)
+                        }
+                    }
+                }
+            } catch {
+                try {
+                    $raw = [System.IO.Directory]::GetFiles($LocalFolder, '*.*', [System.IO.SearchOption]::TopDirectoryOnly)
+                    foreach ($p in $raw) {
+                        $fi = New-Object System.IO.FileInfo($p)
+                        if ($extensions -contains $fi.Extension.ToLowerInvariant() -and $fi.Length -gt 0) {
+                            $foundFiles.Add($fi)
+                        }
+                    }
+                } catch {}
+            }
+
+            if ($foundFiles.Count -eq 0) {
+                if ($BatchQueue) {
+                    $BatchQueue.Enqueue([PSCustomObject]@{
+                        Type  = 'Error'
+                        Error = "No supported wallpaper images (.jpg, .png, .webp, .bmp) found in this folder."
+                    })
+                }
+                return @{ Success = $false; Error = "No images found in the selected folder."; Images = @() }
+            }
+
+            # Random shuffle on refresh (User Preference A3)
+            $rng = New-Object System.Random
+            $n = $foundFiles.Count
+            for ($i = $n - 1; $i -gt 0; $i--) {
+                $j = $rng.Next($i + 1)
+                $temp = $foundFiles[$i]
+                $foundFiles[$i] = $foundFiles[$j]
+                $foundFiles[$j] = $temp
+            }
+
+            # Stream in batches of 24
+            $batchSize = 24
+            $totalCount = $foundFiles.Count
+            $allResultImages = @()
+
+            Add-Type -AssemblyName PresentationCore -ErrorAction SilentlyContinue
+
+            for ($i = 0; $i -lt $totalCount; $i += $batchSize) {
+                if ($CancelToken -and $CancelToken.Cancelled) { break }
+                $chunkCount = [Math]::Min($batchSize, $totalCount - $i)
+                $chunkFiles = $foundFiles.GetRange($i, $chunkCount)
+
+                $chunkResult = @()
+                foreach ($file in $chunkFiles) {
+                    if ($CancelToken -and $CancelToken.Cancelled) { break }
+                    $w = 0
+                    $h = 0
+                    try {
+                        $stream = [System.IO.File]::Open($file.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+                        try {
+                            $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create(
+                                $stream,
+                                [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation,
+                                [System.Windows.Media.Imaging.BitmapCacheOption]::None
+                            )
+                            if ($decoder.Frames.Count -gt 0) {
+                                $w = [int]$decoder.Frames[0].PixelWidth
+                                $h = [int]$decoder.Frames[0].PixelHeight
+                            }
+                        } finally {
+                            $stream.Close()
+                            $stream.Dispose()
+                        }
+                    } catch {}
+
+                    $cleanTitle = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
+                    $parentFolder = $file.Directory.Name
+
+                    $imgObj = [PSCustomObject]@{
+                        source    = 'Local'
+                        urlbase   = "local_" + [System.Math]::Abs($file.FullName.GetHashCode()).ToString()
+                        url       = $file.FullName
+                        thumbUrl  = $file.FullName
+                        title     = $cleanTitle
+                        copyright = $parentFolder
+                        enddate   = ''
+                        resX      = $w
+                        resY      = $h
+                        fileSize  = $file.Length
+                        fileType  = $file.Extension.TrimStart('.').ToUpperInvariant()
+                    }
+                    $chunkResult += $imgObj
+                }
+
+                $allResultImages += $chunkResult
+
+                if ($BatchQueue) {
+                    $BatchQueue.Enqueue([PSCustomObject]@{
+                        Type       = 'Batch'
+                        Source     = 'Local'
+                        BatchIndex = [int]($i / $batchSize)
+                        Images     = $chunkResult
+                        Total      = $totalCount
+                        IsFirst    = ($i -eq 0)
+                        IsLast     = (($i + $batchSize) -ge $totalCount)
+                    })
+                }
+            }
+
+            if ($BatchQueue) {
+                $BatchQueue.Enqueue([PSCustomObject]@{
+                    Type = 'Done'
+                })
+                return @{ Success = $true; Error = $null; Images = @() }
+            }
+
+            return @{ Success = $true; Error = $null; Images = $allResultImages }
+        }
+
         if ($Source -eq 'Spotlight') {
             # --- Fetch the latest batch from Peapix (cheap - small JSON,
             # not the thumbnails themselves) ------------------------------

@@ -1028,7 +1028,12 @@ function Set-BingImage {
     $imageUri = Get-BingImageUri -Image $Image -Resolution $Resolution
     $cachePath = Join-Path $cacheDir "current_wallpaper.jpg"
 
-    Invoke-WebRequest -Uri $imageUri -OutFile $cachePath -UseBasicParsing -ErrorAction Stop
+    if ($Image.source -eq 'Local' -or (Test-Path -LiteralPath $imageUri)) {
+        Copy-Item -LiteralPath $imageUri -Destination $cachePath -Force
+    }
+    else {
+        Invoke-WebRequest -Uri $imageUri -OutFile $cachePath -UseBasicParsing -ErrorAction Stop
+    }
 
     if ($Target -eq 'Desktop' -or $Target -eq 'Both') {
         Set-DesktopWallpaperStyle -Style $Style
@@ -1105,6 +1110,7 @@ function Load-Settings {
         AutoLockScreenSource = "Bing"
         WallhavenApiKey      = ""
         PexelsApiKey         = ""
+        LocalFolderPath      = ""
     }
 }
 
@@ -1229,6 +1235,10 @@ if ($AutoApply) {
                     $pexelsKey = if ($savedSettings -and $savedSettings.PexelsApiKey) { [string]$savedSettings.PexelsApiKey } else { '' }
                     $images = Get-PexelsImages -Count 1 -ApiKey $pexelsKey
                 }
+                'Local' {
+                    $localFolder = if ($savedSettings -and $savedSettings.LocalFolderPath) { [string]$savedSettings.LocalFolderPath } else { '' }
+                    $images = Get-LocalImages -FolderPath $localFolder -Count 1
+                }
                 'None' {
                     return
                 }
@@ -1257,6 +1267,17 @@ if ($AutoApply) {
                     $applySuccess = $true
                 } catch {
                     $errors += "AutoApply Both: $($_.Exception.Message)"
+                }
+            }
+            elseif ($desktopSource -eq 'Local' -and $lockSource -eq 'Local') {
+                try {
+                    $localFolder = if ($savedSettings -and $savedSettings.LocalFolderPath) { [string]$savedSettings.LocalFolderPath } else { '' }
+                    $images = Get-LocalImages -FolderPath $localFolder -Count 1
+                    if (-not $images -or $images.Count -eq 0) { throw "No wallpaper was found in the local folder." }
+                    Set-BingImage -Image $images[0] -Resolution $Resolution -Target 'Both' -Style $Style | Out-Null
+                    $applySuccess = $true
+                } catch {
+                    $errors += "AutoApply Both Local: $($_.Exception.Message)"
                 }
             }
             else {
@@ -1294,6 +1315,7 @@ if ($AutoApply) {
                 SpotlightEnabled     = if ($existing -and $null -ne $existing.SpotlightEnabled) { [bool]$existing.SpotlightEnabled } else { $true }
                 WallhavenApiKey      = if ($existing -and $existing.WallhavenApiKey) { $existing.WallhavenApiKey } else { '' }
                 PexelsApiKey         = if ($existing -and $existing.PexelsApiKey) { $existing.PexelsApiKey } else { '' }
+                LocalFolderPath      = if ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
                 LastAutoAppliedDate  = $todayStamp
                 LastAutoDesktopSource= $desktopSource
                 LastAutoLockSource   = $lockSource
@@ -1657,6 +1679,12 @@ $xaml = @"
                                 <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
                             </Button>
                         </Grid>
+                        <Grid>
+                            <Border Name="SourceLocalIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                            <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                <TextBlock Name="SourceLocalLabel" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
+                            </Button>
+                        </Grid>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -1690,6 +1718,21 @@ $xaml = @"
                             <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                     </Grid>
+                    <!-- Local Folder Selection Button in Toolbar -->
+                    <Border Name="LocalFolderBorder" Visibility="Collapsed" Width="235" Height="38" Background="#18FFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8">
+                        <Button Name="LocalFolderBtn" Background="Transparent" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" Padding="12,0,10,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Name="LocalFolderLabel" Grid.Column="1" Text="Select Folder..." FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#888888" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </Grid>
+                        </Button>
+                    </Border>
                 </StackPanel>
 
                 <StackPanel Name="ColRefresh" Margin="0,0,16,16">
@@ -1844,6 +1887,7 @@ $xaml = @"
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Grid Grid.Column="0">
                                                     <Border Name="DeskBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
@@ -1870,6 +1914,12 @@ $xaml = @"
                                                     </Button>
                                                 </Grid>
                                                 <Grid Grid.Column="4">
+                                                    <Border Name="DeskLocalInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="DeskLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="DeskLocalLbl" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="5">
                                                     <Border Name="DeskNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
                                                     <Button Name="DeskNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
                                                         <TextBlock Name="DeskNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
@@ -1882,6 +1932,7 @@ $xaml = @"
                                         <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
@@ -1913,6 +1964,12 @@ $xaml = @"
                                                     </Button>
                                                 </Grid>
                                                 <Grid Grid.Column="4">
+                                                    <Border Name="LockLocalInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                                    <Button Name="LockLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                                        <TextBlock Name="LockLocalLbl" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                                    </Button>
+                                                </Grid>
+                                                <Grid Grid.Column="5">
                                                     <Border Name="LockNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
                                                     <Button Name="LockNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
                                                         <TextBlock Name="LockNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
@@ -1953,9 +2010,32 @@ $xaml = @"
             </WrapPanel>
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
-                <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Top" FocusVisualStyle="{x:Null}">
-                    <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
-                </ScrollViewer>
+                <Grid>
+                    <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Top" FocusVisualStyle="{x:Null}">
+                        <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
+                    </ScrollViewer>
+                    <!-- Centered Empty State for Local Tab when no folder is selected -->
+                    <Border Name="LocalEmptyStatePanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border Width="72" Height="72" CornerRadius="36" Background="#14FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                                <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="32" Foreground="#88FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Choose a Wallpaper Folder" FontSize="18" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock Text="Select a folder on your PC to load all images into AutoScape" FontSize="13" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                            <Button Name="EmptyStateSelectFolderBtn" Width="210" Height="42" Background="#20FFFFFF" BorderBrush="#35FFFFFF" BorderThickness="1" Foreground="White" FontSize="14" FontWeight="SemiBold" Cursor="Hand">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="8"/>
+                                    </Style>
+                                </Button.Resources>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="Select a Local Folder" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Border>
 
             <Grid Grid.Row="3" Margin="0,28,16,0">
@@ -2187,6 +2267,7 @@ $window.Add_StateChanged({
         }
     })
 $script:appSettings = Load-Settings
+$script:localFolderPath = if ($script:appSettings -and $script:appSettings.LocalFolderPath) { [string]$script:appSettings.LocalFolderPath } else { '' }
 
 $script:ApiKeySources = @{
     'Wallhaven' = @{
@@ -2311,6 +2392,7 @@ function Save-Settings {
             SpotlightEnabled     = [bool]$script:SpotlightEnabled
             WallhavenApiKey      = (Get-SourceApiKey 'Wallhaven')
             PexelsApiKey         = (Get-SourceApiKey 'Pexels')
+            LocalFolderPath      = if ($script:localFolderPath) { $script:localFolderPath } elseif ($existing -and $existing.LocalFolderPath) { [string]$existing.LocalFolderPath } else { '' }
             LastAutoAppliedDate  = if ($existing -and $existing.LastAutoAppliedDate) { [string]$existing.LastAutoAppliedDate } else { '' }
             LastAutoDesktopSource= if ($existing -and $existing.LastAutoDesktopSource) { [string]$existing.LastAutoDesktopSource } else { '' }
             LastAutoLockSource   = if ($existing -and $existing.LastAutoLockSource) { [string]$existing.LastAutoLockSource } else { '' }
@@ -2425,17 +2507,66 @@ $SourceBingBtn = $window.FindName('SourceBingBtn')
 $SourceSpotlightBtn = $window.FindName('SourceSpotlightBtn')
 $SourceWallhavenBtn = $window.FindName('SourceWallhavenBtn')
 $SourcePexelsBtn = $window.FindName('SourcePexelsBtn')
+$SourceLocalBtn = $window.FindName('SourceLocalBtn')
 $SourceBingIndicator = $window.FindName('SourceBingIndicator')
 $SourceSpotlightIndicator = $window.FindName('SourceSpotlightIndicator')
 $SourceWallhavenIndicator = $window.FindName('SourceWallhavenIndicator')
 $SourcePexelsIndicator = $window.FindName('SourcePexelsIndicator')
+$SourceLocalIndicator = $window.FindName('SourceLocalIndicator')
 $SourceBingLabel = $window.FindName('SourceBingLabel')
 $SourceSpotlightLabel = $window.FindName('SourceSpotlightLabel')
 $SourceWallhavenLabel = $window.FindName('SourceWallhavenLabel')
 $SourcePexelsLabel = $window.FindName('SourcePexelsLabel')
+$SourceLocalLabel = $window.FindName('SourceLocalLabel')
+$LocalFolderBorder = $window.FindName('LocalFolderBorder')
+$LocalFolderBtn = $window.FindName('LocalFolderBtn')
+$LocalFolderLabel = $window.FindName('LocalFolderLabel')
+$LocalEmptyStatePanel = $window.FindName('LocalEmptyStatePanel')
+$EmptyStateSelectFolderBtn = $window.FindName('EmptyStateSelectFolderBtn')
 $AppSubtitleText = $window.FindName('AppSubtitleText')
 
 $script:currentSource = 'Bing'
+
+function Update-LocalFolderVisual {
+    if (-not $LocalFolderLabel) { return }
+    if ($script:localFolderPath -and (Test-Path -LiteralPath $script:localFolderPath)) {
+        $folderLeaf = Split-Path -Leaf $script:localFolderPath
+        if ([string]::IsNullOrWhiteSpace($folderLeaf)) { $folderLeaf = $script:localFolderPath }
+        $LocalFolderLabel.Text = $folderLeaf
+        if ($LocalFolderBtn) {
+            $LocalFolderBtn.ToolTip = "Folder: $($script:localFolderPath)`nClick to change folder"
+        }
+    }
+    else {
+        $LocalFolderLabel.Text = "Select Folder..."
+        if ($LocalFolderBtn) {
+            $LocalFolderBtn.ToolTip = "Click to choose a local wallpaper folder"
+        }
+    }
+}
+
+function Select-LocalWallpaperFolder {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = "Select a folder containing wallpaper images"
+    $dialog.ShowNewFolderButton = $false
+    $dialog.AutoUpgradeEnabled = $true
+    if ($script:localFolderPath -and (Test-Path -LiteralPath $script:localFolderPath)) {
+        $dialog.SelectedPath = $script:localFolderPath
+    }
+
+    $hwnd = (New-Object System.Windows.Interop.WindowInteropHelper($window)).Handle
+    $wrapper = New-Object -TypeName System.Windows.Forms.NativeWindow
+    $wrapper.AssignHandle($hwnd)
+
+    $result = $dialog.ShowDialog($wrapper)
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK -and -not [string]::IsNullOrWhiteSpace($dialog.SelectedPath)) {
+        $script:localFolderPath = $dialog.SelectedPath
+        Save-Settings
+        Update-LocalFolderVisual
+        Load-Gallery
+    }
+}
 
 function Update-GlobalApiKeyBoxState([string]$Key) {
     if (-not $ApiKeyBox) { return }
@@ -2461,36 +2592,52 @@ function Update-SourceToggleVisual {
     $isSpotlight = ($script:currentSource -eq 'Spotlight')
     $isWallhaven = ($script:currentSource -eq 'Wallhaven')
     $isPexels = ($script:currentSource -eq 'Pexels')
+    $isLocal = ($script:currentSource -eq 'Local')
 
     if ($SourceBingLabel) { $SourceBingLabel.Foreground = if ($script:currentSource -eq 'Bing') { $activeColor } else { $inactiveColor } }
     if ($SourceSpotlightLabel) { $SourceSpotlightLabel.Foreground = if ($isSpotlight) { $activeColor } else { $inactiveColor } }
     if ($SourceWallhavenLabel) { $SourceWallhavenLabel.Foreground = if ($isWallhaven) { $activeColor } else { $inactiveColor } }
     if ($SourcePexelsLabel) { $SourcePexelsLabel.Foreground = if ($isPexels) { $activeColor } else { $inactiveColor } }
+    if ($SourceLocalLabel) { $SourceLocalLabel.Foreground = if ($isLocal) { $activeColor } else { $inactiveColor } }
+
     if ($SourceBingIndicator) { $SourceBingIndicator.Opacity = if ($script:currentSource -eq 'Bing') { 1 } else { 0 } }
     if ($SourceSpotlightIndicator) { $SourceSpotlightIndicator.Opacity = if ($isSpotlight) { 1 } else { 0 } }
     if ($SourceWallhavenIndicator) { $SourceWallhavenIndicator.Opacity = if ($isWallhaven) { 1 } else { 0 } }
     if ($SourcePexelsIndicator) { $SourcePexelsIndicator.Opacity = if ($isPexels) { 1 } else { 0 } }
+    if ($SourceLocalIndicator) { $SourceLocalIndicator.Opacity = if ($isLocal) { 1 } else { 0 } }
+
     if ($AppSubtitleText) {
-        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } elseif ($isPexels) { 'Pexels 4K nature photography' } else { 'Bing wallpapers, delivered daily' }
+        $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } elseif ($isPexels) { 'Pexels 4K nature photography' } elseif ($isLocal) { 'Your local wallpaper collection' } else { 'Bing wallpapers, delivered daily' }
     }
 
-    # Universal handling for any current or future API-key-based source
-    $isApiKeySource = $script:ApiKeySources.ContainsKey($script:currentSource)
-    if ($isApiKeySource) {
-        $spec = $script:ApiKeySources[$script:currentSource]
+    if ($isLocal) {
         if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Collapsed }
-        if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Visible }
-        if ($LabelRegion) { $LabelRegion.Text = $spec.Label }
-        if ($ApiKeyBox) { $ApiKeyBox.ToolTip = $spec.Tooltip }
-        if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.Text = $spec.Placeholder }
-
-        $currentKey = Get-SourceApiKey $script:currentSource
-        Update-GlobalApiKeyBoxState -Key $currentKey
+        if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($LocalFolderBorder) { $LocalFolderBorder.Visibility = [System.Windows.Visibility]::Visible }
+        if ($LabelRegion) { $LabelRegion.Text = 'Wallpaper Folder' }
+        Update-LocalFolderVisual
     }
     else {
-        if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Visible }
-        if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Collapsed }
-        if ($LabelRegion) { $LabelRegion.Text = 'Region' }
+        if ($LocalFolderBorder) { $LocalFolderBorder.Visibility = [System.Windows.Visibility]::Collapsed }
+
+        # Universal handling for any current or future API-key-based source
+        $isApiKeySource = $script:ApiKeySources.ContainsKey($script:currentSource)
+        if ($isApiKeySource) {
+            $spec = $script:ApiKeySources[$script:currentSource]
+            if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Visible }
+            if ($LabelRegion) { $LabelRegion.Text = $spec.Label }
+            if ($ApiKeyBox) { $ApiKeyBox.ToolTip = $spec.Tooltip }
+            if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.Text = $spec.Placeholder }
+
+            $currentKey = Get-SourceApiKey $script:currentSource
+            Update-GlobalApiKeyBoxState -Key $currentKey
+        }
+        else {
+            if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Visible }
+            if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($LabelRegion) { $LabelRegion.Text = 'Region' }
+        }
     }
 }
 Update-SourceToggleVisual
@@ -2598,6 +2745,24 @@ if ($SourcePexelsBtn) {
             $script:currentSource = 'Pexels'
             Update-SourceToggleVisual
             Load-Gallery
+        })
+}
+if ($SourceLocalBtn) {
+    $SourceLocalBtn.Add_Click({
+            if ($script:currentSource -eq 'Local') { return }
+            $script:currentSource = 'Local'
+            Update-SourceToggleVisual
+            Load-Gallery
+        })
+}
+if ($LocalFolderBtn) {
+    $LocalFolderBtn.Add_Click({
+            Select-LocalWallpaperFolder
+        })
+}
+if ($EmptyStateSelectFolderBtn) {
+    $EmptyStateSelectFolderBtn.Add_Click({
+            Select-LocalWallpaperFolder
         })
 }
 # ------------------------------------------------------------------------
@@ -3378,16 +3543,21 @@ function Apply-WallpaperAsync {
     $fnLockScreenCode = "function Set-LockScreenImageIsolated { " + ${function:Set-LockScreenImageIsolated}.ToString() + " }"
     $fnResizeCode = "function Resize-WallpaperToResolution { " + ${function:Resize-WallpaperToResolution}.ToString() + " }"
     $resolutionSize = Get-ResolutionDimensions -Resolution $Resolution
-    $needsLocalResize = ($Image.source -ne 'Bing')
+    $needsLocalResize = ($Image.source -ne 'Bing' -and $Image.source -ne 'Local')
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
             param([string]$Uri, [string]$Temp, [string]$Dest, [string]$TargetParam, [string]$StyleParam, [string]$LockScreenFnCode, [string]$ResizeFnCode, [bool]$NeedsLocalResize, [int]$TargetWidth, [int]$TargetHeight)
             try {
-                $wc = New-Object System.Net.WebClient
-                $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                $wc.DownloadFile($Uri, $Temp)
-                $wc.Dispose()
+                if (Test-Path -LiteralPath $Uri) {
+                    Copy-Item -LiteralPath $Uri -Destination $Temp -Force
+                }
+                else {
+                    $wc = New-Object System.Net.WebClient
+                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    $wc.DownloadFile($Uri, $Temp)
+                    $wc.Dispose()
+                }
                 if (Test-Path -LiteralPath $Temp) {
                     if ($NeedsLocalResize) {
                         Invoke-Expression $ResizeFnCode
@@ -4265,11 +4435,10 @@ function Render-GalleryGrid {
 
         # Bing/Spotlight thumbnails are already native 16:9, so their card
         # height is left exactly as before (driven by the image's own
-        # aspect). Wallhaven's and Pexels' aren't guaranteed 16:9,
-        # which makes cards different heights - so Wallhaven and Pexels cards
-        # get an explicit height locked to 16:9 of the card's width,
-        # cropped to fit via the UniformToFill stretch above.
-        if ($image.source -eq 'Wallhaven' -or $image.source -eq 'Pexels') {
+        # aspect). Wallhaven's, Pexels', and Local aren't guaranteed 16:9,
+        # which makes cards different heights - so they get an explicit height
+        # locked to 16:9 of the card's width, cropped to fit via UniformToFill.
+        if ($image.source -eq 'Wallhaven' -or $image.source -eq 'Pexels' -or $image.source -eq 'Local') {
             $imgBorder.Add_SizeChanged({
                     param($evtSender, $e)
                     if ($e.NewSize.Width -gt 0) {
@@ -4282,26 +4451,33 @@ function Render-GalleryGrid {
         }
 
         try {
-            $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
-            $thumbCachePath = Join-Path $ThumbCacheDir "${safeName}_thumb.jpg"
-            if (Test-Path -LiteralPath $thumbCachePath) {
+            $imagePathToLoad = $null
+            if ($image.source -eq 'Local' -and (Test-Path -LiteralPath $image.url)) {
+                $imagePathToLoad = $image.url
+            }
+            else {
+                $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
+                $thumbCachePath = Join-Path $ThumbCacheDir "${safeName}_thumb.jpg"
+                if (Test-Path -LiteralPath $thumbCachePath) {
+                    $imagePathToLoad = $thumbCachePath
+                }
+            }
+
+            if ($imagePathToLoad -and (Test-Path -LiteralPath $imagePathToLoad)) {
                 $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
                 $bitmap.BeginInit()
-                $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
+                $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $imagePathToLoad).Path)
                 $bitmap.DecodePixelWidth = 360
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
                 $bitmap.Freeze()
 
                 $imageControl.Source = $bitmap
-                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $imagePathToLoad))
                 [void]$script:galleryImageControls.Add($imageControl)
             }
             else {
-                # Thumbnail failed to download (parallel fetch swallows per-image
-                # errors) - still give the card a fallback accent so selecting it
-                # doesn't silently do nothing.
-                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush $thumbCachePath))
+                $card.Resources.Add('ImageAccentBrush', (Get-ImageAccentBrush ''))
             }
         }
         catch {}
@@ -4329,6 +4505,9 @@ function Render-GalleryGrid {
                 if ($image.copyright) { $image.copyright } else { 'Windows Spotlight' }
             }
             elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' }
+            elseif ($image.source -eq 'Local') {
+                if ($image.copyright) { $image.copyright } else { 'Local' }
+            }
             elseif ($image.source -eq 'Pexels') {
                 $authorName = if ($image.photographer) { [string]$image.photographer }
                 elseif ($image.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
@@ -4355,12 +4534,9 @@ function Render-GalleryGrid {
         $date.TextTrimming = 'CharacterEllipsis'
         $details.Children.Add($date)
 
-        # Wallhaven: collapse the generic "Nature Wallpaper" / "Wallhaven"
-        # two-line label into one compact line built from that image's own
-        # Wallhaven API data (dimension_x/dimension_y, file_type, file_size)
-        # - e.g. "3840 $([char]215) 2160  $([char]8226)  JPEG  $([char]8226)  5.2 MB" - instead of the same
-        # static text repeated on every card.
-        if ($image.source -eq 'Wallhaven') {
+        # Wallhaven & Local: collapse into compact single line
+        # - e.g. "3840 × 2160 • JPEG • 5.2 MB"
+        if ($image.source -eq 'Wallhaven' -or $image.source -eq 'Local') {
             $infoParts = @()
             if ($image.resX -and $image.resY) { $infoParts += "$($image.resX) $([char]215) $($image.resY)" }
             if ($image.fileType) {
@@ -4521,6 +4697,24 @@ function Load-Gallery {
     $selectedRegion = Get-SelectedRegionCode
     $fetchSource = $script:currentSource
 
+    if ($fetchSource -eq 'Local') {
+        if (-not $script:localFolderPath -or -not (Test-Path -LiteralPath $script:localFolderPath)) {
+            if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Visible }
+            if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Collapsed }
+            $StatusText.Text = "Select a local wallpaper folder to display images."
+            $GalleryPanel.Children.Clear()
+            return
+        }
+        else {
+            if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Visible }
+        }
+    }
+    else {
+        if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Visible }
+    }
+
     if ($script:ApiKeySources.ContainsKey($fetchSource)) {
         $sourceKey = Get-SourceApiKey $fetchSource
         $val = Test-SourceApiKey -Source $fetchSource -Key $sourceKey
@@ -4559,7 +4753,7 @@ function Load-Gallery {
     $script:userHasExplicitlySelectedWallpaper = $false
     
     $historyPath = Join-Path $sourceThumbDir '_history.json'
-    if (Test-Path -LiteralPath $historyPath) {
+    if ($fetchSource -ne 'Local' -and (Test-Path -LiteralPath $historyPath)) {
         try {
             $rawHistory = Get-Content -LiteralPath $historyPath -Raw -ErrorAction SilentlyContinue
             if ($rawHistory) {
@@ -4611,7 +4805,7 @@ function Load-Gallery {
             else {
                 $GalleryPanel.Children.Clear()
                 $StatusText.Opacity = 1
-                $StatusText.Text = if ($script:phase1FetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($script:phase1FetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } elseif ($script:phase1FetchSource -eq 'Pexels') { 'Connecting to Pexels...' } else { 'Connecting to Bing...' }
+                $StatusText.Text = if ($script:phase1FetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($script:phase1FetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } elseif ($script:phase1FetchSource -eq 'Pexels') { 'Connecting to Pexels...' } elseif ($script:phase1FetchSource -eq 'Local') { 'Scanning local wallpaper folder...' } else { 'Connecting to Bing...' }
             }
         })
     $script:phase1Timer.Start()
@@ -4631,6 +4825,7 @@ function Load-Gallery {
     [void]$ps.AddArgument((Get-SourceApiKey 'Pexels'))
     [void]$ps.AddArgument($batchQueue)
     [void]$ps.AddArgument($cancelToken)
+    [void]$ps.AddArgument($script:localFolderPath)
 
     $asyncOp = $ps.BeginInvoke()
 
@@ -4672,7 +4867,12 @@ function Load-Gallery {
                         $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
                         $StatusText.Opacity = 1
                         $StatusText.Foreground = $statusErrorBrush
-                        $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($item.Error)) -DefaultAction "load wallpapers"
+                        if ($ctx.Source -eq 'Local') {
+                            $StatusText.Text = if ($item.Error) { $item.Error } else { "No wallpaper images found in this folder." }
+                        }
+                        else {
+                            $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($item.Error)) -DefaultAction "load wallpapers"
+                        }
                         return
                     }
                     elseif ($item.Type -eq 'Batch') {
@@ -4739,7 +4939,12 @@ function Load-Gallery {
                     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
                     $StatusText.Opacity = 1
                     $StatusText.Foreground = $statusErrorBrush
-                    $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+                    if ($fetchSource -eq 'Local') {
+                        $StatusText.Text = if ($errorMsg) { $errorMsg } else { "No supported images found in the selected folder." }
+                    }
+                    else {
+                        $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "load wallpapers"
+                    }
                     return
                 }
 
@@ -4889,12 +5094,16 @@ $DownloadBtn.Add_Click({
 
         $imageUri = Get-BingImageUri -Image $targetImage -Resolution $ResolutionBox.SelectedItem
         $resolutionSize = Get-ResolutionDimensions -Resolution $ResolutionBox.SelectedItem
-        $needsLocalResize = ($targetImage.source -ne 'Bing')
+        $needsLocalResize = ($targetImage.source -ne 'Bing' -and $targetImage.source -ne 'Local')
         $imageDate = if ($targetImage.enddate -and ($targetImage.enddate -match '^\d{8}$')) { $targetImage.enddate } else { (Get-Date).ToString('yyyyMMdd') }
         $cleanTitle = ($actionTitle -replace '[\\/:*?"<>|\x00-\x1F]', '').Trim()
         $cleanTitle = ($cleanTitle -replace '\s+', ' ').Trim()
         if ($cleanTitle.Length -gt 60) { $cleanTitle = $cleanTitle.Substring(0, 60).Trim() }
-        $fileName = if ($cleanTitle) { "Bing-$imageDate-$cleanTitle.jpg" } else { "Bing-$imageDate.jpg" }
+        $fileName = if ($targetImage.source -eq 'Local') {
+            if ($cleanTitle -and $targetImage.fileType) { "$cleanTitle.$($targetImage.fileType.ToLower())" }
+            else { [System.IO.Path]::GetFileName($imageUri) }
+        }
+        elseif ($cleanTitle) { "Bing-$imageDate-$cleanTitle.jpg" } else { "Bing-$imageDate.jpg" }
         $downloadPath = Join-Path $downloadFolder $fileName
         $tempPath = "$downloadPath.tmp"
 
@@ -4904,10 +5113,15 @@ $DownloadBtn.Add_Click({
         [void]$ps.AddScript({
                 param([string]$Uri, [string]$Temp, [string]$Dest, [string]$ResizeFnCode, [bool]$NeedsLocalResize, [int]$TargetWidth, [int]$TargetHeight)
                 try {
-                    $wc = New-Object System.Net.WebClient
-                    $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    $wc.DownloadFile($Uri, $Temp)
-                    $wc.Dispose()
+                    if (Test-Path -LiteralPath $Uri) {
+                        Copy-Item -LiteralPath $Uri -Destination $Temp -Force
+                    }
+                    else {
+                        $wc = New-Object System.Net.WebClient
+                        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        $wc.DownloadFile($Uri, $Temp)
+                        $wc.Dispose()
+                    }
                     if (Test-Path -LiteralPath $Temp) {
                         if ($NeedsLocalResize) {
                             Invoke-Expression $ResizeFnCode
@@ -4982,7 +5196,7 @@ $DownloadBtn.Add_Click({
 
 
 
-@('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'None') | ForEach-Object {
+@('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'Local', 'None') | ForEach-Object {
     [void]$AutoDesktopSourceBox.Items.Add($_)
     [void]$AutoLockScreenSourceBox.Items.Add($_)
 }
@@ -5051,14 +5265,14 @@ function Update-AutoOptionUI {
 
     $inds = @(); $lbls = @(); $vals = @()
     if ($Category -eq 'Desktop') {
-        $inds = @($window.FindName('DeskBingInd'), $window.FindName('DeskSpotlightInd'), $window.FindName('DeskWallhavenInd'), $window.FindName('DeskPexelsInd'), $window.FindName('DeskNoneInd'))
-        $lbls = @($window.FindName('DeskBingLbl'), $window.FindName('DeskSpotlightLbl'), $window.FindName('DeskWallhavenLbl'), $window.FindName('DeskPexelsLbl'), $window.FindName('DeskNoneLbl'))
-        $vals = @('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'None')
+        $inds = @($window.FindName('DeskBingInd'), $window.FindName('DeskSpotlightInd'), $window.FindName('DeskWallhavenInd'), $window.FindName('DeskPexelsInd'), $window.FindName('DeskLocalInd'), $window.FindName('DeskNoneInd'))
+        $lbls = @($window.FindName('DeskBingLbl'), $window.FindName('DeskSpotlightLbl'), $window.FindName('DeskWallhavenLbl'), $window.FindName('DeskPexelsLbl'), $window.FindName('DeskLocalLbl'), $window.FindName('DeskNoneLbl'))
+        $vals = @('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'Local', 'None')
     }
     elseif ($Category -eq 'LockScreen') {
-        $inds = @($window.FindName('LockBingInd'), $window.FindName('LockSpotlightInd'), $window.FindName('LockWallhavenInd'), $window.FindName('LockPexelsInd'), $window.FindName('LockNoneInd'))
-        $lbls = @($window.FindName('LockBingLbl'), $window.FindName('LockSpotlightLbl'), $window.FindName('LockWallhavenLbl'), $window.FindName('LockPexelsLbl'), $window.FindName('LockNoneLbl'))
-        $vals = @('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'None')
+        $inds = @($window.FindName('LockBingInd'), $window.FindName('LockSpotlightInd'), $window.FindName('LockWallhavenInd'), $window.FindName('LockPexelsInd'), $window.FindName('LockLocalInd'), $window.FindName('LockNoneInd'))
+        $lbls = @($window.FindName('LockBingLbl'), $window.FindName('LockSpotlightLbl'), $window.FindName('LockWallhavenLbl'), $window.FindName('LockPexelsLbl'), $window.FindName('LockLocalLbl'), $window.FindName('LockNoneLbl'))
+        $vals = @('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'Local', 'None')
     }
     elseif ($Category -eq 'Schedule') {
         $inds = @($window.FindName('SchedEverydayInd'), $window.FindName('SchedTestInd'))
@@ -5098,6 +5312,8 @@ $DeskWallhavenBtn = $window.FindName('DeskWallhavenBtn')
 if ($DeskWallhavenBtn) { $DeskWallhavenBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Wallhaven' }) }
 $DeskPexelsBtn = $window.FindName('DeskPexelsBtn')
 if ($DeskPexelsBtn) { $DeskPexelsBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Pexels' }) }
+$DeskLocalBtn = $window.FindName('DeskLocalBtn')
+if ($DeskLocalBtn) { $DeskLocalBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'Local' }) }
 $DeskNoneBtn = $window.FindName('DeskNoneBtn')
 if ($DeskNoneBtn) { $DeskNoneBtn.Add_Click({ $AutoDesktopSourceBox.SelectedItem = 'None' }) }
 
@@ -5109,6 +5325,8 @@ $LockWallhavenBtn = $window.FindName('LockWallhavenBtn')
 if ($LockWallhavenBtn) { $LockWallhavenBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Wallhaven' }) }
 $LockPexelsBtn = $window.FindName('LockPexelsBtn')
 if ($LockPexelsBtn) { $LockPexelsBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Pexels' }) }
+$LockLocalBtn = $window.FindName('LockLocalBtn')
+if ($LockLocalBtn) { $LockLocalBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'Local' }) }
 $LockNoneBtn = $window.FindName('LockNoneBtn')
 if ($LockNoneBtn) { $LockNoneBtn.Add_Click({ $AutoLockScreenSourceBox.SelectedItem = 'None' }) }
 
