@@ -4799,12 +4799,23 @@ function Render-GalleryGrid {
         [array]$Images,
         [string]$ThumbCacheDir,
         [switch]$SkipAnimation,
-        [switch]$InsertAtTop
+        [switch]$InsertAtTop,
+        [switch]$Append
     )
 
     if (-not $Images -or $Images.Count -eq 0) { return }
 
-    if (-not $InsertAtTop) {
+    if ($Append) {
+        $newLoaded = New-Object System.Collections.ArrayList
+        if ($script:loadedImages) {
+            foreach ($img in $script:loadedImages) { [void]$newLoaded.Add($img) }
+        }
+        foreach ($img in $Images) { [void]$newLoaded.Add($img) }
+        $script:loadedImages = $newLoaded.ToArray()
+        if (-not $script:galleryImageControls) { $script:galleryImageControls = New-Object System.Collections.ArrayList }
+        if (-not $script:galleryCards) { $script:galleryCards = New-Object System.Collections.ArrayList }
+    }
+    elseif (-not $InsertAtTop) {
         $GalleryPanel.Children.Clear()
         $script:selectedCard = $null
         $script:selectedImage = $null
@@ -4821,7 +4832,7 @@ function Render-GalleryGrid {
         $script:loadedImages = $newLoaded.ToArray()
     }
 
-    if ($script:revealElements) {
+    if (-not $Append -and $script:revealElements) {
         $staticElements = $script:revealElements | Where-Object { $_.Element.Name -eq "RevealBorder" }
         $script:revealElements.Clear()
         foreach ($item in $staticElements) { $script:revealElements.Add($item) | Out-Null }
@@ -4938,7 +4949,7 @@ function Render-GalleryGrid {
 
         $imageControl = New-Object System.Windows.Controls.Image
         $imageControl.Stretch = [System.Windows.Media.Stretch]::UniformToFill
-        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::Fant)
+        [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($imageControl, [System.Windows.Media.BitmapScalingMode]::LowQuality)
         $imgBorder.Child = $imageControl
         $stack.Children.Add($imgBorder)
 
@@ -4968,7 +4979,6 @@ function Render-GalleryGrid {
                 $bitmap.BeginInit()
                 $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $thumbCachePath).Path)
                 $bitmap.DecodePixelWidth = 360
-                $bitmap.CreateOptions = [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
                 $bitmap.Freeze()
@@ -5123,7 +5133,7 @@ function Render-GalleryGrid {
         }
     }
 
-    if ($firstCard -and $Images.Count -gt 0 -and (-not $script:userHasExplicitlySelectedWallpaper)) {
+    if ($firstCard -and $Images.Count -gt 0 -and (-not $script:userHasExplicitlySelectedWallpaper) -and (-not $Append)) {
         Select-Card $firstCard $Images[0]
         $script:userHasExplicitlySelectedWallpaper = $false
     }
@@ -5141,8 +5151,32 @@ function Render-GalleryGrid {
     }
 
     Update-GalleryViewportHeight
-    if ('AutoScapeSmoothScroll' -as [type]) { [AutoScapeSmoothScroll]::Reset() }
-    if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
+    if (-not $Append) {
+        if ('AutoScapeSmoothScroll' -as [type]) { [AutoScapeSmoothScroll]::Reset() }
+        if ($GalleryScrollViewer) { $GalleryScrollViewer.ScrollToTop() }
+    }
+
+    $upgradeDelay = [System.Math]::Min($total * 35 + 200, 1200)
+    $script:qualityUpgradeTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:qualityUpgradeTimer.Interval = [TimeSpan]::FromMilliseconds($upgradeDelay)
+    $localPanel = $GalleryPanel
+    $script:qualityUpgradeTimer.Add_Tick({
+            param($qtSender, $qtArgs)
+            $qtSender.Stop()
+            foreach ($c in $localPanel.Children) {
+                $grid = $c.Child
+                if ($grid) {
+                    $st = $grid.Children | Where-Object { $_ -is [System.Windows.Controls.StackPanel] } | Select-Object -First 1
+                    if ($st -and $st.Children.Count -gt 0) {
+                        $ib = $st.Children[0]
+                        if ($ib -and $ib.Child -is [System.Windows.Controls.Image]) {
+                            [System.Windows.Media.RenderOptions]::SetBitmapScalingMode($ib.Child, [System.Windows.Media.BitmapScalingMode]::HighQuality)
+                        }
+                    }
+                }
+            }
+        })
+    $script:qualityUpgradeTimer.Start()
 }
 
 function Load-Gallery {
@@ -5160,8 +5194,18 @@ function Load-Gallery {
         $script:galleryTimer = $null
     }
     if ($script:galleryRunspaceContext) {
-        try { $script:galleryRunspaceContext.PS.Dispose() } catch {}
+        $oldCtx = $script:galleryRunspaceContext
         $script:galleryRunspaceContext = $null
+        if ($oldCtx.CancelToken) {
+            $oldCtx.CancelToken.Cancelled = $true
+        }
+        [System.Threading.Tasks.Task]::Run([Action] {
+                try {
+                    $oldCtx.PS.Stop()
+                    $oldCtx.PS.Dispose()
+                }
+                catch {}
+            })
     }
 
     $selectedRegion = Get-SelectedRegionCode
@@ -5264,7 +5308,7 @@ function Load-Gallery {
 
     $ps = [powershell]::Create()
     [void]$ps.AddScript({
-            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 360, [string]$PexelsKey = '')
+            param([string]$Region, [string]$CacheDir, [string]$Source, [int]$Count, [string]$WallhavenKey, [int]$HistoryMaxDays = 360, [string]$PexelsKey = '', [System.Collections.Queue]$BatchQueue = $null, [hashtable]$CancelToken = $null)
             try {
                 [System.Net.ServicePointManager]::DefaultConnectionLimit = 64
                 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 -bor [System.Net.SecurityProtocolType]::Tls11 -bor [System.Net.SecurityProtocolType]::Tls
@@ -5682,6 +5726,92 @@ function Load-Gallery {
                     }
                     catch {}
 
+                    if ($BatchQueue) {
+                        $batchSize = 8
+                        $allValidImages = @()
+                        for ($i = 0; $i -lt $candidateImages.Count; $i += $batchSize) {
+                            if ($CancelToken -and $CancelToken.Cancelled) { break }
+                            $chunkCount = [Math]::Min($batchSize, $candidateImages.Count - $i)
+                            $chunkCandidates = @($candidateImages | Select-Object -Skip $i -First $chunkCount)
+
+                            if ('BingWallpaper.FastDownloader' -as [type]) {
+                                $chunkUrls = [string[]]($chunkCandidates | ForEach-Object { [string]$_.thumbUrl })
+                                $chunkTargets = [string[]]($chunkCandidates | ForEach-Object {
+                                        $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                                        Join-Path $CacheDir "${safe}_thumb.jpg"
+                                    })
+                                [BingWallpaper.FastDownloader]::DownloadUrlsParallel($chunkUrls, $chunkTargets, 8)
+                            }
+                            else {
+                                $wcChunk = New-Object System.Net.WebClient
+                                $wcChunk.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                                foreach ($img in $chunkCandidates) {
+                                    $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                                    $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                                    if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
+                                        try { $wcChunk.DownloadFile($img.thumbUrl, $target) } catch {}
+                                    }
+                                }
+                                $wcChunk.Dispose()
+                            }
+
+                            if ($CancelToken -and $CancelToken.Cancelled) { break }
+
+                            $validChunk = @($chunkCandidates | Where-Object {
+                                    $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                                    $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                                    (Test-Path -LiteralPath $target) -and ((Get-Item -LiteralPath $target).Length -gt 0)
+                                })
+
+                            if ($validChunk.Count -gt 0) {
+                                $chunkResult = @()
+                                foreach ($img in $validChunk) {
+                                    $chunkResult += [PSCustomObject]@{
+                                        source    = 'Wallhaven'
+                                        urlbase   = [string]$img.urlbase
+                                        url       = [string]$img.url
+                                        title     = [string]$img.title
+                                        copyright = [string]$img.copyright
+                                        enddate   = ''
+                                        resX      = $img.resX
+                                        resY      = $img.resY
+                                        fileSize  = $img.fileSize
+                                        fileType  = [string]$img.fileType
+                                    }
+                                }
+                                $allValidImages += $validChunk
+
+                                $BatchQueue.Enqueue([PSCustomObject]@{
+                                        Type       = 'Batch'
+                                        Source     = 'Wallhaven'
+                                        BatchIndex = [int]($i / $batchSize)
+                                        Images     = $chunkResult
+                                        Total      = $candidateImages.Count
+                                        IsFirst    = ($i -eq 0)
+                                        IsLast     = (($i + $batchSize) -ge $candidateImages.Count)
+                                    })
+                            }
+                        }
+
+                        if ($allValidImages.Count -eq 0 -and $candidateImages.Count -gt 0) {
+                            $BatchQueue.Enqueue([PSCustomObject]@{
+                                    Type  = 'Error'
+                                    Error = "Unable to connect to Wallhaven."
+                                })
+                            return @{ Success = $false; Error = "Unable to connect to Wallhaven."; Images = @() }
+                        }
+
+                        try {
+                            $allValidImages | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $historyPath -Encoding UTF8
+                        }
+                        catch {}
+
+                        $BatchQueue.Enqueue([PSCustomObject]@{
+                                Type = 'Done'
+                            })
+                        return @{ Success = $true; Error = $null; Images = @() }
+                    }
+
                     # Only the thumbnails we don't already have on disk
                     # actually hit the network (DownloadUrlsParallel skips
                     # any target that already exists) - so wallpapers
@@ -5749,8 +5879,8 @@ function Load-Gallery {
                         return @{ Success = $false; Error = "Please enter your Pexels API key in the toolbar."; Images = @() }
                     }
 
-                    $pexFetchCount = 40
-                    $pexShowCount = 40
+                    $pexFetchCount = 24
+                    $pexShowCount = 24
 
                     # Curated premium landscape wallpaper queries requested by user
                     $wallpaperQueries = @(
@@ -6000,6 +6130,97 @@ function Load-Gallery {
                         Remove-Item -Force -ErrorAction SilentlyContinue
                     }
                     catch {}
+
+                    if ($BatchQueue) {
+                        $batchSize = 8
+                        $allValidImages = @()
+                        for ($i = 0; $i -lt $candidateImages.Count; $i += $batchSize) {
+                            if ($CancelToken -and $CancelToken.Cancelled) { break }
+                            $chunkCount = [Math]::Min($batchSize, $candidateImages.Count - $i)
+                            $chunkCandidates = @($candidateImages | Select-Object -Skip $i -First $chunkCount)
+
+                            if ('BingWallpaper.FastDownloader' -as [type]) {
+                                $chunkUrls = [string[]]($chunkCandidates | ForEach-Object { [string]$_.thumbUrl })
+                                $chunkTargets = [string[]]($chunkCandidates | ForEach-Object {
+                                        $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                                        Join-Path $CacheDir "${safe}_thumb.jpg"
+                                    })
+                                [BingWallpaper.FastDownloader]::DownloadUrlsParallel($chunkUrls, $chunkTargets, 8)
+                            }
+                            else {
+                                $wcChunk = New-Object System.Net.WebClient
+                                $wcChunk.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                                foreach ($img in $chunkCandidates) {
+                                    $safe = $img.urlbase -replace '[^a-zA-Z0-9]', ''
+                                    $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                                    if (-not (Test-Path -LiteralPath $target) -and $img.thumbUrl) {
+                                        try { $wcChunk.DownloadFile($img.thumbUrl, $target) } catch {}
+                                    }
+                                }
+                                $wcChunk.Dispose()
+                            }
+
+                            if ($CancelToken -and $CancelToken.Cancelled) { break }
+
+                            $validChunk = @($chunkCandidates | Where-Object {
+                                    $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                                    $target = Join-Path $CacheDir "${safe}_thumb.jpg"
+                                    (Test-Path -LiteralPath $target) -and ((Get-Item -LiteralPath $target).Length -gt 0)
+                                })
+
+                            if ($validChunk.Count -gt 0) {
+                                $chunkResult = @()
+                                foreach ($img in $validChunk) {
+                                    $pAuthor = if ($img.photographer) { [string]$img.photographer }
+                                    elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                                    elseif ($img.copyright) { [string]$img.copyright }
+                                    else { '' }
+                                    $chunkResult += [PSCustomObject]@{
+                                        source       = 'Pexels'
+                                        urlbase      = [string]$img.urlbase
+                                        url          = [string]$img.url
+                                        title        = [string]$img.title
+                                        copyright    = [string]$img.copyright
+                                        photographer = $pAuthor
+                                        enddate      = ''
+                                        resX         = $img.resX
+                                        resY         = $img.resY
+                                        fileSize     = 0
+                                        fileType     = 'image/jpeg'
+                                    }
+                                }
+                                $allValidImages += $validChunk
+
+                                $BatchQueue.Enqueue([PSCustomObject]@{
+                                        Type       = 'Batch'
+                                        Source     = 'Pexels'
+                                        BatchIndex = [int]($i / $batchSize)
+                                        Images     = $chunkResult
+                                        Total      = $candidateImages.Count
+                                        IsFirst    = ($i -eq 0)
+                                        IsLast     = (($i + $batchSize) -ge $candidateImages.Count)
+                                    })
+                            }
+                        }
+
+                        if ($allValidImages.Count -eq 0 -and $candidateImages.Count -gt 0) {
+                            $BatchQueue.Enqueue([PSCustomObject]@{
+                                    Type  = 'Error'
+                                    Error = "Unable to download Pexels wallpapers."
+                                })
+                            return @{ Success = $false; Error = "Unable to download Pexels wallpapers."; Images = @() }
+                        }
+
+                        try {
+                            $allValidImages | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $historyPath -Encoding UTF8
+                        }
+                        catch {}
+
+                        $BatchQueue.Enqueue([PSCustomObject]@{
+                                Type = 'Done'
+                            })
+                        return @{ Success = $true; Error = $null; Images = @() }
+                    }
 
                     if ('BingWallpaper.FastDownloader' -as [type]) {
                         $thumbUrls = [string[]]($candidateImages | ForEach-Object { [string]$_.thumbUrl })
@@ -6287,14 +6508,33 @@ function Load-Gallery {
             catch {
                 return @{ Success = $false; Error = $_.Exception.Message; Images = @() }
             }
-        }).AddArgument($selectedRegion).AddArgument($sourceThumbDir).AddArgument($fetchSource).AddArgument(24).AddArgument((Get-SourceApiKey 'Wallhaven')).AddArgument(360).AddArgument((Get-SourceApiKey 'Pexels'))
+        })
+
+    $batchQueue = [System.Collections.Queue]::Synchronized((New-Object System.Collections.Queue))
+    $cancelToken = [hashtable]::Synchronized(@{ Cancelled = $false })
+
+    [void]$ps.AddArgument($selectedRegion)
+    [void]$ps.AddArgument($sourceThumbDir)
+    [void]$ps.AddArgument($fetchSource)
+    [void]$ps.AddArgument(24)
+    [void]$ps.AddArgument((Get-SourceApiKey 'Wallhaven'))
+    [void]$ps.AddArgument(360)
+    [void]$ps.AddArgument((Get-SourceApiKey 'Pexels'))
+    [void]$ps.AddArgument($batchQueue)
+    [void]$ps.AddArgument($cancelToken)
 
     $asyncOp = $ps.BeginInvoke()
 
     $script:galleryRunspaceContext = @{
-        PS            = $ps
-        AsyncOp       = $asyncOp
-        ThumbCacheDir = $sourceThumbDir
+        PS                   = $ps
+        AsyncOp              = $asyncOp
+        ThumbCacheDir        = $sourceThumbDir
+        BatchQueue           = $batchQueue
+        CancelToken          = $cancelToken
+        Source               = $fetchSource
+        StreamingDone        = $false
+        HasRendered          = $false
+        NextBatchAllowedTime = [DateTime]::MinValue
     }
 
     $script:galleryTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -6305,9 +6545,66 @@ function Load-Gallery {
                 $timerSender.Stop()
                 return
             }
-            if ($script:galleryRunspaceContext.AsyncOp.IsCompleted) {
+            $ctx = $script:galleryRunspaceContext
+
+            # Process queued batches from progressive streaming (Wallhaven / Pexels)
+            if ($ctx.BatchQueue) {
+                while ($ctx.BatchQueue.Count -gt 0) {
+                    if ($ctx.HasRendered -and [DateTime]::UtcNow -lt $ctx.NextBatchAllowedTime) {
+                        break
+                    }
+
+                    $item = $ctx.BatchQueue.Dequeue()
+                    if ($item.Type -eq 'Error') {
+                        $timerSender.Stop()
+                        $script:galleryRunspaceContext = $null
+                        $script:galleryTimer = $null
+                        try { $ctx.PS.Dispose() } catch {}
+                        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                        $StatusText.Opacity = 1
+                        $StatusText.Foreground = $statusErrorBrush
+                        $StatusText.Text = Get-UserFriendlyNetworkError -Exception (New-Object Exception($item.Error)) -DefaultAction "load wallpapers"
+                        return
+                    }
+                    elseif ($item.Type -eq 'Batch') {
+                        if ($item.IsFirst) {
+                            $ctx.HasRendered = $true
+                            Render-GalleryGrid -Images $item.Images -ThumbCacheDir $ctx.ThumbCacheDir
+                        }
+                        else {
+                            Render-GalleryGrid -Images $item.Images -ThumbCacheDir $ctx.ThumbCacheDir -Append
+                        }
+                        # Card 8 delay = 7 * 35 = 245ms + 400ms animation = 645ms.
+                        # Wait 680ms so the 8th card has completely settled before appending cards 9-16.
+                        $ctx.NextBatchAllowedTime = [DateTime]::UtcNow.AddMilliseconds(680)
+                        $curCount = $GalleryPanel.Children.Count
+                        $StatusText.Text = "Loading $curCount of $($item.Total) wallpapers from $($item.Source)..."
+                        if ($StatusText.Opacity -ne 1) {
+                            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                            $StatusText.Opacity = 1
+                        }
+                        break
+                    }
+                    elseif ($item.Type -eq 'Done') {
+                        $ctx.StreamingDone = $true
+                    }
+                }
+            }
+
+            if ($ctx.AsyncOp.IsCompleted) {
+                if ($ctx.HasRendered) {
+                    if ($ctx.BatchQueue -and $ctx.BatchQueue.Count -gt 0) {
+                        return
+                    }
+                    $timerSender.Stop()
+                    $script:galleryRunspaceContext = $null
+                    $script:galleryTimer = $null
+                    try { $ctx.PS.Dispose() } catch {}
+                    Restore-StatusTextDefaultWithFade
+                    return
+                }
+
                 $timerSender.Stop()
-                $ctx = $script:galleryRunspaceContext
                 $script:galleryRunspaceContext = $null
                 $script:galleryTimer = $null
 
