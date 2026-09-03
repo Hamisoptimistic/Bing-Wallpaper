@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$AutoApply,
     [string]$Region = 'en-US',
@@ -847,20 +847,24 @@ function Get-WallhavenImages {
 
     $items4k = if ($task4k.Status -eq 'RanToCompletion' -and $task4k.Result) {
         try { @((ConvertFrom-Json -InputObject $task4k.Result).data) } catch { @() }
-    } else { @() }
+    }
+    else { @() }
 
     $items2k = if ($task2k.Status -eq 'RanToCompletion' -and $task2k.Result) {
         try { @((ConvertFrom-Json -InputObject $task2k.Result).data) } catch { @() }
-    } else { @() }
+    }
+    else { @() }
 
     try { $swc1.Dispose() } catch {}
     try { $swc2.Dispose() } catch {}
 
     $items = if ($items4k.Count -ge $Count) {
         $items4k
-    } elseif ($items2k.Count -gt $items4k.Count) {
+    }
+    elseif ($items2k.Count -gt $items4k.Count) {
         $items2k
-    } else {
+    }
+    else {
         $items4k
     }
 
@@ -1010,7 +1014,8 @@ function Get-PexelsImages {
         # Thoroughly shuffle the pooled candidates across categories
         $data = if ($pooled.Count -gt 1) {
             @($pooled | Get-Random -Count $pooled.Count)
-        } else {
+        }
+        else {
             @($pooled)
         }
     }
@@ -1031,7 +1036,8 @@ function Get-PexelsImages {
                     $data = @((ConvertFrom-Json -InputObject $fJson).photos)
                     if ($data.Count -gt 0) { break }
                 }
-            } catch {}
+            }
+            catch {}
         }
     }
 
@@ -1054,7 +1060,8 @@ function Get-PexelsImages {
         $thumbUrl = if ($item.src.medium) { [string]$item.src.medium } else { [string]$item.src.small }
         $photoTitle = if ($altText) {
             $altText.Trim()
-        } else {
+        }
+        else {
             'Nature Landscape'
         }
         $creator = if ($item.photographer) { "Photo by $([string]$item.photographer) on Pexels" } else { "Photo on Pexels" }
@@ -1750,7 +1757,7 @@ $xaml = @"
 
             <WrapPanel Grid.Row="1" Name="ToolbarWrap" Orientation="Horizontal" Margin="0,0,0,20">
 
-                <StackPanel Name="ColRegion" Margin="0,0,16,14">
+                <StackPanel Name="ColRegion" Margin="0,0,16,16">
                     <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
                     <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
                         <ComboBox.Tag>
@@ -1765,19 +1772,21 @@ $xaml = @"
                     </ComboBox>
                     <!-- Universal API Key Grid for all current and future sources (Wallhaven, Pexels, NASA, etc.) -->
                     <Grid Name="ApiKeyGrid" Visibility="Collapsed">
-                        <TextBox Name="ApiKeyBox" Width="235" FontSize="13.5" Height="38" Padding="40,0,32,0">
+                        <TextBox Name="ApiKeyBox" Width="235" FontSize="13.5" Height="38" Padding="36,0,32,0">
                             <TextBox.Tag>
                                 <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
                             </TextBox.Tag>
                         </TextBox>
-                        <TextBlock Name="ApiKeyPlaceholder" Text="Paste API key here" Foreground="#55FFFFFF" FontSize="12" IsHitTestVisible="False" VerticalAlignment="Center" Margin="40,0,32,0"/>
-                        <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="26" Height="26" HorizontalAlignment="Right" Margin="0,0,6,0" ToolTip="Clear API Key" Visibility="Collapsed">
+                        <TextBlock Name="ApiKeyPlaceholder" Text="Paste API key here" Foreground="#55FFFFFF" 
+                                   FontSize="{Binding FontSize, ElementName=ApiKeyBox}" 
+                                   IsHitTestVisible="False" VerticalAlignment="Center" Margin="36,-1,32,0"/>
+                        <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="Clear API Key" Visibility="Collapsed">
                             <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                     </Grid>
                 </StackPanel>
 
-                <StackPanel Name="ColRefresh" Margin="0,0,16,14">
+                <StackPanel Name="ColRefresh" Margin="0,0,16,16">
                     <TextBlock Name="LabelRefresh" Text=" " FontSize="13" FontWeight="SemiBold" Margin="4,0,0,8" IsHitTestVisible="False"/>
                     <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
                         <Viewbox Width="19" Height="19" Margin="0,2,0,0">
@@ -2127,10 +2136,10 @@ function Find-RevealBorders($visual) {
 }
 
 $window.Add_Loaded({
-    $tb = $window.FindName('ApiKeyBox')
-    if ($tb) { $tb.ApplyTemplate() | Out-Null }
-    Find-RevealBorders $window
-})
+        $tb = $window.FindName('ApiKeyBox')
+        if ($tb) { $tb.ApplyTemplate() | Out-Null }
+        Find-RevealBorders $window
+    })
 
 $window.Add_MouseMove({
         param($evtSender, $e)
@@ -2275,17 +2284,17 @@ $script:appSettings = Load-Settings
 
 $script:ApiKeySources = @{
     'Wallhaven' = @{
-        Label        = 'API Key (optional)'
-        Placeholder  = 'Paste your Wallhaven API key here'
+        Label        = 'Wallhaven API Key'
+        Placeholder  = 'Paste API key here'
         Tooltip      = 'Optional - Wallhaven works without one for SFW wallpapers. Add a key from wallhaven.cc/settings/account for a higher rate limit.'
         ExpectedLen  = 32
         CharPattern  = '^[a-zA-Z0-9]+$'
         IsOptional   = $true
         SettingsProp = 'WallhavenApiKey'
     }
-    'Pexels' = @{
+    'Pexels'    = @{
         Label        = 'Pexels API Key'
-        Placeholder  = 'Paste your Pexels API key here'
+        Placeholder  = 'Paste API key here'
         Tooltip      = 'Required - Get a free instant API key from pexels.com/api'
         ExpectedLen  = 56
         CharPattern  = '^[a-zA-Z0-9_-]+$'
@@ -2345,11 +2354,13 @@ foreach ($sName in $script:ApiKeySources.Keys) {
         $valResult = Test-SourceApiKey -Source $sName -Key $storedVal
         if ($valResult.Valid) {
             $script:ApiKeys[$sName] = $storedVal
-        } else {
+        }
+        else {
             $script:ApiKeys[$sName] = ''
             if ($script:appSettings) { $script:appSettings.$prop = '' }
         }
-    } else {
+    }
+    else {
         $script:ApiKeys[$sName] = ''
     }
 }
@@ -2562,7 +2573,8 @@ function Update-SourceToggleVisual {
 
         $currentKey = Get-SourceApiKey $script:currentSource
         Update-GlobalApiKeyBoxState -Key $currentKey
-    } else {
+    }
+    else {
         if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Visible }
         if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Collapsed }
         if ($LabelRegion) { $LabelRegion.Text = 'Region' }
@@ -2573,66 +2585,74 @@ Update-SourceToggleVisual
 # Clear button handler: wipes the key for the active source in memory & settings.json, unlocks box, and prompts user
 if ($ClearApiKeyBtn) {
     $ClearApiKeyBtn.Add_Click({
-        $src = $script:currentSource
-        if (-not $script:ApiKeySources.ContainsKey($src)) { return }
+            $src = $script:currentSource
+            if (-not $script:ApiKeySources.ContainsKey($src)) { return }
 
-        Set-SourceApiKey -Source $src -Key ''
-        Update-GlobalApiKeyBoxState -Key ''
+            Set-SourceApiKey -Source $src -Key ''
+            Update-GlobalApiKeyBoxState -Key ''
 
-        if ($ApiKeyBox) {
-            $ApiKeyBox.Focus()
-        }
+            if ($ApiKeyBox) {
+                $ApiKeyBox.Focus()
+            }
 
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        $StatusText.Opacity = 1
-        $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(158, 158, 158)))
-        $StatusText.Text = "$src API key cleared. Paste your key and press Enter."
-    })
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $StatusText.Opacity = 1
+            $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(158, 158, 158)))
+            $StatusText.Text = "$src API key cleared. Paste your key and press Enter."
+        })
 }
 
 # Universal API key box event wiring
 if ($ApiKeyBox) {
     $ApiKeyBox.Add_TextChanged({
-        if ($ApiKeyBox.IsReadOnly) { return }
-        $txt = $ApiKeyBox.Text.Trim()
-        if ($ApiKeyPlaceholder) {
-            $ApiKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
-        }
-    })
+            if ($ApiKeyBox.IsReadOnly) { return }
+            $txt = $ApiKeyBox.Text.Trim()
+            if ($ApiKeyPlaceholder) {
+                $ApiKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+            }
+        })
 
     $ApiKeyBox.Add_PreviewKeyDown({
-        param($s, $e)
-        if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
-            $e.Handled = $true
-            $src = $script:currentSource
-            if (-not $script:ApiKeySources.ContainsKey($src)) { return }
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
+                $e.Handled = $true
+                $src = $script:currentSource
+                if (-not $script:ApiKeySources.ContainsKey($src)) { return }
 
-            if ($ApiKeyBox.IsReadOnly) {
-                # Already locked with valid key: Enter key simply refreshes gallery!
+                if ($ApiKeyBox.IsReadOnly) {
+                    # Already locked with valid key: Enter key simply refreshes gallery!
+                    Load-Gallery
+                    return
+                }
+
+                $rawInput = $ApiKeyBox.Text.Trim()
+                if ([string]::IsNullOrWhiteSpace($rawInput) -and $script:ApiKeySources[$src].IsOptional) {
+                    Set-SourceApiKey -Source $src -Key ''
+                    Update-GlobalApiKeyBoxState -Key ''
+                    if ($window) { $window.Focus() }
+                    Load-Gallery
+                    return
+                }
+
+                $validation = Test-SourceApiKey -Source $src -Key $rawInput
+
+                if (-not $validation.Valid) {
+                    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                    $StatusText.Opacity = 1
+                    $StatusText.Foreground = $statusErrorBrush
+                    $StatusText.Text = $validation.Error
+                    $ApiKeyBox.SelectAll()
+                    return
+                }
+
+                # Valid key! Save to memory & settings.json, lock, mask, and refresh gallery!
+                Set-SourceApiKey -Source $src -Key $rawInput
+                Update-GlobalApiKeyBoxState -Key $rawInput
+                if ($window) { $window.Focus() }
+
                 Load-Gallery
-                return
             }
-
-            $rawInput = $ApiKeyBox.Text.Trim()
-            $validation = Test-SourceApiKey -Source $src -Key $rawInput
-
-            if (-not $validation.Valid) {
-                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-                $StatusText.Opacity = 1
-                $StatusText.Foreground = $statusErrorBrush
-                $StatusText.Text = $validation.Error
-                $ApiKeyBox.SelectAll()
-                return
-            }
-
-            # Valid key! Save to memory & settings.json, lock, mask, and refresh gallery!
-            Set-SourceApiKey -Source $src -Key $rawInput
-            Update-GlobalApiKeyBoxState -Key $rawInput
-            if ($window) { $window.Focus() }
-
-            Load-Gallery
-        }
-    })
+        })
 }
 
 if ($SourceBingBtn) {
@@ -4516,7 +4536,7 @@ function Set-ToolbarCompact {
 
     $script:ToolbarIsCompact = $Compact
     $tc = New-Object System.Windows.ThicknessConverter
-    $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,14' }))
+    $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,16' }))
     $comboHeight = if ($Compact) { 34 } else { 38 }
     $comboFont = if ($Compact) { 12.5 } else { 13.5 }
     $labelFont = if ($Compact) { 12 } else { 13 }
@@ -4529,6 +4549,7 @@ function Set-ToolbarCompact {
     foreach ($box in @($RegionBox, $ApiKeyBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
         if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
     }
+    if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.FontSize = $comboFont }
     if ($RefreshBtn) { $RefreshBtn.Width = $iconSize; $RefreshBtn.Height = $iconSize }
     if ($AutoUnifiedButton) { $AutoUnifiedButton.Height = $comboHeight }
     if ($SpotlightSetBtn) {
@@ -4575,7 +4596,8 @@ function Update-ToolbarCompactState {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 1)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 12, 0, 0)
-        } else {
+        }
+        else {
             [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 0)
             $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
@@ -4611,7 +4633,8 @@ function Render-GalleryGrid {
         $script:loadedImages = $Images
         $script:galleryImageControls = New-Object System.Collections.ArrayList
         $script:galleryCards = New-Object System.Collections.ArrayList
-    } else {
+    }
+    else {
         $newLoaded = New-Object System.Collections.ArrayList
         foreach ($img in $Images) { [void]$newLoaded.Add($img) }
         foreach ($img in $script:loadedImages) { [void]$newLoaded.Add($img) }
@@ -4807,17 +4830,20 @@ function Render-GalleryGrid {
             elseif ($image.source -eq 'Wallhaven') { 'Wallhaven' }
             elseif ($image.source -eq 'Pexels') {
                 $authorName = if ($image.photographer) { [string]$image.photographer }
-                              elseif ($image.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
-                              elseif ($image.copyright) { [string]$image.copyright }
-                              else { '' }
+                elseif ($image.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                elseif ($image.copyright) { [string]$image.copyright }
+                else { '' }
                 $dimText = if ($image.resX -and $image.resY) { "$($image.resX) x $($image.resY)" } else { '' }
                 if ($dimText -and $authorName) {
                     "$dimText  $([char]8226)  $authorName"
-                } elseif ($dimText) {
+                }
+                elseif ($dimText) {
                     $dimText
-                } elseif ($authorName) {
+                }
+                elseif ($authorName) {
                     $authorName
-                } else {
+                }
+                else {
                     'Pexels'
                 }
             }
@@ -4900,7 +4926,8 @@ function Render-GalleryGrid {
         if ($InsertAtTop) {
             $GalleryPanel.Children.Insert($current - 1, $card)
             $script:galleryCards.Insert($current - 1, $card)
-        } else {
+        }
+        else {
             $GalleryPanel.Children.Add($card)
             [void]$script:galleryCards.Add($card)
         }
@@ -4996,7 +5023,8 @@ function Load-Gallery {
     
     if ($fetchSource -eq 'Bing') {
         $sourceThumbDir = Join-Path $thumbCacheDir "Bing_$selectedRegion"
-    } else {
+    }
+    else {
         $sourceThumbDir = Join-Path $thumbCacheDir $fetchSource
     }
 
@@ -5026,9 +5054,9 @@ function Load-Gallery {
                     $validItems = $cachedArray | Select-Object -First $limit
                     foreach ($img in $validItems) {
                         $pAuthor = if ($img.photographer) { [string]$img.photographer }
-                                   elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
-                                   elseif ($img.copyright) { [string]$img.copyright }
-                                   else { '' }
+                        elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                        elseif ($img.copyright) { [string]$img.copyright }
+                        else { '' }
                         $script:phase1Images += [PSCustomObject]@{
                             source       = $fetchSource
                             urlbase      = [string]$img.urlbase
@@ -5045,7 +5073,8 @@ function Load-Gallery {
                     }
                 }
             }
-        } catch {}
+        }
+        catch {}
     }
 
     $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
@@ -5058,17 +5087,18 @@ function Load-Gallery {
     $script:phase1Timer = New-Object System.Windows.Threading.DispatcherTimer
     $script:phase1Timer.Interval = [TimeSpan]::FromMilliseconds(50)
     $script:phase1Timer.Add_Tick({
-        param($timerSender, $timerArgs)
-        $timerSender.Stop()
-        if ($script:phase1FetchSource -notin @('Wallhaven', 'Pexels') -and $script:phase1Images.Count -gt 0) {
-            $StatusText.Opacity = 0
-            Render-GalleryGrid -Images $script:phase1Images -ThumbCacheDir $script:phase1ThumbDir
-        } else {
-            $GalleryPanel.Children.Clear()
-            $StatusText.Opacity = 1
-            $StatusText.Text = if ($script:phase1FetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($script:phase1FetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } elseif ($script:phase1FetchSource -eq 'Pexels') { 'Connecting to Pexels...' } else { 'Connecting to Bing...' }
-        }
-    })
+            param($timerSender, $timerArgs)
+            $timerSender.Stop()
+            if ($script:phase1FetchSource -notin @('Wallhaven', 'Pexels') -and $script:phase1Images.Count -gt 0) {
+                $StatusText.Opacity = 0
+                Render-GalleryGrid -Images $script:phase1Images -ThumbCacheDir $script:phase1ThumbDir
+            }
+            else {
+                $GalleryPanel.Children.Clear()
+                $StatusText.Opacity = 1
+                $StatusText.Text = if ($script:phase1FetchSource -eq 'Spotlight') { 'Connecting to Windows Spotlight...' } elseif ($script:phase1FetchSource -eq 'Wallhaven') { 'Connecting to Wallhaven...' } elseif ($script:phase1FetchSource -eq 'Pexels') { 'Connecting to Pexels...' } else { 'Connecting to Bing...' }
+            }
+        })
     $script:phase1Timer.Start()
 
     $ps = [powershell]::Create()
@@ -5346,20 +5376,24 @@ function Load-Gallery {
 
                     $items4k = if ($task4k.Status -eq 'RanToCompletion' -and $task4k.Result) {
                         try { @((ConvertFrom-Json -InputObject $task4k.Result).data) } catch { @() }
-                    } else { @() }
+                    }
+                    else { @() }
 
                     $items2k = if ($task2k.Status -eq 'RanToCompletion' -and $task2k.Result) {
                         try { @((ConvertFrom-Json -InputObject $task2k.Result).data) } catch { @() }
-                    } else { @() }
+                    }
+                    else { @() }
 
                     try { $swc1.Dispose() } catch {}
                     try { $swc2.Dispose() } catch {}
 
                     $items = if ($items4k.Count -ge $whFetchCount) {
                         $items4k
-                    } elseif ($items2k.Count -gt $items4k.Count) {
+                    }
+                    elseif ($items2k.Count -gt $items4k.Count) {
                         $items2k
-                    } else {
+                    }
+                    else {
                         $items4k
                     }
                     $items = @($items | Select-Object -First $whFetchCount)
@@ -5688,14 +5722,16 @@ function Load-Gallery {
                                     }
                                     if ($pooled.Count -gt 0) { break }
                                 }
-                            } catch {}
+                            }
+                            catch {}
                         }
                     }
 
                     # Thoroughly shuffle the pooled candidates across categories
                     $filteredPhotos = if ($pooled.Count -gt 1) {
                         @($pooled | Get-Random -Count $pooled.Count)
-                    } else {
+                    }
+                    else {
                         @($pooled)
                     }
 
@@ -5753,7 +5789,8 @@ function Load-Gallery {
                         $altDesc = if ($item.alt) { [string]$item.alt } else { '' }
                         $photoTitle = if ($altDesc) {
                             $altDesc.Trim()
-                        } else {
+                        }
+                        else {
                             'Nature Landscape'
                         }
                         $creator = if ($item.photographer) { "Photo by $([string]$item.photographer) on Pexels" } else { "Photo on Pexels" }
@@ -5842,9 +5879,9 @@ function Load-Gallery {
                     $resultImages = @()
                     foreach ($img in $uniqueImages) {
                         $pAuthor = if ($img.photographer) { [string]$img.photographer }
-                                   elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
-                                   elseif ($img.copyright) { [string]$img.copyright }
-                                   else { '' }
+                        elseif ($img.copyright -match '^Photo by (.+?) on Pexels') { $Matches[1] }
+                        elseif ($img.copyright) { [string]$img.copyright }
+                        else { '' }
                         $resultImages += [PSCustomObject]@{
                             source       = 'Pexels'
                             urlbase      = [string]$img.urlbase
@@ -6150,18 +6187,21 @@ function Load-Gallery {
                             $newImages += $img
                         }
                     }
-                } else {
+                }
+                else {
                     $newImages = @($images)
                 }
 
                 if (-not $isPexelsOrWallhaven -and $newImages.Count -eq 0 -and $script:phase1Images.Count -gt 0) {
                     Restore-StatusTextDefaultWithFade
-                } else {
+                }
+                else {
                     $isTopInsert = (-not $isPexelsOrWallhaven -and $script:phase1Images -and $script:phase1Images.Count -gt 0)
                     
                     if ($isTopInsert) {
                         Render-GalleryGrid -Images $newImages -ThumbCacheDir $ctx.ThumbCacheDir -InsertAtTop
-                    } else {
+                    }
+                    else {
                         Render-GalleryGrid -Images $images -ThumbCacheDir $ctx.ThumbCacheDir
                     }
 
@@ -6466,11 +6506,11 @@ $AutoUnifiedButton.Add_Click({
                 $openPopupTimer = New-Object System.Windows.Threading.DispatcherTimer
                 $openPopupTimer.Interval = [TimeSpan]::FromMilliseconds(240)
                 $openPopupTimer.Add_Tick({
-                    if ($script:SpotlightEnabled -and -not $SpotlightOptionsPopup.IsOpen) {
-                        $SpotlightOptionsPopup.IsOpen = $true
-                    }
-                    $this.Stop()
-                })
+                        if ($script:SpotlightEnabled -and -not $SpotlightOptionsPopup.IsOpen) {
+                            $SpotlightOptionsPopup.IsOpen = $true
+                        }
+                        $this.Stop()
+                    })
                 $openPopupTimer.Start()
             }
         }
@@ -6488,11 +6528,13 @@ function Update-AutoOptionUI {
         $inds = @($window.FindName('DeskBingInd'), $window.FindName('DeskSpotlightInd'), $window.FindName('DeskWallhavenInd'), $window.FindName('DeskPexelsInd'), $window.FindName('DeskNoneInd'))
         $lbls = @($window.FindName('DeskBingLbl'), $window.FindName('DeskSpotlightLbl'), $window.FindName('DeskWallhavenLbl'), $window.FindName('DeskPexelsLbl'), $window.FindName('DeskNoneLbl'))
         $vals = @('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'None')
-    } elseif ($Category -eq 'LockScreen') {
+    }
+    elseif ($Category -eq 'LockScreen') {
         $inds = @($window.FindName('LockBingInd'), $window.FindName('LockSpotlightInd'), $window.FindName('LockWallhavenInd'), $window.FindName('LockPexelsInd'), $window.FindName('LockNoneInd'))
         $lbls = @($window.FindName('LockBingLbl'), $window.FindName('LockSpotlightLbl'), $window.FindName('LockWallhavenLbl'), $window.FindName('LockPexelsLbl'), $window.FindName('LockNoneLbl'))
         $vals = @('Bing', 'Spotlight', 'Wallhaven', 'Pexels', 'None')
-    } elseif ($Category -eq 'Schedule') {
+    }
+    elseif ($Category -eq 'Schedule') {
         $inds = @($window.FindName('SchedEverydayInd'), $window.FindName('SchedTestInd'))
         $lbls = @($window.FindName('SchedEverydayLbl'), $window.FindName('SchedTestLbl'))
         if ($AutoScheduleBox.Items.Count -ge 2) {
@@ -6506,13 +6548,15 @@ function Update-AutoOptionUI {
             if ($vals[$i] -is [System.Windows.Controls.ComboBoxItem]) {
                 $selTag = if ($SelectedItem -is [System.Windows.Controls.ComboBoxItem]) { $SelectedItem.Tag } else { [string]$SelectedItem }
                 $match = ($vals[$i].Tag -eq $selTag -or $vals[$i].Content -eq $SelectedItem)
-            } else {
+            }
+            else {
                 $match = ($vals[$i] -eq [string]$SelectedItem)
             }
             if ($match) {
                 $inds[$i].Opacity = 1
                 $lbls[$i].Foreground = "#FFFFFF"
-            } else {
+            }
+            else {
                 $inds[$i].Opacity = 0
                 $lbls[$i].Foreground = "#9E9E9E"
             }
