@@ -1625,7 +1625,7 @@ $xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="AutoScape" Height="780" Width="1100" MinWidth="820" MinHeight="560"
+        Title="AutoScape" Height="680" Width="1100" MinWidth="780" MinHeight="520"
         WindowStyle="None"
         Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
     
@@ -1977,7 +1977,17 @@ $xaml = @"
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid Name="WindowRootGrid">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Setter Property="Margin" Value="0"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="Margin" Value="8"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
         <!-- Top-right custom window caption buttons (Minimize, Maximize/Restore, Close) -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="999" shell:WindowChrome.IsHitTestVisibleInChrome="True">
             <Button Name="CaptionMinBtn" Style="{StaticResource CaptionButtonStyle}" ToolTip="Minimize">
@@ -2137,11 +2147,11 @@ $xaml = @"
 
                                 
 
-                                <!-- Filters quick-settings button (right) -->
-                                <Button Name="FiltersBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="16,0,16,0" ToolTip="Filters &amp; Settings" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <!-- Preferences button (right) -->
+                                <Button Name="FiltersBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="14,0,16,0" ToolTip="Preferences" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Text="&#xE71C;" FontFamily="Segoe MDL2 Assets" FontSize="13.5" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Name="FiltersBtnText" Text="Filters" FontSize="13.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                        <TextBlock Text="&#xE771;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Name="FiltersBtnText" Text="Preferences" FontSize="13.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -2308,21 +2318,8 @@ $xaml = @"
                             CornerRadius="10" Padding="18" Width="440" Opacity="0" SnapsToDevicePixels="False">
                         <!-- Removed DropShadowEffect to prevent gray box background bug -->
                         <StackPanel>
-                            <!-- Title -->
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Filters &amp; Preferences" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
-                                <Border Grid.Column="1" Background="#18FFFFFF" CornerRadius="4" Padding="7,2">
-                                    <TextBlock Text="Quick Settings" FontSize="11" Foreground="#9E9E9E"/>
-                                </Border>
-                            </Grid>
-                            <Border Height="1" Background="#15FFFFFF" Margin="0,0,0,14"/>
-
                             <!-- 1. Dynamic Source Section (Region / API Key / Local Folder) -->
-                            <StackPanel Name="ColRegion" Margin="0,0,0,14">
+                            <StackPanel Name="ColRegion" Margin="0,4,0,14">
                                 <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
                                 <ComboBox Name="RegionBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
                                     <ComboBox.Tag>
@@ -2437,10 +2434,10 @@ $xaml = @"
 
             <Grid Grid.Row="1" Name="ToolbarWrap" Visibility="Collapsed" Height="0" />
 
-            <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
+            <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Center">
                 <Grid>
-                    <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Top" FocusVisualStyle="{x:Null}">
-                        <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Top" />
+                    <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Center" FocusVisualStyle="{x:Null}">
+                        <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Center" />
                     </ScrollViewer>
                     <!-- Centered Empty State for Local Tab when no folder is selected -->
                     <Border Name="LocalEmptyStatePanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40">
@@ -2471,7 +2468,7 @@ $xaml = @"
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Name="StatusText" Text="" Foreground="#888" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextWrapping="Wrap" Margin="14,0,16,0"/>
                 
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <Button Name="InfoBtn" Style="{StaticResource ModernIconButton}" Width="46" Height="46" Margin="0,0,12,0" ToolTip="User Guide">
@@ -2687,9 +2684,30 @@ public static class AutoScapeChromeHelper
     public const uint LR_LOADFROMFILE = 0x0010;
     public const uint LR_DEFAULTSIZE = 0x0040;
 
+    private const int GWL_STYLE = -16;
+    private const int WS_CAPTION = 0x00C00000;
+    private const int WS_MINIMIZEBOX = 0x00020000;
+    private const int WS_MAXIMIZEBOX = 0x00010000;
+    private const int WS_SYSMENU = 0x00080000;
+
+    [DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
+
+    public static void EnableWindowAnimations(IntPtr hwnd)
+    {
+        try {
+            int style = GetWindowLong(hwnd, GWL_STYLE);
+            SetWindowLong(hwnd, GWL_STYLE, style | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+        } catch {}
+    }
+
     public static void Attach(IntPtr hwnd)
     {
         try {
+            EnableWindowAnimations(hwnd);
             HwndSource source = HwndSource.FromHwnd(hwnd);
             if (source != null)
             {
@@ -2822,7 +2840,16 @@ try {
 }
 catch {}
 
+$WindowRootGrid = $window.FindName('WindowRootGrid')
+function Update-MaximizedLayout {
+    if ($WindowRootGrid) {
+        $isMax = ($window.WindowState -eq [System.Windows.WindowState]::Maximized)
+        $WindowRootGrid.Margin = if ($isMax) { [System.Windows.Thickness]::new(8) } else { [System.Windows.Thickness]::new(0) }
+    }
+}
+
 $window.Add_StateChanged({
+        Update-MaximizedLayout
         if ($script:activeModalControl) {
             Close-InWindowModal
         }
@@ -2835,6 +2862,7 @@ $window.Add_StateChanged({
             if ($CaptionMaxBtn) { $CaptionMaxBtn.ToolTip = if ($isMax) { 'Restore' } else { 'Maximize' } }
         }
     })
+Update-MaximizedLayout
 $script:appSettings = Load-Settings
 $script:localFolderPath = if ($script:appSettings -and $script:appSettings.LocalFolderPath) { [string]$script:appSettings.LocalFolderPath } else { '' }
 
@@ -3065,12 +3093,8 @@ Enable-StrictToolTipDelay $RefreshBtn
 $RefreshIcon = $window.FindName('RefreshIcon')
 
 function Update-FiltersBtnText {
-    if ($FiltersBtnText -and $ResolutionBox -and $ResolutionBox.SelectedItem) {
-        $res = [string]$ResolutionBox.SelectedItem
-        $FiltersBtnText.Text = "Filters $([char]183) $res"
-    }
-    elseif ($FiltersBtnText) {
-        $FiltersBtnText.Text = "Filters"
+    if ($FiltersBtnText) {
+        $FiltersBtnText.Text = "Preferences"
     }
 }
 $GalleryPanel = $window.FindName('GalleryPanel')
@@ -3094,19 +3118,19 @@ $CaptionCloseBtn = $window.FindName('CaptionCloseBtn')
 $CaptionMaxIcon = $window.FindName('CaptionMaxIcon')
 
 if ($CaptionMinBtn) {
-    $CaptionMinBtn.Add_Click({ $window.WindowState = [System.Windows.WindowState]::Minimized })
+    $CaptionMinBtn.Add_Click({ [System.Windows.SystemCommands]::MinimizeWindow($window) })
 }
 if ($CaptionMaxBtn) {
     $CaptionMaxBtn.Add_Click({
-        $window.WindowState = if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
-            [System.Windows.WindowState]::Normal
+        if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
+            [System.Windows.SystemCommands]::RestoreWindow($window)
         } else {
-            [System.Windows.WindowState]::Maximized
+            [System.Windows.SystemCommands]::MaximizeWindow($window)
         }
     })
 }
 if ($CaptionCloseBtn) {
-    $CaptionCloseBtn.Add_Click({ $window.Close() })
+    $CaptionCloseBtn.Add_Click({ [System.Windows.SystemCommands]::CloseWindow($window) })
 }
 
 $HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
@@ -3114,10 +3138,10 @@ if ($HeaderTitlePanel) {
     $HeaderTitlePanel.Add_MouseLeftButtonDown({
         param($s, $e)
         if ($e.ClickCount -ge 2) {
-            $window.WindowState = if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
-                [System.Windows.WindowState]::Normal
+            if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
+                [System.Windows.SystemCommands]::RestoreWindow($window)
             } else {
-                [System.Windows.WindowState]::Maximized
+                [System.Windows.SystemCommands]::MaximizeWindow($window)
             }
         }
         else {
@@ -4911,12 +4935,12 @@ function Update-ToolbarCompactState {
         $AutoLabel.Visibility = if ($width -lt 980) { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
     }
     if ($FiltersBtnText) {
-        if ($width -lt 980) { $FiltersBtnText.Text = "Filters" } else { Update-FiltersBtnText }
+        $FiltersBtnText.Text = "Preferences"
     }
 
-    # Responsive Header: center ControlDeckCard, or wrap under title on very narrow screens
+    # Responsive Header: center ControlDeckCard, or wrap under title on narrow/scaled screens
     if ($ControlDeckCard) {
-        if ($width -lt 860) {
+        if ($width -lt 940) {
             [System.Windows.Controls.Grid]::SetRow($ControlDeckCard, 1)
             $ControlDeckCard.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             $ControlDeckCard.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
@@ -4934,9 +4958,9 @@ function Update-ToolbarCompactState {
         }
     }
 
-    # Responsive Gallery: 3 columns on narrow screens, 4 on wide
+    # Responsive Gallery: 4 columns on wide displays, 3 on standard/scaled laptops, 2 on narrow
     if ($GalleryPanel) {
-        $targetCols = if ($width -lt 850) { 3 } else { 4 }
+        $targetCols = if ($width -lt 740) { 2 } elseif ($width -lt 1060) { 3 } else { 4 }
         if ($GalleryPanel.Columns -ne $targetCols) {
             $GalleryPanel.Columns = $targetCols
         }
@@ -6151,7 +6175,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
 if ($FiltersBtn -and $FiltersPopup) {
     $script:filtersPopupClosedAt = [DateTime]::MinValue
     $filtersPopupCardWidth = 440.0
-    $filtersPopupCardHeight = 240.0
+    $filtersPopupCardHeight = 195.0
     $filtersPopupEdgePad = 8.0
 
     $window.Add_SizeChanged({
