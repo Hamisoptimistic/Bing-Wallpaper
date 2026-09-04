@@ -75,6 +75,61 @@ function Write-TimingLog {
 }
 Write-TimingLog "SCRIPT: first line executing (in-process launch)"
 
+$script:interactionLogPath = Join-Path $script:logsDir 'autoscape-interactions.log'
+$script:archiveLogPath     = $script:interactionLogPath
+
+function Write-InteractionLog {
+    param([string]$Message)
+    try {
+        if (-not (Test-Path -LiteralPath $script:logsDir)) {
+            New-Item -ItemType Directory -Path $script:logsDir -Force | Out-Null
+        }
+        $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff")
+        $memMB = [Math]::Round(([System.Diagnostics.Process]::GetCurrentProcess().WorkingSet64 / 1MB), 1)
+        Add-Content -Path $script:interactionLogPath -Value "[$ts] [MEM: ${memMB}MB] $Message" -ErrorAction SilentlyContinue
+    } catch {}
+}
+
+function Write-ArchiveLog {
+    param([string]$Message)
+    Write-InteractionLog $Message
+}
+
+function Invoke-MemoryFlush {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param(
+        [string]$Reason = '',
+        [switch]$Async
+    )
+
+    if ($Async) {
+        if ('BingWallpaperNative' -as [type]) {
+            try {
+                [BingWallpaperNative]::FlushMemoryBackground($script:interactionLogPath, $Reason)
+                return
+            } catch {}
+        }
+    }
+
+    try {
+        $beforeMemMB = [Math]::Round(([System.Diagnostics.Process]::GetCurrentProcess().WorkingSet64 / 1MB), 1)
+
+        if ('BingWallpaperNative' -as [type]) {
+            try { [BingWallpaperNative]::FlushMemory() } catch {}
+        }
+        elseif ('BingWallpaperNativeExtra' -as [type]) {
+            try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
+        }
+
+        $afterMemMB = [Math]::Round(([System.Diagnostics.Process]::GetCurrentProcess().WorkingSet64 / 1MB), 1)
+        if ($Reason) {
+            Write-InteractionLog "[MEM_FLUSH] ($Reason) WorkingSet: ${beforeMemMB}MB -> ${afterMemMB}MB"
+        }
+    } catch {}
+}
+$script:galleryIdleSettleTimer = $null
+Write-InteractionLog "[APP_INIT] AutoScape initialized. Initial WorkingSet recorded."
+
 # Enforce modern security protocols and higher concurrent connection limit
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
@@ -317,6 +372,7 @@ if (-not ('BingWallpaperNative' -as [type])) {
     $script:nativeCsSourceCore = @'
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 public static class AppUserModel
 {
@@ -370,6 +426,35 @@ public static class BingWallpaperNative
         {
             DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref useDark, sizeof(int));
         }
+    }
+
+    [DllImport("psapi.dll")]
+    private static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+    public static void FlushMemory()
+    {
+        try {
+            EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle);
+        } catch { }
+    }
+
+    public static void FlushMemoryBackground(string logPath = null, string reason = null)
+    {
+        Task.Run(() => {
+            try {
+                long before = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64;
+                GC.Collect(2, GCCollectionMode.Forced, false);
+                EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle);
+                long after = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64;
+                if (!string.IsNullOrEmpty(logPath) && !string.IsNullOrEmpty(reason)) {
+                    double bMB = Math.Round(before / (1024.0 * 1024.0), 1);
+                    double aMB = Math.Round(after / (1024.0 * 1024.0), 1);
+                    string ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    string line = string.Format("[{0}] [MEM: {1}MB] [MEM_FLUSH] ({2}) WorkingSet: {3}MB -> {4}MB\r\n", ts, aMB, reason, bMB, aMB);
+                    System.IO.File.AppendAllText(logPath, line);
+                }
+            } catch { }
+        });
     }
 }
 '@
@@ -462,7 +547,9 @@ public static class BingWallpaperNativeExtra
 
     public static void FlushMemory()
     {
-        try { EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle); } catch { }
+        try {
+            EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle);
+        } catch { }
     }
 
     // --- IFileOpenDialog folder picker (legacy fallback path) ---
@@ -1639,6 +1726,7 @@ $xaml = @"
     
     <Window.Resources>
         <Style TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -1663,6 +1751,7 @@ $xaml = @"
         </Style>
 
         <Style x:Key="ModernIconButton" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -1684,6 +1773,139 @@ $xaml = @"
                                 <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
                                 <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#10FFFFFF"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FluentCardContextMenu" TargetType="ContextMenu">
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Grid.IsSharedSizeScope" Value="True"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="210"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Margin="8" Background="#1E1F24" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="4">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Direction="270" Color="#000000"/>
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FluentCardMenuItem" TargetType="MenuItem">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border Name="ItemBorder" Background="Transparent" CornerRadius="5" Padding="12,8,14,8" BorderThickness="1" BorderBrush="Transparent">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0" ContentSource="Icon" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="False" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#25FFFFFF"/>
+                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#10FFFFFF"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#55FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AutoToggleSwitchStyle" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Track" Width="40" Height="20" CornerRadius="10"
+                                Background="#00000000" BorderBrush="#38FFFFFF" BorderThickness="1"
+                                SnapsToDevicePixels="True" UseLayoutRounding="True">
+                            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="7"
+                                        Background="#9E9E9E"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0"
+                                        SnapsToDevicePixels="True" UseLayoutRounding="True">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="ThumbPos" X="0" Y="0"/>
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="#FFFFFF"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="#FFFFFF"/>
+                                <Setter TargetName="Thumb" Property="Background" Value="#1A1C23"/>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Thumb"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                             To="20" Duration="0:0:0.18">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                            To="#FFFFFF" Duration="0:0:0.15"/>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                            To="#FFFFFF" Duration="0:0:0.15"/>
+                                            <ColorAnimation Storyboard.TargetName="Thumb"
+                                                            Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                            To="#1A1C23" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Thumb"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                             To="0" Duration="0:0:0.18">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                            To="#00000000" Duration="0:0:0.15"/>
+                                            <ColorAnimation Storyboard.TargetName="Track"
+                                                            Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                            To="#38FFFFFF" Duration="0:0:0.15"/>
+                                            <ColorAnimation Storyboard.TargetName="Thumb"
+                                                            Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                            To="#9E9E9E" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1742,7 +1964,7 @@ $xaml = @"
                                               IsHitTestVisible="False"
                                               HorizontalAlignment="Left"
                                               VerticalAlignment="Center"
-                                              Margin="13,0,0,0"/>
+                                              Margin="13,1.5,0,0"/>
                             <ContentPresenter Name="ContentSite"
                                               IsHitTestVisible="False"
                                               Content="{TemplateBinding SelectionBoxItem}"
@@ -1768,6 +1990,10 @@ $xaml = @"
                             </Popup>
                         </Grid>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="Tag" Value="{x:Null}">
+                                <Setter TargetName="IconSite" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="ContentSite" Property="Margin" Value="14,0,34,0"/>
+                            </Trigger>
                             <Trigger Property="HasItems" Value="False">
                                 <Setter TargetName="PART_Popup" Property="MinHeight" Value="95"/>
                             </Trigger>
@@ -1820,7 +2046,7 @@ $xaml = @"
                     <ControlTemplate TargetType="TextBox">
                         <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="6">
                             <Grid>
-                                <ContentPresenter Content="{TemplateBinding Tag}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,0,0,0"/>
+                                <ContentPresenter Content="{TemplateBinding Tag}" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="13,1.5,0,0"/>
                                 <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                             </Grid>
                         </Border>
@@ -1907,17 +2133,20 @@ $xaml = @"
         </Style>
 
         <Style TargetType="ToolTip">
-            <Setter Property="Background" Value="#2E2E2E"/>
-            <Setter Property="Foreground" Value="#F5F5F5"/>
-            <Setter Property="FontSize" Value="12.5"/>
-            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="FontSize" Value="13.5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToolTip">
-                        <Border Background="{TemplateBinding Background}" BorderBrush="#454545" BorderThickness="1.5" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <Border Margin="8" Background="#1E1F24" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8" Padding="12,8,14,8">
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.4" Color="Black"/>
+                                <DropShadowEffect BlurRadius="12" Opacity="0.5" ShadowDepth="3" Direction="270" Color="#000000"/>
                             </Border.Effect>
                             <ContentPresenter/>
                         </Border>
@@ -1926,7 +2155,9 @@ $xaml = @"
             </Setter>
         </Style>
 
+
         <Style x:Key="CaptionButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Width" Value="46"/>
@@ -1952,6 +2183,7 @@ $xaml = @"
         </Style>
 
         <Style x:Key="CaptionCloseButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Width" Value="46"/>
@@ -2010,59 +2242,56 @@ $xaml = @"
             </Grid.RowDefinitions>
 
             <Grid Name="HeaderGrid" Margin="0,0,0,16">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- Left: Logo and Title -->
-                <StackPanel Name="HeaderTitlePanel" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Border Name="LogoBorder" Background="Transparent" Width="42" Height="42" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="AutoScape" FontSize="25" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <!-- Center: 2-Tier Floating Control Deck (Tabs on Top, Action Controls Below - No Gray Box, No Divider) -->
-                <Border Name="ControlDeckCard" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                <!-- Center: 2-Tier Floating Control Deck (Tabs on Top, Action Controls Below) -->
+                <Border Name="ControlDeckCard" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Background="Transparent" BorderThickness="0" Padding="0"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         
-                        <!-- Tier 1: Source Toggle Pill (Restored earlier standalone pill look) -->
+                        <!-- Tier 1: Source Toggle Pill (Matches HeaderActionPill width responsively) -->
                         <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center" Height="41"
+                                Width="{Binding ActualWidth, ElementName=HeaderActionPill}"
                                 Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <StackPanel Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                            <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                    <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" HorizontalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,7,0,8"/>
                                     </Button>
                                 </Grid>
-                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Grid Grid.Column="1" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                    <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" HorizontalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,7,0,8"/>
                                     </Button>
                                 </Grid>
-                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Grid Grid.Column="2" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                    <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" HorizontalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,7,0,8"/>
                                     </Button>
                                 </Grid>
-                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Grid Grid.Column="3" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <Border Name="SourcePexelsIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                    <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" HorizontalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,7,0,8"/>
                                     </Button>
                                 </Grid>
-                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Grid Grid.Column="4" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <Border Name="SourceLocalIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                    <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="SourceLocalLabel" Text="Local" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" HorizontalAlignment="Stretch" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceLocalLabel" Text="Local" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,7,0,8"/>
                                     </Button>
                                 </Grid>
-                            </StackPanel>
+                            </Grid>
                         </Border>
 
                         <Border Name="HeaderActionPill" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10,0,0" Height="41"
@@ -2073,19 +2302,13 @@ $xaml = @"
                                 
                                 <!-- Refresh gallery button (left) -->
                                 <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Width="36" Height="33" Padding="0" Margin="0" ToolTip="Refresh Gallery (F5)" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                    <Viewbox Width="16" Height="16">
-                                        <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
-                                            <Canvas.RenderTransform>
-                                                <RotateTransform/>
-                                            </Canvas.RenderTransform>
-                                            <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
-                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                            <Path Data="M18.5,5 V10 H13.5"
-                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                        </Canvas>
-                                    </Viewbox>
+                                    <TextBlock Name="RefreshIcon" Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13.5"
+                                               Foreground="#9E9E9E"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                        <TextBlock.RenderTransform>
+                                            <RotateTransform Angle="0"/>
+                                        </TextBlock.RenderTransform>
+                                    </TextBlock>
                                 </Button>
 
                                 
@@ -2093,22 +2316,9 @@ $xaml = @"
                                 <!-- Automation unified pill button (middle) -->
                                 <Button Name="AutoUnifiedButton" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="0,0,6,0" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="AutoLabel" Text="Auto" FontSize="13.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" Margin="12,0,8,0"/>
+                                        <TextBlock Name="AutoLabel" Text="Auto" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="12,0,8,0"/>
 
-                                        <Grid Name="AutoPillRow" VerticalAlignment="Center" Margin="0,0,4,0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                            <Border Name="SpotlightPill" Width="42" Height="19" CornerRadius="9.5"
-                                                    Background="#404040" BorderBrush="#5A5A5A" BorderThickness="1"
-                                                    Cursor="Hand" VerticalAlignment="Center"
-                                                    SnapsToDevicePixels="True" UseLayoutRounding="True">
-                                                <Ellipse Name="SpotlightThumb" Width="13" Height="13" Fill="#C8C8C8"
-                                                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0"
-                                                         SnapsToDevicePixels="True" UseLayoutRounding="True">
-                                                    <Ellipse.RenderTransform>
-                                                        <TranslateTransform X="0" Y="0"/>
-                                                    </Ellipse.RenderTransform>
-                                                </Ellipse>
-                                            </Border>
-                                        </Grid>
+                                        <CheckBox Name="AutoToggleCheckbox" Style="{StaticResource AutoToggleSwitchStyle}" IsChecked="False" IsHitTestVisible="False" VerticalAlignment="Center" Margin="0,0,4,0"/>
                 
                                         <Button Name="SpotlightSetBtn" Width="26" Height="26" Margin="0,0,3,0" VerticalAlignment="Center"
                                                 Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
@@ -2123,6 +2333,9 @@ $xaml = @"
                                                                     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                                 </Border>
                                                                 <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsEnabled" Value="True">
+                                                                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                                                                    </Trigger>
                                                                     <Trigger Property="IsMouseOver" Value="True">
                                                                         <Setter TargetName="ChevronBorder" Property="Background" Value="#15FFFFFF"/>
                                                                         <Setter Property="Foreground" Value="#DDD"/>
@@ -2151,7 +2364,15 @@ $xaml = @"
                                 <Button Name="FiltersBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="14,0,16,0" ToolTip="Preferences" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                         <TextBlock Text="&#xE771;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Name="FiltersBtnText" Text="Preferences" FontSize="13.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                        <TextBlock Name="FiltersBtnText" Text="Preferences" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Archive Search button (right of Preferences) -->
+                                <Button Name="ArchiveSearchBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="14,0,16,0" ToolTip="Search Bing Wallpapers by Date" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13.5" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Name="ArchiveSearchBtnText" Text="Archive Search" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -2162,7 +2383,7 @@ $xaml = @"
 
             <!-- Spotlight Automation Options Popup -->
             <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=AutoUnifiedButton}"
-                   Placement="Bottom" VerticalOffset="6" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
+                   Placement="Bottom" VerticalOffset="16" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
                    PopupAnimation="None" Focusable="False">
                 <Grid Name="SpotlightPopupTransformHost" Margin="0" Background="Transparent" RenderTransformOrigin="0.5,0.5">
                     <Grid.RenderTransform>
@@ -2171,8 +2392,7 @@ $xaml = @"
                     <Border Name="SpotlightPopupCard" Background="#1a1a1a" BorderBrush="#25FFFFFF" BorderThickness="1"
                             CornerRadius="10" Padding="18" Width="490" Opacity="0" SnapsToDevicePixels="False">
                         <StackPanel>
-                            <TextBlock Text="Choose your wallpaper source" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,10"/>
-                            <Border Height="1" Background="#15FFFFFF" Margin="0,0,0,14"/>
+                            <TextBlock Text="Choose your wallpaper source" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,14"/>
                             
                             <ComboBox Name="AutoDesktopSourceBox" Visibility="Collapsed" />
                             <ComboBox Name="AutoLockScreenSourceBox" Visibility="Collapsed" />
@@ -2308,7 +2528,7 @@ $xaml = @"
 
             <!-- Filters & Preferences Popup -->
             <Popup Name="FiltersPopup" PlacementTarget="{Binding ElementName=FiltersBtn}"
-                   Placement="Bottom" VerticalOffset="6" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
+                   Placement="Bottom" VerticalOffset="16" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
                    PopupAnimation="None" Focusable="False">
                 <Grid Name="FiltersPopupTransformHost" Margin="0" Background="Transparent" RenderTransformOrigin="0.5,0.5">
                     <Grid.RenderTransform>
@@ -2323,13 +2543,7 @@ $xaml = @"
                                 <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
                                 <ComboBox Name="RegionBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
                                     <ComboBox.Tag>
-                                        <Viewbox Width="16.5" Height="16.5">
-                                            <Canvas Width="20" Height="20">
-                                                <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                <Ellipse Canvas.Left="6" Canvas.Top="1" Width="8" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                <Line X1="1" Y1="10" X2="19" Y2="10" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                            </Canvas>
-                                        </Viewbox>
+                                        <TextBlock Text="&#xE909;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#9E9E9E"/>
                                     </ComboBox.Tag>
                                 </ComboBox>
                                 <!-- Universal API Key Grid for Wallhaven, Pexels, etc. -->
@@ -2342,8 +2556,8 @@ $xaml = @"
                                     <TextBlock Name="ApiKeyPlaceholder" Text="Paste API key here" Foreground="#55FFFFFF" 
                                                FontSize="{Binding FontSize, ElementName=ApiKeyBox}" 
                                                IsHitTestVisible="False" VerticalAlignment="Center" Margin="36,-1,32,0"/>
-                                    <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="Clear API Key" Visibility="Collapsed">
-                                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="28" Height="28" Padding="0" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0" ToolTip="Clear API Key" Visibility="Collapsed">
+                                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12.5" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Button>
                                 </Grid>
                                 <!-- Local Folder Selection Button -->
@@ -2355,7 +2569,7 @@ $xaml = @"
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                             <TextBlock Name="LocalFolderLabel" Grid.Column="1" Text="Select Folder..." FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#888888" VerticalAlignment="Center" Margin="6,0,0,0"/>
                                         </Grid>
@@ -2384,13 +2598,7 @@ $xaml = @"
                                     <TextBlock Name="LabelApplyTo" Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
                                     <ComboBox Name="TargetBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
                                         <ComboBox.Tag>
-                                            <Viewbox Width="15.5" Height="15.5">
-                                                <Canvas Width="20" Height="20">
-                                                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                    <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                                    <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                                </Canvas>
-                                            </Viewbox>
+                                            <TextBlock Text="&#xE7F4;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#9E9E9E"/>
                                         </ComboBox.Tag>
                                     </ComboBox>
                                 </StackPanel>
@@ -2408,12 +2616,7 @@ $xaml = @"
                                     <TextBlock Name="LabelStyle" Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
                                     <ComboBox Name="StyleBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
                                         <ComboBox.Tag>
-                                            <Viewbox Width="15.5" Height="15.5">
-                                                <Canvas Width="20" Height="20">
-                                                    <Path Data="M2,7 V2 H7" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                                    <Path Data="M18,13 V18 H13" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                                </Canvas>
-                                            </Viewbox>
+                                            <TextBlock Text="&#xE7A8;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#9E9E9E"/>
                                         </ComboBox.Tag>
                                     </ComboBox>
                                 </StackPanel>
@@ -2432,6 +2635,124 @@ $xaml = @"
                 </Grid>
             </Popup>
 
+            <!-- Archive & Date Search Popup -->
+            <Popup Name="ArchiveSearchPopup" PlacementTarget="{Binding ElementName=ArchiveSearchBtn}"
+                   Placement="Bottom" VerticalOffset="16" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
+                   PopupAnimation="None" Focusable="False">
+                <Grid Name="ArchiveSearchPopupTransformHost" Margin="0" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <TranslateTransform x:Name="ArchiveSearchPopupTransform" Y="0"/>
+                    </Grid.RenderTransform>
+                    <Border Name="ArchiveSearchPopupCard" Background="#1a1a1a" BorderBrush="#25FFFFFF" BorderThickness="1"
+                            CornerRadius="10" Padding="18" Width="430" Opacity="0" SnapsToDevicePixels="False">
+                        <StackPanel>
+                            <!-- Header -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
+                                <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#60CDFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="Search Bing wallpapers by date" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Scope Selector Tabs -->
+                            <Border Background="#20FFFFFF" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="7" Padding="2.5" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <Border Name="ScopeDayIndicator" Background="#28FFFFFF" CornerRadius="5" Opacity="1"/>
+                                        <Button Name="ScopeDayBtn" Background="Transparent" BorderThickness="0" Cursor="Hand" Height="30">
+                                            <TextBlock Name="ScopeDayLabel" Text="Specific Day" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="1">
+                                        <Border Name="ScopeMonthIndicator" Background="#28FFFFFF" CornerRadius="5" Opacity="0"/>
+                                        <Button Name="ScopeMonthBtn" Background="Transparent" BorderThickness="0" Cursor="Hand" Height="30">
+                                            <TextBlock Name="ScopeMonthLabel" Text="Full Month" FontSize="12" FontWeight="SemiBold" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="2">
+                                        <Border Name="ScopeYearIndicator" Background="#28FFFFFF" CornerRadius="5" Opacity="0"/>
+                                        <Button Name="ScopeYearBtn" Background="Transparent" BorderThickness="0" Cursor="Hand" Height="30">
+                                            <TextBlock Name="ScopeYearLabel" Text="Full Year" FontSize="12" FontWeight="SemiBold" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Date Selection Controls (Year, Month, Day) & Year-mode Region Host -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Name="ColArchiveYear" Width="*"/>
+                                    <ColumnDefinition Name="ColArchiveMonthGap" Width="10"/>
+                                    <ColumnDefinition Name="ColArchiveMonth" Width="1.2*"/>
+                                    <ColumnDefinition Name="ColArchiveDayGap" Width="10"/>
+                                    <ColumnDefinition Name="ColArchiveDay" Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Year -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Year" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="2,0,0,5"/>
+                                    <ComboBox Name="ArchiveYearBox" HorizontalAlignment="Stretch" FontSize="13" Height="38"/>
+                                </StackPanel>
+
+                                <!-- Month -->
+                                <StackPanel Name="StackArchiveMonth" Grid.Column="2">
+                                    <TextBlock Text="Month" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="2,0,0,5"/>
+                                    <ComboBox Name="ArchiveMonthBox" HorizontalAlignment="Stretch" FontSize="13" Height="38"/>
+                                </StackPanel>
+
+                                <!-- Day -->
+                                <StackPanel Name="StackArchiveDay" Grid.Column="4">
+                                    <TextBlock Text="Day" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="2,0,0,5"/>
+                                    <ComboBox Name="ArchiveDayBox" HorizontalAlignment="Stretch" FontSize="13" Height="38"/>
+                                </StackPanel>
+
+                                <!-- Top Region Host (Used in Full Year mode) -->
+                                <Grid Name="RegionTopHost" Grid.Column="2" Grid.ColumnSpan="3" Visibility="Collapsed"/>
+                            </Grid>
+
+                            <!-- Full Year Notice (Shown only when Full Year mode is active) -->
+                            <StackPanel Name="ArchiveYearNotice" Visibility="Collapsed" Margin="2,0,0,12">
+                                <TextBlock Text="Unstable" FontSize="12" FontWeight="Bold" Foreground="#FFA048" Margin="0,0,0,2"/>
+                                <TextBlock Text="might take a few minutes to load all wallpapers." FontSize="11" Foreground="#AAAAAA"/>
+                            </StackPanel>
+
+                            <!-- Bottom Row: Region & Search Button (Day/Month modes) or Full-width Search (Year mode) -->
+                            <Grid Name="ArchiveBottomRow" Margin="0,0,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Name="ColBottomRegion" Width="*"/>
+                                    <ColumnDefinition Name="ColBottomGap" Width="10"/>
+                                    <ColumnDefinition Name="ColBottomSearch" Width="130"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Bottom Region Host (Used in Day and Month modes) -->
+                                <Grid Name="RegionBottomHost" Grid.Column="0">
+                                    <StackPanel Name="StackArchiveRegion">
+                                        <TextBlock Text="Region" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="2,0,0,5"/>
+                                        <ComboBox Name="ArchiveRegionBox" HorizontalAlignment="Stretch" FontSize="13" Height="38"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Search Action Button -->
+                                <Button Name="FetchArchiveBtn" Grid.Column="2" Height="38" VerticalAlignment="Bottom" Background="#0078D4" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Stretch">
+                                    <Button.Resources>
+                                        <Style TargetType="Border">
+                                            <Setter Property="CornerRadius" Value="6"/>
+                                        </Style>
+                                    </Button.Resources>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13.5" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Name="FetchArchiveBtnText" Text="Search" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Popup>
+
             <Grid Grid.Row="1" Name="ToolbarWrap" Visibility="Collapsed" Height="0" />
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Center">
@@ -2443,7 +2764,7 @@ $xaml = @"
                     <Border Name="LocalEmptyStatePanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Border Width="72" Height="72" CornerRadius="36" Background="#14FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
-                                <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="32" Foreground="#88FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="32" Foreground="#88FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <TextBlock Text="Choose a Wallpaper Folder" FontSize="18" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                             <TextBlock Text="Select a folder on your PC to load all images into AutoScape" FontSize="13" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,0,0,20"/>
@@ -2454,10 +2775,57 @@ $xaml = @"
                                     </Style>
                                 </Button.Resources>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <TextBlock Text="Select a Local Folder" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Centered Empty State for Pexels Tab when no API key is configured -->
+                    <Border Name="PexelsEmptyStatePanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="440">
+                            <Border Width="72" Height="72" CornerRadius="36" Background="#14FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="30" Foreground="#88FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Pexels API Key Required" FontSize="18" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock Text="Get a free instant API key from Pexels to browse 4K nature photography" FontSize="13" Foreground="#9E9E9E" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                            
+                            <Grid HorizontalAlignment="Center" Margin="0,0,0,14" Width="360">
+                                <TextBox Name="PexelsEmptyKeyBox" Height="40" FontSize="13" HorizontalAlignment="Stretch" Padding="38,0,14,0">
+                                    <TextBox.Tag>
+                                        <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
+                                    </TextBox.Tag>
+                                </TextBox>
+                                <TextBlock Name="PexelsEmptyKeyPlaceholder" Text="Paste Pexels API key here..." Foreground="#55FFFFFF" 
+                                           FontSize="13" IsHitTestVisible="False" VerticalAlignment="Center" Margin="40,0,14,0"/>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Name="PexelsEmptySaveBtn" Height="40" Padding="20,0,20,0" Background="#20FFFFFF" BorderBrush="#35FFFFFF" BorderThickness="1" Foreground="White" FontSize="13.5" FontWeight="SemiBold" Cursor="Hand" Margin="0,0,10,0">
+                                    <Button.Resources>
+                                        <Style TargetType="Border">
+                                            <Setter Property="CornerRadius" Value="8"/>
+                                        </Style>
+                                    </Button.Resources>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Save Key" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Button Name="PexelsEmptyGetBtn" Height="40" Padding="16,0,16,0" Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" Foreground="#E0E0E0" FontSize="13.5" Cursor="Hand">
+                                    <Button.Resources>
+                                        <Style TargetType="Border">
+                                            <Setter Property="CornerRadius" Value="8"/>
+                                        </Style>
+                                    </Button.Resources>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE8A7;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Get Free Key" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -2815,31 +3183,6 @@ $applyDarkTitleBar = {
 }
 $window.Add_SourceInitialized($applyDarkTitleBar)
 
-# Header logo: loaded from a PNG instead of being built from inline XAML
-# gradients/paths. A BitmapImage load is cheap and synchronous, so this can
-# run immediately - no deferral, no pop-in, and no risk of the vector
-# recreation being subtly wrong since it's just displaying the real artwork.
-try {
-    $logoPath = Join-Path $scriptDir 'assets\logo.png'
-    if (Test-Path -LiteralPath $logoPath) {
-        $logoBitmap = New-Object System.Windows.Media.Imaging.BitmapImage
-        $logoBitmap.BeginInit()
-        $logoBitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $logoPath).Path)
-        $logoBitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
-        $logoBitmap.EndInit()
-        $logoBitmap.Freeze()
-
-        $logoImage = New-Object System.Windows.Controls.Image
-        $logoImage.Source = $logoBitmap
-        $logoImage.Stretch = [System.Windows.Media.Stretch]::Uniform
-        $logoImage.Margin = New-Object System.Windows.Thickness(0)
-
-        $logoBorder = $window.FindName('LogoBorder')
-        if ($logoBorder) { $logoBorder.Child = $logoImage }
-    }
-}
-catch {}
-
 $WindowRootGrid = $window.FindName('WindowRootGrid')
 function Update-MaximizedLayout {
     if ($WindowRootGrid) {
@@ -3041,6 +3384,9 @@ function Enable-StrictToolTipDelay($targetElement) {
     # style.
     if ($targetElement.ToolTip -is [System.Windows.Controls.ToolTip]) {
         $targetElement.ToolTip.PlacementTarget = $targetElement
+        if (-not $targetElement.ToolTip.Style -and $window -and $window.Resources -and $window.Resources.Contains([System.Windows.Controls.ToolTip])) {
+            $targetElement.ToolTip.Style = $window.Resources[[System.Windows.Controls.ToolTip]]
+        }
     }
 
     [System.Windows.Controls.ToolTipService]::SetIsEnabled($targetElement, $false)
@@ -3087,6 +3433,87 @@ Enable-StrictToolTipDelay $FiltersBtn
 $FiltersPopup = $window.FindName('FiltersPopup')
 $FiltersPopupCard = $window.FindName('FiltersPopupCard')
 $FiltersPopupTransform = $window.FindName('FiltersPopupTransform')
+
+# --- Archive Search Controls ---
+$ArchiveSearchBtn = $window.FindName('ArchiveSearchBtn')
+$ArchiveSearchBtnText = $window.FindName('ArchiveSearchBtnText')
+Enable-StrictToolTipDelay $ArchiveSearchBtn
+$ArchiveSearchPopup = $window.FindName('ArchiveSearchPopup')
+$ArchiveSearchPopupCard = $window.FindName('ArchiveSearchPopupCard')
+$ArchiveSearchPopupTransform = $window.FindName('ArchiveSearchPopupTransform')
+
+$ScopeDayBtn = $window.FindName('ScopeDayBtn')
+$ScopeMonthBtn = $window.FindName('ScopeMonthBtn')
+$ScopeYearBtn = $window.FindName('ScopeYearBtn')
+$ScopeDayIndicator = $window.FindName('ScopeDayIndicator')
+$ScopeMonthIndicator = $window.FindName('ScopeMonthIndicator')
+$ScopeYearIndicator = $window.FindName('ScopeYearIndicator')
+$ScopeDayLabel = $window.FindName('ScopeDayLabel')
+$ScopeMonthLabel = $window.FindName('ScopeMonthLabel')
+$ScopeYearLabel = $window.FindName('ScopeYearLabel')
+
+$StackArchiveMonth = $window.FindName('StackArchiveMonth')
+$StackArchiveDay = $window.FindName('StackArchiveDay')
+$ArchiveYearNotice = $window.FindName('ArchiveYearNotice')
+
+$ArchiveYearBox = $window.FindName('ArchiveYearBox')
+$ArchiveMonthBox = $window.FindName('ArchiveMonthBox')
+$ArchiveDayBox = $window.FindName('ArchiveDayBox')
+$ArchiveRegionBox = $window.FindName('ArchiveRegionBox')
+$FetchArchiveBtn = $window.FindName('FetchArchiveBtn')
+$FetchArchiveBtnText = $window.FindName('FetchArchiveBtnText')
+
+# Populate Archive dropdowns
+if ($ArchiveYearBox) {
+    $curYr = [DateTime]::Now.Year
+    for ($y = $curYr; $y -ge 2010; $y--) {
+        [void]$ArchiveYearBox.Items.Add($y.ToString())
+    }
+    $ArchiveYearBox.SelectedIndex = 0
+}
+
+if ($ArchiveMonthBox) {
+    $archiveMonths = @(
+        'January', 'February', 'March', 'April',
+        'May', 'June', 'July', 'August',
+        'September', 'October', 'November', 'December'
+    )
+    foreach ($mName in $archiveMonths) {
+        [void]$ArchiveMonthBox.Items.Add($mName)
+    }
+    $ArchiveMonthBox.SelectedIndex = [Math]::Max(0, [DateTime]::Now.Month - 1)
+}
+
+if ($ArchiveDayBox) {
+    for ($d = 1; $d -le 31; $d++) {
+        [void]$ArchiveDayBox.Items.Add($d.ToString("00"))
+    }
+    $ArchiveDayBox.SelectedIndex = [Math]::Max(0, [DateTime]::Now.Day - 1)
+}
+
+if ($ArchiveRegionBox) {
+    $peapixRegions = @(
+        @{ Name = 'United States'; Code = 'us' },
+        @{ Name = 'United Kingdom'; Code = 'gb' },
+        @{ Name = 'Canada'; Code = 'ca' },
+        @{ Name = 'Germany'; Code = 'de' },
+        @{ Name = 'France'; Code = 'fr' },
+        @{ Name = 'India'; Code = 'in' },
+        @{ Name = 'Japan'; Code = 'jp' },
+        @{ Name = 'China'; Code = 'cn' },
+        @{ Name = 'Italy'; Code = 'it' },
+        @{ Name = 'Spain'; Code = 'es' },
+        @{ Name = 'Brazil'; Code = 'br' },
+        @{ Name = 'Australia'; Code = 'au' }
+    )
+    foreach ($pReg in $peapixRegions) {
+        $cbItem = New-Object System.Windows.Controls.ComboBoxItem
+        $cbItem.Content = $pReg.Name
+        $cbItem.Tag = $pReg.Code
+        [void]$ArchiveRegionBox.Items.Add($cbItem)
+    }
+    $ArchiveRegionBox.SelectedIndex = 0
+}
 $LabelRegion = $window.FindName('LabelRegion')
 $RefreshBtn = $window.FindName('RefreshBtn')
 Enable-StrictToolTipDelay $RefreshBtn
@@ -3103,6 +3530,7 @@ if ($GalleryScrollViewer -and ('AutoScapeSmoothScroll' -as [type])) {
     [AutoScapeSmoothScroll]::Attach($GalleryScrollViewer)
 }
 $StatusText = $window.FindName('StatusText')
+$script:StatusText = $StatusText
 $InfoBtn = $window.FindName('InfoBtn')
 Enable-StrictToolTipDelay $InfoBtn
 # CheckUpdateBtn no longer lives in the main toolbar - it now lives inside the
@@ -3111,6 +3539,7 @@ Enable-StrictToolTipDelay $InfoBtn
 $CheckUpdateBtn = $null
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
+$script:UpdateBtn = $UpdateBtn
 
 $CaptionMinBtn = $window.FindName('CaptionMinBtn')
 $CaptionMaxBtn = $window.FindName('CaptionMaxBtn')
@@ -3133,10 +3562,11 @@ if ($CaptionCloseBtn) {
     $CaptionCloseBtn.Add_Click({ [System.Windows.SystemCommands]::CloseWindow($window) })
 }
 
-$HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
-if ($HeaderTitlePanel) {
-    $HeaderTitlePanel.Add_MouseLeftButtonDown({
+$HeaderGrid = $window.FindName('HeaderGrid')
+if ($HeaderGrid) {
+    $HeaderGrid.Add_MouseLeftButtonDown({
         param($s, $e)
+        if ($e.OriginalSource -and ($e.OriginalSource -is [System.Windows.Controls.Button] -or $e.OriginalSource -is [System.Windows.Controls.Primitives.ButtonBase])) { return }
         if ($e.ClickCount -ge 2) {
             if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
                 [System.Windows.SystemCommands]::RestoreWindow($window)
@@ -3151,6 +3581,15 @@ if ($HeaderTitlePanel) {
 }
 
 # --- Source toggle pill -----------------
+$SourceTogglePill = $window.FindName('SourceTogglePill')
+$HeaderActionPill = $window.FindName('HeaderActionPill')
+if ($SourceTogglePill -and $HeaderActionPill) {
+    $HeaderActionPill.Add_SizeChanged({
+        if ($HeaderActionPill.ActualWidth -gt 0) {
+            $SourceTogglePill.Width = $HeaderActionPill.ActualWidth
+        }
+    })
+}
 $SourceBingBtn = $window.FindName('SourceBingBtn')
 $SourceSpotlightBtn = $window.FindName('SourceSpotlightBtn')
 $SourceWallhavenBtn = $window.FindName('SourceWallhavenBtn')
@@ -3171,6 +3610,11 @@ $LocalFolderBtn = $window.FindName('LocalFolderBtn')
 $LocalFolderLabel = $window.FindName('LocalFolderLabel')
 $LocalEmptyStatePanel = $window.FindName('LocalEmptyStatePanel')
 $EmptyStateSelectFolderBtn = $window.FindName('EmptyStateSelectFolderBtn')
+$PexelsEmptyStatePanel = $window.FindName('PexelsEmptyStatePanel')
+$PexelsEmptyKeyBox = $window.FindName('PexelsEmptyKeyBox')
+$PexelsEmptyKeyPlaceholder = $window.FindName('PexelsEmptyKeyPlaceholder')
+$PexelsEmptySaveBtn = $window.FindName('PexelsEmptySaveBtn')
+$PexelsEmptyGetBtn = $window.FindName('PexelsEmptyGetBtn')
 $AppSubtitleText = $window.FindName('AppSubtitleText')
 
 $script:currentSource = 'Bing'
@@ -3365,6 +3809,19 @@ if ($ApiKeyBox) {
             }
         })
 
+    $ApiKeyBox.Add_GotFocus({
+            if ($ApiKeyPlaceholder -and -not $ApiKeyBox.IsReadOnly) {
+                $ApiKeyPlaceholder.Visibility = [System.Windows.Visibility]::Collapsed
+            }
+        })
+
+    $ApiKeyBox.Add_LostFocus({
+            if ($ApiKeyPlaceholder -and -not $ApiKeyBox.IsReadOnly) {
+                $txt = $ApiKeyBox.Text.Trim()
+                $ApiKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+            }
+        })
+
     $ApiKeyBox.Add_PreviewKeyDown({
             param($s, $e)
             if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
@@ -3410,7 +3867,10 @@ if ($ApiKeyBox) {
 
 if ($SourceBingBtn) {
     $SourceBingBtn.Add_Click({
-            if ($script:currentSource -eq 'Bing') { return }
+            if ($script:currentSource -eq 'Bing' -and -not $script:isArchiveView) { return }
+            $script:isArchiveView = $false
+            Write-InteractionLog "[TAB_CLICK] Switched to Bing tab"
+            Stop-ArchiveSearch -Reason "Switched to Bing"
             $script:currentSource = 'Bing'
             Update-SourceToggleVisual
             Load-Gallery
@@ -3418,7 +3878,10 @@ if ($SourceBingBtn) {
 }
 if ($SourceSpotlightBtn) {
     $SourceSpotlightBtn.Add_Click({
-            if ($script:currentSource -eq 'Spotlight') { return }
+            if ($script:currentSource -eq 'Spotlight' -and -not $script:isArchiveView) { return }
+            $script:isArchiveView = $false
+            Write-InteractionLog "[TAB_CLICK] Switched to Spotlight tab"
+            Stop-ArchiveSearch -Reason "Switched to Spotlight"
             $script:currentSource = 'Spotlight'
             Update-SourceToggleVisual
             Load-Gallery
@@ -3426,7 +3889,10 @@ if ($SourceSpotlightBtn) {
 }
 if ($SourceWallhavenBtn) {
     $SourceWallhavenBtn.Add_Click({
-            if ($script:currentSource -eq 'Wallhaven') { return }
+            if ($script:currentSource -eq 'Wallhaven' -and -not $script:isArchiveView) { return }
+            $script:isArchiveView = $false
+            Write-InteractionLog "[TAB_CLICK] Switched to Wallhaven tab"
+            Stop-ArchiveSearch -Reason "Switched to Wallhaven"
             $script:currentSource = 'Wallhaven'
             Update-SourceToggleVisual
             Load-Gallery
@@ -3434,7 +3900,10 @@ if ($SourceWallhavenBtn) {
 }
 if ($SourcePexelsBtn) {
     $SourcePexelsBtn.Add_Click({
-            if ($script:currentSource -eq 'Pexels') { return }
+            if ($script:currentSource -eq 'Pexels' -and -not $script:isArchiveView) { return }
+            $script:isArchiveView = $false
+            Write-InteractionLog "[TAB_CLICK] Switched to Pexels tab"
+            Stop-ArchiveSearch -Reason "Switched to Pexels"
             $script:currentSource = 'Pexels'
             Update-SourceToggleVisual
             Load-Gallery
@@ -3442,7 +3911,10 @@ if ($SourcePexelsBtn) {
 }
 if ($SourceLocalBtn) {
     $SourceLocalBtn.Add_Click({
-            if ($script:currentSource -eq 'Local') { return }
+            if ($script:currentSource -eq 'Local' -and -not $script:isArchiveView) { return }
+            $script:isArchiveView = $false
+            Write-InteractionLog "[TAB_CLICK] Switched to Local tab"
+            Stop-ArchiveSearch -Reason "Switched to Local"
             $script:currentSource = 'Local'
             Update-SourceToggleVisual
             Load-Gallery
@@ -3458,28 +3930,73 @@ if ($EmptyStateSelectFolderBtn) {
             Select-LocalWallpaperFolder
         })
 }
+
+if ($PexelsEmptyKeyBox) {
+    $PexelsEmptyKeyBox.Add_TextChanged({
+        if ($PexelsEmptyKeyPlaceholder) {
+            $txt = $PexelsEmptyKeyBox.Text.Trim()
+            $PexelsEmptyKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+        }
+    })
+    $PexelsEmptyKeyBox.Add_GotFocus({
+        if ($PexelsEmptyKeyPlaceholder) {
+            $PexelsEmptyKeyPlaceholder.Visibility = [System.Windows.Visibility]::Collapsed
+        }
+    })
+    $PexelsEmptyKeyBox.Add_LostFocus({
+        if ($PexelsEmptyKeyPlaceholder) {
+            $txt = $PexelsEmptyKeyBox.Text.Trim()
+            $PexelsEmptyKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+        }
+    })
+    $PexelsEmptyKeyBox.Add_KeyDown({
+        param($s, $e)
+        if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
+            $e.Handled = $true
+            if ($PexelsEmptySaveBtn) {
+                $PexelsEmptySaveBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+            }
+        }
+    })
+}
+
+if ($PexelsEmptySaveBtn) {
+    $PexelsEmptySaveBtn.Add_Click({
+        $raw = if ($PexelsEmptyKeyBox) { $PexelsEmptyKeyBox.Text.Trim() } else { '' }
+        $validation = Test-SourceApiKey -Source 'Pexels' -Key $raw
+        if (-not $validation.Valid) {
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $StatusText.Opacity = 1
+            $StatusText.Foreground = $statusErrorBrush
+            $StatusText.Text = $validation.Error
+            return
+        }
+
+        Set-SourceApiKey -Source 'Pexels' -Key $raw
+        Update-GlobalApiKeyBoxState -Key $raw
+        if ($PexelsEmptyKeyBox) { $PexelsEmptyKeyBox.Text = '' }
+        if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($window) { $window.Focus() }
+        Load-Gallery
+    })
+}
+
+if ($PexelsEmptyGetBtn) {
+    $PexelsEmptyGetBtn.Add_Click({
+        try {
+            [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo -Property @{
+                FileName = 'https://www.pexels.com/api/'
+                UseShellExecute = $true
+            })) | Out-Null
+        }
+        catch {
+            try { Start-Process 'https://www.pexels.com/api/' } catch {}
+        }
+    })
+}
 # ------------------------------------------------------------------------
 
-$SpotlightPill = $window.FindName('SpotlightPill')
-$SpotlightThumb = $window.FindName('SpotlightThumb')
-$SpotlightThumbTranslate = $null
-$SpotlightThumbScale = $null
-if ($SpotlightThumb -and $SpotlightThumb.RenderTransform) {
-    try {
-        $SpotlightThumbTranslate = $SpotlightThumb.RenderTransform
-        $SpotlightThumbScale = New-Object System.Windows.Media.ScaleTransform(1.0, 1.0)
-        $thumbTransformGroup = New-Object System.Windows.Media.TransformGroup
-        [void]$thumbTransformGroup.Children.Add($SpotlightThumbScale)
-        [void]$thumbTransformGroup.Children.Add($SpotlightThumbTranslate)
-        $SpotlightThumb.RenderTransform = $thumbTransformGroup
-        $SpotlightThumb.RenderTransformOrigin = New-Object System.Windows.Point(0.5, 0.5)
-    }
-    catch {
-        # If anything here fails, fall back to the plain translate transform
-        # so the toggle still slides even without the squish flourish.
-        $SpotlightThumbScale = $null
-    }
-}
+$AutoToggleCheckbox = $window.FindName('AutoToggleCheckbox')
 $SpotlightSetBtn = $window.FindName('SpotlightSetBtn')
 Enable-StrictToolTipDelay $SpotlightSetBtn
 $SpotlightSetBtnGlow = if ($SpotlightSetBtn) { $SpotlightSetBtn.Effect } else { $null }
@@ -3514,7 +4031,6 @@ $HeaderActionRow = $window.FindName('HeaderActionRow')
 $AutoLabel = $window.FindName('AutoLabel')
 $MainContent = $window.FindName('MainContent')
 $SourceTogglePill = $window.FindName('SourceTogglePill')
-$HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
 
 $ModalDimOverlay = $window.FindName('ModalDimOverlay')
 $ModalHost = $window.FindName('ModalHost')
@@ -3885,29 +4401,12 @@ function Start-RefreshAnimation {
 
     $rotation = [System.Windows.Media.RotateTransform]$RefreshIcon.RenderTransform
     
-    # 0 -> accelerate -> fast rotation -> slow down -> 366° -> gently settle -> 360°
-    $spin = New-Object System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
-    $spin.Duration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(700))
+    # Fluent Snappy Settle: 0° -> 360° with CubicEase EaseOut (680ms)
+    $spin = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.0, 360.0, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(680)))
+    $easing = New-Object System.Windows.Media.Animation.CubicEase
+    $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $spin.EasingFunction = $easing
     $spin.FillBehavior = [System.Windows.Media.Animation.FillBehavior]::Stop
-    [System.Windows.Media.Animation.Timeline]::SetDesiredFrameRate($spin, 60)
-
-    # Keyframe 1: 0° -> accelerate -> fast rotation -> slow down -> 366° (EaseInOut)
-    $kf1 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame
-    $kf1.KeyTime = [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::FromMilliseconds(520))
-    $kf1.Value = 366
-    $ease1 = New-Object System.Windows.Media.Animation.CubicEase
-    $ease1.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseInOut
-    $kf1.EasingFunction = $ease1
-    [void]$spin.KeyFrames.Add($kf1)
-
-    # Keyframe 2: 366° -> gently settle -> 360° (EaseOut)
-    $kf2 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame
-    $kf2.KeyTime = [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::FromMilliseconds(700))
-    $kf2.Value = 360
-    $ease2 = New-Object System.Windows.Media.Animation.CubicEase
-    $ease2.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-    $kf2.EasingFunction = $ease2
-    [void]$spin.KeyFrames.Add($kf2)
 
     $rotation.BeginAnimation([System.Windows.Media.RotateTransform]::AngleProperty, $spin, [System.Windows.Media.Animation.HandoffBehavior]::SnapshotAndReplace)
 
@@ -3917,7 +4416,7 @@ function Start-RefreshAnimation {
     }
 
     $script:refreshDelayTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(700)
+    $script:refreshDelayTimer.Interval = [TimeSpan]::FromMilliseconds(680)
     $script:refreshDelayTimer.Add_Tick({
             $script:refreshDelayTimer.Stop()
             $script:refreshDelayTimer = $null
@@ -4162,6 +4661,9 @@ function Set-CardAccent($card, $accentBrush) {
 }
 
 function Select-Card($card, $image) {
+    if ($image) {
+        Write-InteractionLog "[CARD_SELECT] Title='$($image.title)' Source='$($image.source)'"
+    }
     if ($script:selectedCard -and $script:selectedCard -ne $card) {
         $script:selectedCard.Background = $cardUnselectedBg
         $script:selectedCard.Resources['TitleText'].Foreground = [System.Windows.Media.Brushes]::White
@@ -4218,6 +4720,7 @@ $statusSuccessBrush = (New-Object System.Windows.Media.SolidColorBrush([System.W
 $statusErrorBrush = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(248, 113, 113)))
 $script:statusResetTimer = $null
 $script:fadeTimer = $null
+$script:hoverRestoreTimer = $null
 $script:loadingStatusTimer = $null
 $script:downloadTimer = $null
 $script:dlContext = $null
@@ -4240,6 +4743,7 @@ function Apply-WallpaperAsync {
     )
     if (-not $Image) { return }
     $actionTitle = Get-CleanImageTitle $Image
+    Write-InteractionLog "[WALLPAPER_APPLY_START] Title='$actionTitle' Target='$Target' Style='$Style' Resolution='$Resolution'"
 
     $UpdateBtn.IsEnabled = $false
     $DownloadBtn.IsEnabled = $false
@@ -4361,9 +4865,12 @@ function Apply-WallpaperAsync {
                 }
 
                 if ($isSuccess) {
+                    Write-InteractionLog "[WALLPAPER_APPLY_SUCCESS] Wallpaper applied successfully to $($ctx.Target)"
                     Set-TransientStatus -Message (Get-AppliedSuccessMessage $ctx.Target)
+                    Invoke-MemoryFlush -Reason "PostWallpaperApply" -Async
                 }
                 else {
+                    Write-InteractionLog "[WALLPAPER_APPLY_FAIL] Failed: $errorMsg"
                     $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "apply wallpaper"
                     Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
                 }
@@ -4372,38 +4879,76 @@ function Apply-WallpaperAsync {
     $script:applyTimer.Start()
 }
 
+function Set-StatusTextWithFade {
+    param([string]$Text)
+    $targetCtrl = if ($script:StatusText) { $script:StatusText } else { $StatusText }
+    if (-not $targetCtrl -or -not $Text) { return }
+
+    # If applying or a transient status is actively displaying (e.g. Success / Error message), do not overwrite
+    if ($script:statusResetTimer -and $script:statusResetTimer.IsEnabled) { return }
+    if ($script:applyTimer -and $script:applyTimer.IsEnabled) { return }
+
+    # Cancel any pending restore timer (e.g. from mouse leaving an adjacent card)
+    if ($script:hoverRestoreTimer) { $script:hoverRestoreTimer.Stop() }
+
+    # If already displaying this exact text, nothing to do
+    if ($targetCtrl.Text -eq $Text) { return }
+
+    # Remove any existing animation lock so opacity is directly controllable
+    $targetCtrl.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+
+    # Set text immediately so there is never a blank gap or null reference
+    $targetCtrl.Foreground = $statusDefaultBrush
+    $targetCtrl.Text = $Text
+
+    # Smooth fade-in ("come nicely"): from 0.3 to 1.0 over 220ms
+    $fadeDur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(220))
+    $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.3, 1.0, $fadeDur
+    $targetCtrl.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
+}
+
+function Invoke-RestoreStatusDefaultImmediate {
+    $ctrl = if ($script:StatusText) { $script:StatusText } else { $StatusText }
+    if (-not $ctrl) { return }
+    if ($script:statusResetTimer -and $script:statusResetTimer.IsEnabled) { return }
+    if ($script:applyTimer -and $script:applyTimer.IsEnabled) { return }
+
+    $defaultText = if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
+        'Unable to load wallpapers. Please check your internet connection.'
+    }
+    else {
+        'Double-click any wallpaper to apply'
+    }
+
+    if ($ctrl.Text -eq $defaultText) { return }
+
+    $ctrl.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+    $ctrl.Foreground = if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) { $statusErrorBrush } else { $statusDefaultBrush }
+    $ctrl.Text = $defaultText
+
+    # Fade back to default text nice and slow (420ms duration)
+    $slowDur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(420))
+    $slowFade = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.25, 1.0, $slowDur
+    $ctrl.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $slowFade)
+}
+
 function Restore-StatusTextDefaultWithFade {
-    if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        $StatusText.Opacity = 1
-        $StatusText.Foreground = $statusErrorBrush
-        $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
+    param([switch]$Immediate)
+    if ($Immediate) {
+        if ($script:hoverRestoreTimer) { $script:hoverRestoreTimer.Stop() }
+        Invoke-RestoreStatusDefaultImmediate
         return
     }
 
-    $fadeDuration = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-    $fadeOut = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1, 0, $fadeDuration
-    $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeOut)
-    
-    if ($script:fadeTimer) { $script:fadeTimer.Stop() }
-    $script:fadeTimer = New-Object System.Windows.Threading.DispatcherTimer
-    $script:fadeTimer.Interval = [TimeSpan]::FromMilliseconds(320)
-    $script:fadeTimer.Add_Tick({
-            $script:fadeTimer.Stop()
-            if (-not $script:loadedImages -or $script:loadedImages.Count -eq 0) {
-                $StatusText.Foreground = $statusErrorBrush
-                $StatusText.Text = 'Unable to load wallpapers. Please check your internet connection.'
-            }
-            else {
-                $StatusText.Foreground = $statusDefaultBrush
-                $StatusText.Text = 'Double-click any wallpaper to apply'
-            }
-            $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(300))
-            $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, $dur)
-            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
-            try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
+    # Debounce for smooth card-to-card movement: wait 150ms before returning to default text
+    if ($script:hoverRestoreTimer) { $script:hoverRestoreTimer.Stop() }
+    $script:hoverRestoreTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:hoverRestoreTimer.Interval = [TimeSpan]::FromMilliseconds(150)
+    $script:hoverRestoreTimer.Add_Tick({
+            $script:hoverRestoreTimer.Stop()
+            Invoke-RestoreStatusDefaultImmediate
         })
-    $script:fadeTimer.Start()
+    $script:hoverRestoreTimer.Start()
 }
 
 function Get-AppliedSuccessMessage([string]$target) {
@@ -4433,17 +4978,6 @@ function Get-UserFriendlyNetworkError {
 $script:SpotlightTaskName = 'BingWallpaperSpotlight'
 $script:SpotlightScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
 $script:SpotlightEnabled = $false
-
-$script:pillBgBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(64, 64, 64))
-$script:pillBorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(90, 90, 90))
-$script:pillThumbBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(200, 200, 200))
-if ($SpotlightPill) {
-    $SpotlightPill.Background = $script:pillBgBrush
-    $SpotlightPill.BorderBrush = $script:pillBorderBrush
-}
-if ($SpotlightThumb) {
-    $SpotlightThumb.Fill = $script:pillThumbBrush
-}
 
 $processPath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
 $script:SpotlightScriptPath = if ($processPath -match '\.exe$' -and $processPath -notmatch 'powershell\.exe|pwsh\.exe|pwsh-login\.exe') {
@@ -4515,71 +5049,28 @@ function Set-SpotlightState {
         [switch]$Animate = $true,
         [switch]$UpdateTask = $true
     )
-    $script:SpotlightEnabled = $Enabled
+    $script:SpotlightEnabled = [bool]$Enabled
 
-    # Travel distance = track width (44) - thumb diameter (14) - 2x margin (3) = 24px.
-    $targetX = if ($Enabled) { 24.0 } else { 0.0 }
-    $targetBgColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(64, 64, 64) }
-    $targetBorderColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(0, 120, 212) } else { [System.Windows.Media.Color]::FromRgb(90, 90, 90) }
-    $targetThumbColor = if ($Enabled) { [System.Windows.Media.Color]::FromRgb(255, 255, 255) } else { [System.Windows.Media.Color]::FromRgb(200, 200, 200) }
+    if ($SpotlightSetBtn) { $SpotlightSetBtn.IsEnabled = $script:SpotlightEnabled }
+    if (-not $script:SpotlightEnabled -and $SpotlightOptionsPopup) { $SpotlightOptionsPopup.IsOpen = $false }
 
-    if ($SpotlightSetBtn) { $SpotlightSetBtn.IsEnabled = $Enabled }
-    if (-not $Enabled -and $SpotlightOptionsPopup) { $SpotlightOptionsPopup.IsOpen = $false }
-
-    if ($Animate) {
-        $dur = [TimeSpan]::FromMilliseconds(220)
-        $easing = New-Object System.Windows.Media.Animation.CubicEase
-        $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-
-        $thumbAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList $targetX, (New-Object System.Windows.Duration($dur))
-        $thumbAnim.EasingFunction = $easing
-        $SpotlightThumbTranslate.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $thumbAnim)
-
-        $bgAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetBgColor, (New-Object System.Windows.Duration($dur))
-        $bgAnim.EasingFunction = $easing
-        $script:pillBgBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $bgAnim)
-
-        $borderAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetBorderColor, (New-Object System.Windows.Duration($dur))
-        $borderAnim.EasingFunction = $easing
-        $script:pillBorderBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $borderAnim)
-
-        $thumbColorAnim = New-Object System.Windows.Media.Animation.ColorAnimation -ArgumentList $targetThumbColor, (New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(180)))
-        $script:pillThumbBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $thumbColorAnim)
-
-        if ($SpotlightThumbScale) {
+    if ($AutoToggleCheckbox) {
+        $AutoToggleCheckbox.IsChecked = $script:SpotlightEnabled
+        if (-not $Animate) {
             try {
-                $squish = New-Object System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
-                $squishOutEase = New-Object System.Windows.Media.Animation.QuadraticEase
-                $squishOutEase.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-                $k0 = New-Object System.Windows.Media.Animation.LinearDoubleKeyFrame(1.0, [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::Zero))
-                $k1 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame(1.2, [System.Windows.Media.Animation.KeyTime]::FromTimeSpan([TimeSpan]::FromMilliseconds(80)))
-                $k1.EasingFunction = $squishOutEase
-                $k2 = New-Object System.Windows.Media.Animation.EasingDoubleKeyFrame(1.0, [System.Windows.Media.Animation.KeyTime]::FromTimeSpan($dur))
-                $k2.EasingFunction = $easing
-                [void]$squish.KeyFrames.Add($k0)
-                [void]$squish.KeyFrames.Add($k1)
-                [void]$squish.KeyFrames.Add($k2)
-                $SpotlightThumbScale.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $squish)
+                $AutoToggleCheckbox.UpdateLayout()
+                $thumb = $AutoToggleCheckbox.Template.FindName('Thumb', $AutoToggleCheckbox)
+                if ($thumb -and $thumb.RenderTransform) {
+                    $thumb.RenderTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
+                    $thumb.RenderTransform.X = if ($script:SpotlightEnabled) { 20 } else { 0 }
+                }
             }
             catch {}
         }
     }
-    else {
-        $SpotlightThumbTranslate.BeginAnimation([System.Windows.Media.TranslateTransform]::XProperty, $null)
-        $SpotlightThumbTranslate.X = $targetX
-
-        $script:pillBgBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
-        $script:pillBgBrush.Color = $targetBgColor
-
-        $script:pillBorderBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
-        $script:pillBorderBrush.Color = $targetBorderColor
-
-        $script:pillThumbBrush.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $null)
-        $script:pillThumbBrush.Color = $targetThumbColor
-    }
 
     if ($UpdateTask) {
-        Update-SpotlightScheduledTaskAsync -Enable $Enabled
+        Update-SpotlightScheduledTaskAsync -Enable $script:SpotlightEnabled
         Save-Settings
     }
 }
@@ -4849,7 +5340,7 @@ function Show-ModernDialog {
 
     Open-DialogModal -Control $dlg -CloseCallback {
         $frame.Continue = $false
-        try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
+        Invoke-MemoryFlush -Reason "ConfirmDialogClosed" -Async
     }
 
     [System.Windows.Threading.Dispatcher]::PushFrame($frame)
@@ -4937,25 +5428,14 @@ function Update-ToolbarCompactState {
     if ($FiltersBtnText) {
         $FiltersBtnText.Text = "Preferences"
     }
+    if ($ArchiveSearchBtnText) {
+        $ArchiveSearchBtnText.Text = if ($width -lt 920) { "Search" } else { "Archive Search" }
+    }
 
-    # Responsive Header: center ControlDeckCard, or wrap under title on narrow/scaled screens
+    # Responsive Header: ControlDeckCard is centered across top bar
     if ($ControlDeckCard) {
-        if ($width -lt 940) {
-            [System.Windows.Controls.Grid]::SetRow($ControlDeckCard, 1)
-            $ControlDeckCard.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $ControlDeckCard.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
-            if ($HeaderTitlePanel) {
-                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            }
-        }
-        else {
-            [System.Windows.Controls.Grid]::SetRow($ControlDeckCard, 0)
-            $ControlDeckCard.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $ControlDeckCard.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
-            if ($HeaderTitlePanel) {
-                $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Left
-            }
-        }
+        $ControlDeckCard.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+        $ControlDeckCard.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
     }
 
     # Responsive Gallery: 4 columns on wide displays, 3 on standard/scaled laptops, 2 on narrow
@@ -5038,8 +5518,34 @@ function Render-GalleryGrid {
         $card.Margin = New-Object System.Windows.Thickness(0, 0, 16, 16)
         $card.Cursor = [System.Windows.Input.Cursors]::Hand
         $card.Tag = $image
-        if ($image.copyright) {
-            $card.ToolTip = "$displayTitle`n$($image.copyright)"
+        $skipTooltip = ($image.source -eq 'Local') -or ($script:currentSource -eq 'Local') -or ($image.source -eq 'Wallhaven') -or ($script:currentSource -eq 'Wallhaven')
+        if (-not $skipTooltip -and ($image.copyright -or $displayTitle)) {
+            $tipPanel = New-Object System.Windows.Controls.StackPanel
+            $tipPanel.MaxWidth = 360
+
+            if ($displayTitle) {
+                $titleBlock = New-Object System.Windows.Controls.TextBlock
+                $titleBlock.Text = $displayTitle
+                $titleBlock.FontWeight = [System.Windows.FontWeights]::SemiBold
+                $titleBlock.FontSize = 13.5
+                $titleBlock.Foreground = [System.Windows.Media.Brushes]::White
+                $titleBlock.TextWrapping = [System.Windows.TextWrapping]::Wrap
+                $tipPanel.Children.Add($titleBlock) | Out-Null
+            }
+
+            if ($image.copyright) {
+                $copyBlock = New-Object System.Windows.Controls.TextBlock
+                $copyBlock.Text = $image.copyright
+                $copyBlock.FontSize = 12
+                $copyBlock.Foreground = (New-Object System.Windows.Media.BrushConverter).ConvertFromString("#AAAAAA")
+                $copyBlock.TextWrapping = [System.Windows.TextWrapping]::Wrap
+                if ($displayTitle) {
+                    $copyBlock.Margin = New-Object System.Windows.Thickness(0, 4, 0, 0)
+                }
+                $tipPanel.Children.Add($copyBlock) | Out-Null
+            }
+
+            $card.ToolTip = $tipPanel
             [System.Windows.Controls.ToolTipService]::SetInitialShowDelay($card, 600)
             [System.Windows.Controls.ToolTipService]::SetBetweenShowDelay($card, 600)
             Enable-StrictToolTipDelay $card
@@ -5080,6 +5586,72 @@ function Render-GalleryGrid {
         $revealBorder.IsHitTestVisible = $false
     
         $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
+
+        # Context Menu: Explore in 3D (Google Earth) styled to match the Tab Bar pill
+        $cleanLocation = $null
+        if ($image.source -eq 'Spotlight' -and $image.title) {
+            $cleanLocation = $image.title.Trim()
+        }
+        elseif ($image.copyrightlink -and $image.copyrightlink -match 'q=([^&]+)') {
+            $rawQ = [System.Uri]::UnescapeDataString($Matches[1]) -replace '\+', ' '
+            if ($rawQ.Trim().Length -gt 1) {
+                $cleanLocation = $rawQ.Trim()
+            }
+        }
+        if (-not $cleanLocation -and $image.title -and $image.title.Trim().Length -gt 1 -and $image.title -notmatch '^AutoScape') {
+            $cleanLocation = $image.title.Trim()
+        }
+        if (-not $cleanLocation -and $image.copyright -and $image.source -ne 'Local') {
+            $rawLoc = ($image.copyright -replace '\s*\(.*?\)', '') -replace '^Photo by .+? on Pexels', ''
+            $rawLoc = ($rawLoc -replace '^[©\s]+', '').Trim()
+            if ($rawLoc.Length -gt 2) {
+                $cleanLocation = $rawLoc
+            }
+        }
+
+        if ($cleanLocation) {
+            $cardMenu = New-Object System.Windows.Controls.ContextMenu
+            $cardMenu.Style = $window.Resources['FluentCardContextMenu']
+
+            $earthMenuItem = New-Object System.Windows.Controls.MenuItem
+            $earthMenuItem.Style = $window.Resources['FluentCardMenuItem']
+            $earthMenuItem.Header = "Explore in 3D (Google Earth)"
+
+            $iconBlock = New-Object System.Windows.Controls.TextBlock
+            $iconBlock.Text = [char]0xE707
+            $iconBlock.FontFamily = New-Object System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets")
+            $iconBlock.FontSize = 13.5
+            $iconBlock.Foreground = [System.Windows.Media.Brushes]::White
+            $iconBlock.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+            $earthMenuItem.Icon = $iconBlock
+            $encodedQ = [System.Uri]::EscapeDataString($cleanLocation)
+            $earthUrl = "https://earth.google.com/web/search/$encodedQ"
+            $earthMenuItem.Tag = $earthUrl
+
+            $earthMenuItem.Add_Click({
+                param($s, $e)
+                $targetUrl = [string]$s.Tag
+                if ($targetUrl) {
+                    try {
+                        [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo -Property @{
+                            FileName = $targetUrl
+                            UseShellExecute = $true
+                        })) | Out-Null
+                    }
+                    catch {
+                        try { Start-Process $targetUrl } catch {}
+                    }
+                }
+            })
+
+            $cardMenu.Items.Add($earthMenuItem) | Out-Null
+            $card.ContextMenu = $cardMenu
+        }
+
+        $card.Add_PreviewMouseRightButtonDown({
+            param($evtSender, $e)
+            Select-Card $evtSender $evtSender.Tag
+        })
 
         $card.Add_MouseEnter({ 
                 param($evtSender, $e)
@@ -5127,22 +5699,16 @@ function Render-GalleryGrid {
         $imgBorder.Child = $imageControl
         $stack.Children.Add($imgBorder)
 
-        # Bing/Spotlight thumbnails are already native 16:9, so their card
-        # height is left exactly as before (driven by the image's own
-        # aspect). Wallhaven's, Pexels', and Local aren't guaranteed 16:9,
-        # which makes cards different heights - so they get an explicit height
-        # locked to 16:9 of the card's width, cropped to fit via UniformToFill.
-        if ($image.source -eq 'Wallhaven' -or $image.source -eq 'Pexels' -or $image.source -eq 'Local') {
-            $imgBorder.Add_SizeChanged({
-                    param($evtSender, $e)
-                    if ($e.NewSize.Width -gt 0) {
-                        $desiredHeight = [Math]::Round($e.NewSize.Width * 9.0 / 16.0, 2)
-                        if ([double]::IsNaN($evtSender.Height) -or [Math]::Abs($evtSender.Height - $desiredHeight) -gt 0.5) {
-                            $evtSender.Height = $desiredHeight
-                        }
+        # Ensure thumbnail border always maintains 16:9 ratio of card width so cards never collapse
+        $imgBorder.Add_SizeChanged({
+                param($evtSender, $e)
+                if ($e.NewSize.Width -gt 0) {
+                    $desiredHeight = [Math]::Round($e.NewSize.Width * 9.0 / 16.0, 2)
+                    if ([double]::IsNaN($evtSender.Height) -or [Math]::Abs($evtSender.Height - $desiredHeight) -gt 0.5) {
+                        $evtSender.Height = $desiredHeight
                     }
-                })
-        }
+                }
+            })
 
         try {
             $safeName = $image.urlbase -replace '[^a-zA-Z0-9]', ''
@@ -5158,11 +5724,15 @@ function Render-GalleryGrid {
             elseif ($image.url -and (Test-Path -LiteralPath $image.url)) {
                 $imagePathToLoad = $image.url
             }
+            elseif ($image.thumbUrl -and ($image.thumbUrl -match '^https?://')) {
+                $imagePathToLoad = $image.thumbUrl
+            }
 
-            if ($imagePathToLoad -and (Test-Path -LiteralPath $imagePathToLoad)) {
+            $isWeb = $imagePathToLoad -and ($imagePathToLoad -match '^https?://')
+            if ($imagePathToLoad -and ($isWeb -or (Test-Path -LiteralPath $imagePathToLoad))) {
                 $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
                 $bitmap.BeginInit()
-                $bitmap.UriSource = New-Object System.Uri((Resolve-Path -LiteralPath $imagePathToLoad).Path)
+                $bitmap.UriSource = if ($isWeb) { New-Object System.Uri($imagePathToLoad) } else { New-Object System.Uri((Resolve-Path -LiteralPath $imagePathToLoad).Path) }
                 $bitmap.DecodePixelWidth = 360
                 $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
                 $bitmap.EndInit()
@@ -5349,6 +5919,7 @@ function Render-GalleryGrid {
     }
 
     $upgradeDelay = [System.Math]::Min($total * 35 + 200, 1200)
+    if ($script:qualityUpgradeTimer) { $script:qualityUpgradeTimer.Stop() }
     $script:qualityUpgradeTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:qualityUpgradeTimer.Interval = [TimeSpan]::FromMilliseconds($upgradeDelay)
     $localPanel = $GalleryPanel
@@ -5367,6 +5938,16 @@ function Render-GalleryGrid {
                     }
                 }
             }
+            Write-InteractionLog "[GALLERY_SETTLED] Gallery cards rendered and settled ($total cards)"
+            if ($script:galleryIdleSettleTimer) { $script:galleryIdleSettleTimer.Stop() }
+            $script:galleryIdleSettleTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:galleryIdleSettleTimer.Interval = [TimeSpan]::FromSeconds(5)
+            $script:galleryIdleSettleTimer.Add_Tick({
+                $script:galleryIdleSettleTimer.Stop()
+                $script:galleryIdleSettleTimer = $null
+                Invoke-MemoryFlush -Reason "GalleryIdleSettle" -Async
+            })
+            $script:galleryIdleSettleTimer.Start()
         })
     $script:qualityUpgradeTimer.Start()
 }
@@ -5376,7 +5957,12 @@ function Load-Gallery {
     [CmdletBinding()]
     param()
 
+    if ($script:galleryIdleSettleTimer) {
+        $script:galleryIdleSettleTimer.Stop()
+        $script:galleryIdleSettleTimer = $null
+    }
     if ($script:fadeTimer) { $script:fadeTimer.Stop() }
+    if ($script:hoverRestoreTimer) { $script:hoverRestoreTimer.Stop() }
     if ($script:statusResetTimer) { $script:statusResetTimer.Stop() }
     if ($script:loadingStatusTimer) { $script:loadingStatusTimer.Stop() }
     if ('AutoScapeSmoothScroll' -as [type]) { [AutoScapeSmoothScroll]::Reset() }
@@ -5399,6 +5985,12 @@ function Load-Gallery {
                 catch {}
             })
     }
+    if ($script:archiveSearchContext) {
+        try { $script:archiveSearchContext.Timer.Stop() } catch {}
+        try { $script:archiveSearchContext.PS.Stop() } catch {}
+        try { $script:archiveSearchContext.PS.Dispose() } catch {}
+        $script:archiveSearchContext = $null
+    }
 
     $selectedRegion = Get-SelectedRegionCode
     $fetchSource = $script:currentSource
@@ -5406,6 +5998,7 @@ function Load-Gallery {
     if ($fetchSource -eq 'Local') {
         if (-not $script:localFolderPath -or -not (Test-Path -LiteralPath $script:localFolderPath)) {
             if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Visible }
+            if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
             if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Collapsed }
             $StatusText.Text = "Select a local wallpaper folder to display images."
             $GalleryPanel.Children.Clear()
@@ -5413,11 +6006,30 @@ function Load-Gallery {
         }
         else {
             if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Visible }
+        }
+    }
+    elseif ($fetchSource -eq 'Pexels') {
+        $sourceKey = Get-SourceApiKey 'Pexels'
+        $val = Test-SourceApiKey -Source 'Pexels' -Key $sourceKey
+        if (-not $val.Valid) {
+            if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Visible }
+            if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Collapsed }
+            $StatusText.Text = "Enter a Pexels API key to browse wallpapers."
+            $GalleryPanel.Children.Clear()
+            return
+        }
+        else {
+            if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
             if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Visible }
         }
     }
     else {
         if ($LocalEmptyStatePanel) { $LocalEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
         if ($GalleryScrollViewer) { $GalleryScrollViewer.Visibility = [System.Windows.Visibility]::Visible }
     }
 
@@ -5785,6 +6397,7 @@ $DownloadBtn.Add_Click({
 
         if (-not $targetImage) { return }
         $actionTitle = Get-CleanImageTitle $targetImage
+        Write-InteractionLog "[DOWNLOAD_CLICK] Target='$actionTitle' Source='$($targetImage.source)' Resolution='$($ResolutionBox.SelectedItem)'"
 
         $UpdateBtn.IsEnabled = $false
         $DownloadBtn.IsEnabled = $false
@@ -5887,10 +6500,13 @@ $DownloadBtn.Add_Click({
                     }
 
                     if ($isSuccess) {
+                        Write-InteractionLog "[DOWNLOAD_SUCCESS] Downloaded '$actionTitle'"
                         if ($ctx.TargetCard) { Stop-CardDownloadAnimation $ctx.TargetCard $true }
                         Set-TransientStatus -Message "Wallpaper downloaded"
+                        Invoke-MemoryFlush -Reason "PostDownload" -Async
                     }
                     else {
+                        Write-InteractionLog "[DOWNLOAD_FAIL] Download failed: $errorMsg"
                         if ($ctx.TargetCard) { Stop-CardDownloadAnimation $ctx.TargetCard $false }
                         $errMsg = Get-UserFriendlyNetworkError -Exception (New-Object Exception($errorMsg)) -DefaultAction "download wallpaper"
                         Set-TransientStatus -Message $errMsg -Brush $statusErrorBrush -Seconds 5
@@ -6116,18 +6732,18 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
                     if ($hOffset -lt $minH) { $hOffset = $minH }
                     $SpotlightOptionsPopup.HorizontalOffset = $hOffset
 
-                    $vOffset = 6.0
+                    $vOffset = 16.0
                     $targetBottom = $targetPos.Y + $SpotlightSetBtn.ActualHeight
                     $roomBelow = $window.ActualHeight - $spotlightPopupEdgePad - $targetBottom
                     if ($roomBelow -lt $spotlightPopupCardHeight) {
                         # Not enough room below - flip the card above the button instead.
-                        $vOffset = - ($SpotlightSetBtn.ActualHeight + $spotlightPopupCardHeight + 6.0)
+                        $vOffset = - ($SpotlightSetBtn.ActualHeight + $spotlightPopupCardHeight + 16.0)
                     }
                     $SpotlightOptionsPopup.VerticalOffset = $vOffset
                 }
                 catch {
                     $SpotlightOptionsPopup.HorizontalOffset = 0.0
-                    $SpotlightOptionsPopup.VerticalOffset = 6.0
+                    $SpotlightOptionsPopup.VerticalOffset = 16.0
                 }
             }
 
@@ -6138,6 +6754,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     # timing used elsewhere in the toolbar (e.g. Set-SpotlightState's pill
     # animation) so this flyout feels consistent with the rest of the app.
     $SpotlightOptionsPopup.Add_Opened({
+            Write-InteractionLog "[AUTO_OPTIONS_OPEN] Automatic wallpaper schedule options opened"
             try {
                 $source = [System.Windows.Interop.HwndSource]::FromVisual($SpotlightOptionsPopup.Child)
                 if ($source -and $source.Handle -ne [IntPtr]::Zero) {
@@ -6161,6 +6778,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
 
     $SpotlightOptionsPopup.Add_Closed({
             $script:spotlightPopupClosedAt = [DateTime]::Now
+            Write-InteractionLog "[AUTO_OPTIONS_CLOSE] Automatic wallpaper schedule options closed"
 
             if ($AutoUnifiedButton) {
                 $AutoUnifiedButton.Background = [System.Windows.Media.Brushes]::Transparent
@@ -6169,6 +6787,7 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
 
             $SpotlightPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
             $SpotlightPopupCard.Opacity = 0
+            Invoke-MemoryFlush -Reason "AutoOptionsClosed" -Async
         })
 }
 
@@ -6193,6 +6812,9 @@ if ($FiltersBtn -and $FiltersPopup) {
                 if ($SpotlightOptionsPopup -and $SpotlightOptionsPopup.IsOpen) {
                     $SpotlightOptionsPopup.IsOpen = $false
                 }
+                if ($ArchiveSearchPopup -and $ArchiveSearchPopup.IsOpen) {
+                    $ArchiveSearchPopup.IsOpen = $false
+                }
 
                 try {
                     $targetPos = $FiltersBtn.TranslatePoint([System.Windows.Point]::new(0, 0), $window)
@@ -6204,17 +6826,17 @@ if ($FiltersBtn -and $FiltersPopup) {
                     if ($hOffset -lt $minH) { $hOffset = $minH }
                     $FiltersPopup.HorizontalOffset = $hOffset
 
-                    $vOffset = 6.0
+                    $vOffset = 16.0
                     $targetBottom = $targetPos.Y + $FiltersBtn.ActualHeight
                     $roomBelow = $window.ActualHeight - $filtersPopupEdgePad - $targetBottom
                     if ($roomBelow -lt $filtersPopupCardHeight) {
-                        $vOffset = - ($FiltersBtn.ActualHeight + $filtersPopupCardHeight + 6.0)
+                        $vOffset = - ($FiltersBtn.ActualHeight + $filtersPopupCardHeight + 16.0)
                     }
                     $FiltersPopup.VerticalOffset = $vOffset
                 }
                 catch {
                     $FiltersPopup.HorizontalOffset = -180.0
-                    $FiltersPopup.VerticalOffset = 6.0
+                    $FiltersPopup.VerticalOffset = 16.0
                 }
             }
 
@@ -6222,6 +6844,7 @@ if ($FiltersBtn -and $FiltersPopup) {
         })
 
     $FiltersPopup.Add_Opened({
+            Write-InteractionLog "[PREFERENCES_OPEN] Preferences flyout opened"
             try {
                 $source = [System.Windows.Interop.HwndSource]::FromVisual($FiltersPopup.Child)
                 if ($source -and $source.Handle -ne [IntPtr]::Zero) {
@@ -6245,6 +6868,7 @@ if ($FiltersBtn -and $FiltersPopup) {
 
     $FiltersPopup.Add_Closed({
             $script:filtersPopupClosedAt = [DateTime]::Now
+            Write-InteractionLog "[PREFERENCES_CLOSE] Preferences flyout closed"
 
             if ($FiltersBtn) {
                 $FiltersBtn.Background = [System.Windows.Media.Brushes]::Transparent
@@ -6253,7 +6877,538 @@ if ($FiltersBtn -and $FiltersPopup) {
 
             $FiltersPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
             $FiltersPopupCard.Opacity = 0
+            Invoke-MemoryFlush -Reason "PreferencesClosed" -Async
         })
+}
+
+# --- Peapix Bing Archive Scraper & Date Search Handlers ---
+function Get-PeapixBingMonth {
+    param(
+        [string]$Country = 'us',
+        [int]$Year = 2026,
+        [int]$Month = 8
+    )
+
+    $monthStr = $Month.ToString("00")
+    $url = "https://peapix.com/bing/$Country/$Year/$monthStr"
+    try {
+        $response = Invoke-WebRequest -Uri $url -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -UseBasicParsing -TimeoutSec 10
+        $html = $response.Content
+    } catch {
+        return @()
+    }
+
+    $pattern = '(?s)<div class="[^"]*rounded-bottom">.*?<img[^>]*data-src="([^"]+)"[^>]*>.*?<a[^>]*href="(/bing/\d+)"[^>]*>([^<]+)</a>.*?<span class="text-body-tertiary fs-sm">([^<]+)</span>'
+    $matches = [regex]::Matches($html, $pattern)
+    
+    $results = @()
+    foreach ($m in $matches) {
+        $thumbUrl = $m.Groups[1].Value
+        $pageUrl  = "https://peapix.com" + $m.Groups[2].Value
+        $rawTitle = $m.Groups[3].Value.Trim()
+        $title    = [System.Net.WebUtility]::HtmlDecode($rawTitle)
+        $dateText = $m.Groups[4].Value.Trim()
+
+        $baseImg  = $thumbUrl -replace '_640\.jpg$', ''
+        $full1080 = $baseImg + '_1920.jpg'
+        $full4k   = $baseImg + '.jpg'
+
+        $parsedDate = $null
+        try {
+            $parsedDate = [DateTime]::ParseExact("$dateText $Year", "MMMM dd yyyy", [System.Globalization.CultureInfo]::InvariantCulture).ToString("yyyy-MM-dd")
+        } catch {
+            $parsedDate = "$Year-$monthStr"
+        }
+
+        $results += [PSCustomObject]@{
+            source       = 'Bing'
+            title        = $title
+            date         = $parsedDate
+            dateText     = $dateText
+            thumbUrl     = $thumbUrl
+            url          = $full4k
+            urlbase      = $full1080
+            copyright    = "Bing Wallpaper - $parsedDate"
+            photographer = ''
+            pageUrl      = $pageUrl
+            enddate      = ($parsedDate -replace '-', '')
+            resX         = 3840
+            resY         = 2160
+        }
+    }
+    return $results
+}
+
+$script:archiveSearchScope = 'Day' # 'Day', 'Month', 'Year'
+function Set-ArchiveSearchScope {
+    param([string]$Scope)
+    Write-InteractionLog "[ARCHIVE_SCOPE_CHANGE] Scope changed to '$Scope'"
+    $script:archiveSearchScope = $Scope
+    $grayBrush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString("#888888")
+
+    # Move StackArchiveRegion between Top Host (Year mode) and Bottom Host (Day/Month mode)
+    if ($Scope -eq 'Year') {
+        if ($RegionTopHost -and $RegionBottomHost -and $StackArchiveRegion) {
+            if ($RegionBottomHost.Children.Contains($StackArchiveRegion)) {
+                $RegionBottomHost.Children.Remove($StackArchiveRegion)
+            }
+            if (-not $RegionTopHost.Children.Contains($StackArchiveRegion)) {
+                $RegionTopHost.Children.Add($StackArchiveRegion)
+            }
+            $RegionTopHost.Visibility = [System.Windows.Visibility]::Visible
+        }
+        if ($ColBottomRegion) { $ColBottomRegion.Width = New-Object System.Windows.GridLength(0) }
+        if ($ColBottomGap) { $ColBottomGap.Width = New-Object System.Windows.GridLength(0) }
+        if ($ColBottomSearch) { $ColBottomSearch.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+    } else {
+        if ($RegionTopHost -and $RegionBottomHost -and $StackArchiveRegion) {
+            if ($RegionTopHost.Children.Contains($StackArchiveRegion)) {
+                $RegionTopHost.Children.Remove($StackArchiveRegion)
+            }
+            if (-not $RegionBottomHost.Children.Contains($StackArchiveRegion)) {
+                $RegionBottomHost.Children.Add($StackArchiveRegion)
+            }
+            $RegionTopHost.Visibility = [System.Windows.Visibility]::Collapsed
+        }
+        if ($ColBottomRegion) { $ColBottomRegion.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+        if ($ColBottomGap) { $ColBottomGap.Width = New-Object System.Windows.GridLength(10) }
+        if ($ColBottomSearch) { $ColBottomSearch.Width = New-Object System.Windows.GridLength(130) }
+    }
+
+    if ($Scope -eq 'Day') {
+        if ($ScopeDayIndicator) { $ScopeDayIndicator.Opacity = 1 }
+        if ($ScopeDayLabel) { $ScopeDayLabel.Foreground = [System.Windows.Media.Brushes]::White }
+        if ($ScopeMonthIndicator) { $ScopeMonthIndicator.Opacity = 0 }
+        if ($ScopeMonthLabel) { $ScopeMonthLabel.Foreground = $grayBrush }
+        if ($ScopeYearIndicator) { $ScopeYearIndicator.Opacity = 0 }
+        if ($ScopeYearLabel) { $ScopeYearLabel.Foreground = $grayBrush }
+
+        if ($ColArchiveYear) { $ColArchiveYear.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveMonthGap) { $ColArchiveMonthGap.Width = New-Object System.Windows.GridLength(10) }
+        if ($ColArchiveMonth) { $ColArchiveMonth.Width = New-Object System.Windows.GridLength(1.2, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveDayGap) { $ColArchiveDayGap.Width = New-Object System.Windows.GridLength(10) }
+        if ($ColArchiveDay) { $ColArchiveDay.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+
+        if ($StackArchiveMonth) { $StackArchiveMonth.Visibility = [System.Windows.Visibility]::Visible }
+        if ($StackArchiveDay) { $StackArchiveDay.Visibility = [System.Windows.Visibility]::Visible }
+        if ($ArchiveYearNotice) { $ArchiveYearNotice.Visibility = [System.Windows.Visibility]::Collapsed }
+    }
+    elseif ($Scope -eq 'Month') {
+        if ($ScopeDayIndicator) { $ScopeDayIndicator.Opacity = 0 }
+        if ($ScopeDayLabel) { $ScopeDayLabel.Foreground = $grayBrush }
+        if ($ScopeMonthIndicator) { $ScopeMonthIndicator.Opacity = 1 }
+        if ($ScopeMonthLabel) { $ScopeMonthLabel.Foreground = [System.Windows.Media.Brushes]::White }
+        if ($ScopeYearIndicator) { $ScopeYearIndicator.Opacity = 0 }
+        if ($ScopeYearLabel) { $ScopeYearLabel.Foreground = $grayBrush }
+
+        if ($ColArchiveYear) { $ColArchiveYear.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveMonthGap) { $ColArchiveMonthGap.Width = New-Object System.Windows.GridLength(10) }
+        if ($ColArchiveMonth) { $ColArchiveMonth.Width = New-Object System.Windows.GridLength(1.8, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveDayGap) { $ColArchiveDayGap.Width = New-Object System.Windows.GridLength(0) }
+        if ($ColArchiveDay) { $ColArchiveDay.Width = New-Object System.Windows.GridLength(0) }
+
+        if ($StackArchiveMonth) { $StackArchiveMonth.Visibility = [System.Windows.Visibility]::Visible }
+        if ($StackArchiveDay) { $StackArchiveDay.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($ArchiveYearNotice) { $ArchiveYearNotice.Visibility = [System.Windows.Visibility]::Collapsed }
+    }
+    elseif ($Scope -eq 'Year') {
+        if ($ScopeDayIndicator) { $ScopeDayIndicator.Opacity = 0 }
+        if ($ScopeDayLabel) { $ScopeDayLabel.Foreground = $grayBrush }
+        if ($ScopeMonthIndicator) { $ScopeMonthIndicator.Opacity = 0 }
+        if ($ScopeMonthLabel) { $ScopeMonthLabel.Foreground = $grayBrush }
+        if ($ScopeYearIndicator) { $ScopeYearIndicator.Opacity = 1 }
+        if ($ScopeYearLabel) { $ScopeYearLabel.Foreground = [System.Windows.Media.Brushes]::White }
+
+        if ($ColArchiveYear) { $ColArchiveYear.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveMonthGap) { $ColArchiveMonthGap.Width = New-Object System.Windows.GridLength(10) }
+        if ($ColArchiveMonth) { $ColArchiveMonth.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveDayGap) { $ColArchiveDayGap.Width = New-Object System.Windows.GridLength(0) }
+        if ($ColArchiveDay) { $ColArchiveDay.Width = New-Object System.Windows.GridLength(0) }
+
+        if ($StackArchiveMonth) { $StackArchiveMonth.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($StackArchiveDay) { $StackArchiveDay.Visibility = [System.Windows.Visibility]::Collapsed }
+        if ($ArchiveYearNotice) { $ArchiveYearNotice.Visibility = [System.Windows.Visibility]::Visible }
+    }
+}
+
+if ($ScopeDayBtn) { $ScopeDayBtn.Add_Click({ Set-ArchiveSearchScope 'Day' }) }
+if ($ScopeMonthBtn) { $ScopeMonthBtn.Add_Click({ Set-ArchiveSearchScope 'Month' }) }
+if ($ScopeYearBtn) { $ScopeYearBtn.Add_Click({ Set-ArchiveSearchScope 'Year' }) }
+
+if ($ArchiveSearchBtn -and $ArchiveSearchPopup) {
+    $script:archivePopupClosedAt = [DateTime]::MinValue
+    $archivePopupCardWidth = 430.0
+    $archivePopupCardHeight = 280.0
+    $archivePopupEdgePad = 8.0
+
+    $window.Add_SizeChanged({
+        if ($ArchiveSearchPopup -and $ArchiveSearchPopup.IsOpen) { $ArchiveSearchPopup.IsOpen = $false }
+    })
+
+    $ArchiveSearchBtn.Add_Click({
+        param($sender, $e)
+        if ($e) { $e.Handled = $true }
+
+        $msSinceClosed = ([DateTime]::Now - $script:archivePopupClosedAt).TotalMilliseconds
+        if ($msSinceClosed -lt 200) { return }
+
+        if (-not $ArchiveSearchPopup.IsOpen) {
+            if ($FiltersPopup -and $FiltersPopup.IsOpen) { $FiltersPopup.IsOpen = $false }
+            if ($SpotlightOptionsPopup -and $SpotlightOptionsPopup.IsOpen) { $SpotlightOptionsPopup.IsOpen = $false }
+
+            try {
+                $targetPos = $ArchiveSearchBtn.TranslatePoint([System.Windows.Point]::new(0, 0), $window)
+
+                $hOffset = -180.0
+                $maxH = ($window.ActualWidth - $archivePopupEdgePad) - $targetPos.X - $archivePopupCardWidth
+                $minH = $archivePopupEdgePad - $targetPos.X
+                if ($hOffset -gt $maxH) { $hOffset = $maxH }
+                if ($hOffset -lt $minH) { $hOffset = $minH }
+                $ArchiveSearchPopup.HorizontalOffset = $hOffset
+
+                $vOffset = 16.0
+                $targetBottom = $targetPos.Y + $ArchiveSearchBtn.ActualHeight
+                $roomBelow = $window.ActualHeight - $archivePopupEdgePad - $targetBottom
+                if ($roomBelow -lt $archivePopupCardHeight) {
+                    $vOffset = - ($ArchiveSearchBtn.ActualHeight + $archivePopupCardHeight + 16.0)
+                }
+                $ArchiveSearchPopup.VerticalOffset = $vOffset
+            }
+            catch {
+                $ArchiveSearchPopup.HorizontalOffset = -180.0
+                $ArchiveSearchPopup.VerticalOffset = 16.0
+            }
+        }
+
+        $ArchiveSearchPopup.IsOpen = -not $ArchiveSearchPopup.IsOpen
+    })
+
+    $ArchiveSearchPopup.Add_Opened({
+        Write-InteractionLog "[ARCHIVE_POPUP_OPEN] Archive Search popup opened"
+        try {
+            $source = [System.Windows.Interop.HwndSource]::FromVisual($ArchiveSearchPopup.Child)
+            if ($source -and $source.Handle -ne [IntPtr]::Zero) {
+                [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
+            }
+        } catch {}
+
+        if ($ArchiveSearchBtn) {
+            $ArchiveSearchBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
+            $ArchiveSearchBtn.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(16, 255, 255, 255))
+        }
+
+        $easing = New-Object System.Windows.Media.Animation.CubicEase
+        $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+        $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
+        $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, $dur
+        $fadeAnim.EasingFunction = $easing
+        $ArchiveSearchPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+    })
+
+    $ArchiveSearchPopup.Add_Closed({
+        $script:archivePopupClosedAt = [DateTime]::Now
+        Write-InteractionLog "[ARCHIVE_POPUP_CLOSE] Archive Search popup closed"
+        if ($ArchiveSearchBtn) {
+            $ArchiveSearchBtn.Background = [System.Windows.Media.Brushes]::Transparent
+            $ArchiveSearchBtn.BorderBrush = [System.Windows.Media.Brushes]::Transparent
+        }
+        $ArchiveSearchPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $ArchiveSearchPopupCard.Opacity = 0
+        Invoke-MemoryFlush -Reason "ArchivePopupClosed" -Async
+    })
+}
+
+if ($FetchArchiveBtn) {
+    $script:archiveSearchContext = $null
+
+    $FetchArchiveBtn.Add_Click({
+        if ($ArchiveSearchPopup) { $ArchiveSearchPopup.IsOpen = $false }
+
+        # Cancel any previous running search
+        if ($script:archiveSearchContext) {
+            try { $script:archiveSearchContext.Timer.Stop() } catch {}
+            try { $script:archiveSearchContext.PS.Stop() } catch {}
+            try { $script:archiveSearchContext.PS.Dispose() } catch {}
+            $script:archiveSearchContext = $null
+        }
+
+        $selYear = if ($ArchiveYearBox -and $ArchiveYearBox.SelectedItem) { [int]$ArchiveYearBox.SelectedItem } else { [DateTime]::Now.Year }
+        $selMonth = if ($ArchiveMonthBox) { $ArchiveMonthBox.SelectedIndex + 1 } else { [DateTime]::Now.Month }
+        $selDay = if ($ArchiveDayBox -and $ArchiveDayBox.SelectedItem) { [int]$ArchiveDayBox.SelectedItem } else { 1 }
+        $selRegionCode = if ($ArchiveRegionBox -and $ArchiveRegionBox.SelectedItem -and $ArchiveRegionBox.SelectedItem.Tag) { [string]$ArchiveRegionBox.SelectedItem.Tag } else { 'us' }
+        $scope = $script:archiveSearchScope
+
+        # Switch visually to Bing tab
+        if ($script:currentSource -ne 'Bing') {
+            $script:currentSource = 'Bing'
+            Update-SourceToggleVisual
+        }
+
+        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+        $StatusText.Opacity = 1
+        $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
+
+        $thumbDir = Join-Path $script:cacheDir "Thumbnails\Bing_$selRegionCode"
+        if (-not (Test-Path -LiteralPath $thumbDir)) {
+            try { New-Item -ItemType Directory -Path $thumbDir -Force | Out-Null } catch {}
+        }
+
+        if ($scope -eq 'Day') {
+            $targetDateStr = "$selYear-" + $selMonth.ToString("00") + "-" + $selDay.ToString("00")
+            $StatusText.Text = "Searching Bing archive for $targetDateStr..."
+        }
+        elseif ($scope -eq 'Month') {
+            $monthStr = $selMonth.ToString("00")
+            $StatusText.Text = "Loading Bing wallpapers for $selYear-$monthStr..."
+        }
+        elseif ($scope -eq 'Year') {
+            $StatusText.Text = "Loading full year archive for $selYear (this may take a few seconds)..."
+        }
+
+        $queue = [System.Collections.Queue]::Synchronized((New-Object System.Collections.Queue))
+        $ps = [PowerShell]::Create()
+        [void]$ps.AddScript({
+            param($Scope, $Country, $Year, $Month, $Day, $Queue, $LogPath, $ThumbDir)
+
+            function LogMsg($msg) {
+                if ($LogPath) {
+                    $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff")
+                    Add-Content -Path $LogPath -Value "[$ts] $msg" -ErrorAction SilentlyContinue
+                }
+            }
+
+            function FetchMonth($c, $y, $m) {
+                $mStr = $m.ToString("00")
+                $url = "https://peapix.com/bing/$c/$y/$mStr"
+                LogMsg "Requesting URL: $url"
+                try {
+                    $resp = Invoke-WebRequest -Uri $url -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -UseBasicParsing -TimeoutSec 12
+                    LogMsg "Received response: $($resp.StatusCode), Length: $($resp.Content.Length)"
+                    $html = $resp.Content
+                } catch {
+                    LogMsg "HTTP Error for $($url): $($_.Exception.Message)"
+                    return @()
+                }
+
+                $pattern = '(?s)<div class="[^"]*rounded-bottom">.*?<img[^>]*data-src="([^"]+)"[^>]*>.*?<a[^>]*href="(/bing/\d+)"[^>]*>([^<]+)</a>.*?<span class="text-body-tertiary fs-sm">([^<]+)</span>'
+                $matches = [regex]::Matches($html, $pattern)
+                LogMsg "Parsed $($matches.Count) wallpapers from $url"
+
+                $items = @()
+                foreach ($match in $matches) {
+                    $thumbUrl = $match.Groups[1].Value
+                    $pageUrl  = "https://peapix.com" + $match.Groups[2].Value
+                    $rawTitle = $match.Groups[3].Value.Trim()
+                    $title    = [System.Net.WebUtility]::HtmlDecode($rawTitle)
+                    $dateText = $match.Groups[4].Value.Trim()
+
+                    $baseImg  = $thumbUrl -replace '_640\.jpg$', ''
+                    $full1080 = $baseImg + '_1920.jpg'
+                    $full4k   = $baseImg + '.jpg'
+
+                    $parsedDate = $null
+                    try {
+                        $parsedDate = [DateTime]::ParseExact("$dateText $y", "MMMM dd yyyy", [System.Globalization.CultureInfo]::InvariantCulture).ToString("yyyy-MM-dd")
+                    } catch {
+                        $parsedDate = "$y-$mStr"
+                    }
+
+                    $items += [PSCustomObject]@{
+                        source       = 'Bing'
+                        title        = $title
+                        date         = $parsedDate
+                        dateText     = $dateText
+                        thumbUrl     = $thumbUrl
+                        url          = $full4k
+                        urlbase      = $full1080
+                        copyright    = "Bing Wallpaper - $parsedDate"
+                        photographer = ''
+                        pageUrl      = $pageUrl
+                        enddate      = ($parsedDate -replace '-', '')
+                        resX         = 3840
+                        resY         = 2160
+                        accentR      = 0
+                        accentG      = 120
+                        accentB      = 215
+                    }
+                }
+
+                # Download thumbnails in parallel in the background runspace before rendering
+                if ($items.Count -gt 0 -and $ThumbDir) {
+                    try {
+                        $thumbUrls = [string[]]($items | ForEach-Object { [string]$_.thumbUrl })
+                        $thumbTargets = [string[]]($items | ForEach-Object {
+                            $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                            Join-Path $ThumbDir "${safe}_thumb.jpg"
+                        })
+                        if ('BingWallpaper.FastDownloader' -as [type]) {
+                            [BingWallpaper.FastDownloader]::DownloadUrlsParallel($thumbUrls, $thumbTargets, 10)
+                        } else {
+                            $wc = New-Object System.Net.WebClient
+                            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+                            for ($k = 0; $k -lt $thumbUrls.Length; $k++) {
+                                if (-not (Test-Path -LiteralPath $thumbTargets[$k])) {
+                                    try { $wc.DownloadFile($thumbUrls[$k], $thumbTargets[$k]) } catch {}
+                                }
+                            }
+                            $wc.Dispose()
+                        }
+                        for ($k = 0; $k -lt $items.Count; $k++) {
+                            if (Test-Path -LiteralPath $thumbTargets[$k]) {
+                                $items[$k].thumbUrl = $thumbTargets[$k]
+                            }
+                        }
+                        LogMsg "Downloaded and verified $($items.Count) thumbnails in $ThumbDir"
+                    } catch {
+                        LogMsg "Error during parallel thumbnail download: $($_.Exception.Message)"
+                    }
+                }
+
+                return $items
+            }
+
+            try {
+                if ($Scope -eq 'Day') {
+                    $targetDateStr = "$Year-" + $Month.ToString("00") + "-" + $Day.ToString("00")
+                    LogMsg "Executing Day search for $targetDateStr in region $Country..."
+                    $monthItems = FetchMonth $Country $Year $Month
+                    $matched = $monthItems | Where-Object { $_.date -eq $targetDateStr }
+                    if (-not $matched -and $monthItems.Count -gt 0) {
+                        $matched = $monthItems | Where-Object { $_.dateText -match "\b0?$Day\b" }
+                    }
+                    if ($matched) {
+                        LogMsg "Found matching wallpaper: $($matched.title) ($($matched.date))"
+                    } else {
+                        LogMsg "No wallpaper matched $targetDateStr in $($monthItems.Count) month items"
+                    }
+                    $Queue.Enqueue(@{ Type = 'DayResult'; Date = $targetDateStr; Matched = $matched })
+                }
+                elseif ($Scope -eq 'Month') {
+                    $mStr = $Month.ToString("00")
+                    LogMsg "Executing Month search for $Year-$mStr in region $Country..."
+                    $monthItems = FetchMonth $Country $Year $Month
+                    $Queue.Enqueue(@{ Type = 'MonthResult'; MonthStr = "$Year-$mStr"; Items = $monthItems })
+                }
+                elseif ($Scope -eq 'Year') {
+                    LogMsg "Executing Year search for $Year in region $Country..."
+                    $maxM = if ($Year -eq [DateTime]::Now.Year) { [DateTime]::Now.Month } else { 12 }
+                    for ($m = $maxM; $m -ge 1; $m--) {
+                        $mItems = FetchMonth $Country $Year $m
+                        $Queue.Enqueue(@{ Type = 'YearMonthChunk'; Month = $m; Items = $mItems })
+                        Start-Sleep -Milliseconds 120
+                    }
+                }
+            }
+            catch {
+                LogMsg "Fatal error in archive worker: $($_.Exception.ToString())"
+                $Queue.Enqueue(@{ Type = 'Error'; Message = $_.Exception.Message })
+            }
+            finally {
+                $Queue.Enqueue(@{ Type = 'Completed' })
+            }
+        })
+
+        [void]$ps.AddArgument($scope)
+        [void]$ps.AddArgument($selRegionCode)
+        [void]$ps.AddArgument($selYear)
+        [void]$ps.AddArgument($selMonth)
+        [void]$ps.AddArgument($selDay)
+        [void]$ps.AddArgument($queue)
+        [void]$ps.AddArgument($script:archiveLogPath)
+        [void]$ps.AddArgument($thumbDir)
+
+        Write-ArchiveLog "[SEARCH_START] Scope=$scope, Year=$selYear, Month=$selMonth, Day=$selDay, Region=$selRegionCode"
+
+        $asyncHandle = $ps.BeginInvoke()
+
+        $script:archiveSearchTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:archiveSearchTimer.Interval = [TimeSpan]::FromMilliseconds(40)
+
+        $script:archiveSearchContext = @{
+            PS           = $ps
+            Handle       = $asyncHandle
+            Queue        = $queue
+            Scope        = $scope
+            Year         = $selYear
+            ThumbDir     = $thumbDir
+            TotalCount   = 0
+            IsFirstChunk = $true
+            Timer        = $script:archiveSearchTimer
+        }
+
+        $script:archiveSearchTimer.Add_Tick({
+            param($timerSender, $timerArgs)
+            if (-not $script:archiveSearchContext) {
+                $timerSender.Stop()
+                return
+            }
+
+            $ctx = $script:archiveSearchContext
+            while ($ctx.Queue.Count -gt 0) {
+                $msg = $ctx.Queue.Dequeue()
+                if ($msg.Type -eq 'DayResult') {
+                    if ($msg.Matched) {
+                        $StatusText.Text = "Loaded wallpaper for $($msg.Date)"
+                        Render-GalleryGrid -Images @($msg.Matched) -ThumbCacheDir $ctx.ThumbDir
+                        Write-ArchiveLog "[UI_RENDER] Rendered wallpaper for $($msg.Date): $($msg.Matched.title)"
+                    } else {
+                        $StatusText.Foreground = $statusErrorBrush
+                        $StatusText.Text = "No Bing wallpaper found for $($msg.Date)"
+                        Write-ArchiveLog "[UI_RESULT] No wallpaper found for $($msg.Date)"
+                    }
+                }
+                elseif ($msg.Type -eq 'MonthResult') {
+                    if ($msg.Items -and $msg.Items.Count -gt 0) {
+                        $StatusText.Text = "Loaded $($msg.Items.Count) wallpapers for $($msg.MonthStr)"
+                        Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir
+                        Write-ArchiveLog "[UI_RENDER] Rendered $($msg.Items.Count) wallpapers for $($msg.MonthStr)"
+                    } else {
+                        $StatusText.Foreground = $statusErrorBrush
+                        $StatusText.Text = "No Bing wallpapers found for $($msg.MonthStr)"
+                        Write-ArchiveLog "[UI_RESULT] No wallpapers found for $($msg.MonthStr)"
+                    }
+                }
+                elseif ($msg.Type -eq 'YearMonthChunk') {
+                    if ($msg.Items -and $msg.Items.Count -gt 0) {
+                        $ctx.TotalCount += $msg.Items.Count
+                        $curCount = $ctx.TotalCount
+                        $mNum = $msg.Month
+                        $StatusText.Text = "Loading $($ctx.Year) archive: $curCount wallpapers loaded (Month $mNum)..."
+                        if ($ctx.IsFirstChunk) {
+                            $ctx.IsFirstChunk = $false
+                            Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir
+                        } else {
+                            Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir -Append
+                        }
+                        Write-ArchiveLog "[UI_RENDER] Appended Month $mNum ($($msg.Items.Count) items). Total: $curCount"
+                    }
+                }
+                elseif ($msg.Type -eq 'Error') {
+                    $StatusText.Foreground = $statusErrorBrush
+                    $StatusText.Text = "Archive error: $($msg.Message)"
+                    Write-ArchiveLog "[UI_ERROR] $($msg.Message)"
+                }
+                elseif ($msg.Type -eq 'Completed') {
+                    $timerSender.Stop()
+                    if ($ctx.Scope -eq 'Year') {
+                        if ($ctx.TotalCount -gt 0) {
+                            $StatusText.Text = "Loaded $($ctx.TotalCount) wallpapers for year $($ctx.Year)"
+                        } else {
+                            $StatusText.Foreground = $statusErrorBrush
+                            $StatusText.Text = "No Bing wallpapers found for year $($ctx.Year)"
+                        }
+                    }
+                    Write-ArchiveLog "[SEARCH_COMPLETE] Finished processing $($ctx.Scope) for $($ctx.Year)"
+                    try { $ctx.PS.Dispose() } catch {}
+                    $script:archiveSearchContext = $null
+                    Invoke-MemoryFlush -Reason "ArchiveSearchComplete" -Async
+                    return
+                }
+            }
+        })
+
+        $script:archiveSearchTimer.Start()
+    })
 }
 
 
@@ -6264,6 +7419,7 @@ if ($detectedItem) {
 }
 
 $window.Add_ContentRendered({
+        Write-InteractionLog "[APP_STARTUP] ContentRendered fired"
         Start-DeferredNativeExtraCompile
         $RegionBox.Add_SelectionChanged({ Load-Gallery })
         Load-Gallery
@@ -6279,9 +7435,20 @@ $window.Add_ContentRendered({
                 Start-Process -FilePath $conhostExe -ArgumentList "--headless `"$powershellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -AutoApply" -WindowStyle Hidden
             }
         }
+
+        # Fast post-startup memory settle timer: 2.8 seconds after window renders, do a clean flush
+        $script:initSettleTimer = New-Object System.Windows.Threading.DispatcherTimer
+        $script:initSettleTimer.Interval = [TimeSpan]::FromMilliseconds(2800)
+        $script:initSettleTimer.Add_Tick({
+            $script:initSettleTimer.Stop()
+            $script:initSettleTimer = $null
+            Invoke-MemoryFlush -Reason "PostStartup-InitialSettle" -Async
+        })
+        $script:initSettleTimer.Start()
     })
 
 $RefreshBtn.Add_Click({
+        Write-InteractionLog "[REFRESH_CLICK] User clicked Refresh"
         if ($script:isRefreshAnimating) { return }
         if (-not $RefreshIcon) {
             Load-Gallery
@@ -6370,13 +7537,14 @@ $window.Add_PreviewKeyDown({
 
 $window.Add_StateChanged({
         if ($window.WindowState -eq [System.Windows.WindowState]::Minimized) {
-            try { [BingWallpaperNativeExtra]::FlushMemory() } catch {}
+            Write-InteractionLog "[WINDOW_MINIMIZE] Window minimized"
+            Invoke-MemoryFlush -Reason "WindowMinimized" -Async
         }
     })
 
 $script:memTrimTimer = New-Object System.Windows.Threading.DispatcherTimer
-$script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(45)
-$script:memTrimTimer.Add_Tick({ try { [BingWallpaperNativeExtra]::FlushMemory() } catch {} })
+$script:memTrimTimer.Interval = [TimeSpan]::FromSeconds(30)
+$script:memTrimTimer.Add_Tick({ Invoke-MemoryFlush -Reason "Periodic-Idle-Trim" -Async })
 $script:memTrimTimer.Start()
 
 [System.Windows.Threading.Dispatcher]::CurrentDispatcher.add_UnhandledException({

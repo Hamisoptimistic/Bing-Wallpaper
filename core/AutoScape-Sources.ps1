@@ -389,6 +389,11 @@ function Get-BingImageUri {
         throw "Invalid Local image data - missing file path."
     }
 
+    if ($Image.url -and ($Image.url -match '^https?://') -and (-not $Image.urlbase -or -not ($Image.urlbase -match '^/th\?id='))) {
+        if ($Resolution -match '1080' -and $Image.urlbase) { return $Image.urlbase }
+        return $Image.url
+    }
+
     $urlBase = $Image.urlbase
     if (-not $urlBase -or -not ($urlBase -match '^/th\?id=')) {
         throw "Invalid image URLBase format received from Bing."
