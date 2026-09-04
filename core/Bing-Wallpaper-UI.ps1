@@ -5464,6 +5464,50 @@ function Update-ToolbarCompactState {
 }
 
 
+function Get-CleanGeographicLocation($image) {
+    if (-not $image) { return $null }
+    $raw = ""
+
+    # Priority 1: Spotlight titles are usually real places (with possible photographic prefix)
+    if ($image.source -eq 'Spotlight') {
+        if ($image.title) { $raw = $image.title.Trim() }
+    }
+    # Priority 2: Bing copyright strings follow "Location (© Photographer/Agency)"
+    elseif ($image.copyright -and $image.source -ne 'Local') {
+        $c = $image.copyright -replace '\s*\(.*?\)\s*$', ''
+        $c = ($c -replace '^[©\s]+', '').Trim()
+        $c = ($c -replace '^Photo by .+? on Pexels', '').Trim()
+        if ($c.Length -gt 2 -and $c -notmatch '^(by |©|c )?[A-Z][a-z]+ [A-Z][a-z]+(\/iStock|\/Getty|\/Moment|\/500px)?$') {
+            $raw = $c
+        }
+    }
+
+    # Priority 3: General image title if meaningful
+    if (-not $raw -and $image.title -and $image.title.Trim().Length -gt 2 -and $image.title -notmatch '^AutoScape') {
+        $raw = $image.title.Trim()
+    }
+
+    if (-not $raw) { return $null }
+
+    # Clean out photographic / descriptive prefixes that break geocoders
+    $loc = $raw
+    $loc = $loc -replace '^(Aerial|Drone|Bird''s[- ]eye|Elevated|Panoramic|Scenic|High[- ]angle|Low[- ]angle)\s+view\s+(of\s+)?', ''
+    $loc = $loc -replace '^(Close[- ]up|Detail|Building detail|Architectural detail)\s+(of\s+)?', ''
+    $loc = $loc -replace '^(A\s+)?(Sunrise|Sunset|Dawn|Dusk)\s+(over|at|in)\s+', ''
+    $loc = $loc -replace '^(Snow[- ]covered|Sunlit|Misty|Foggy|Dramatic|Golden|Vibrant|Autumn|Winter|Summer|Spring)\s+(huts\s+and\s+|peaks\s+and\s+|trees\s+and\s+)?', ''
+    $loc = $loc -replace '^.+?\s+emerging\s+from\s+[^,]+,\s*', ''
+    $loc = $loc -replace '^Sunrise\s+long\s+exposure\s+waves,\s*', ''
+    $loc = $loc -replace '^Whale\s+shark\s+and\s+golden\s+trevally,\s*', ''
+    $loc = $loc -replace '^Horsehair\s+parachute\s+fungus,\s*', ''
+    $loc = $loc -replace '^Sunlit\s+huts\s+and\s+', ''
+    $loc = $loc -replace '\s+during\s+[^,]+', ''
+    $loc = $loc -replace '\s+at\s+(sunset|sunrise|night|dusk|dawn)', ''
+
+    $loc = $loc.Trim(' ,.-')
+    if ($loc.Length -le 1) { return $null }
+    return $loc
+}
+
 function Render-GalleryGrid {
     param(
         [array]$Images,
@@ -5604,26 +5648,7 @@ function Render-GalleryGrid {
         $script:revealElements.Add(@{ Element = $revealBorder; Brush = $revealBorderBrush }) | Out-Null
 
         # Context Menu: Explore in 3D (Google Earth) styled to match the Tab Bar pill
-        $cleanLocation = $null
-        if ($image.source -eq 'Spotlight' -and $image.title) {
-            $cleanLocation = $image.title.Trim()
-        }
-        elseif ($image.copyrightlink -and $image.copyrightlink -match 'q=([^&]+)') {
-            $rawQ = [System.Uri]::UnescapeDataString($Matches[1]) -replace '\+', ' '
-            if ($rawQ.Trim().Length -gt 1) {
-                $cleanLocation = $rawQ.Trim()
-            }
-        }
-        if (-not $cleanLocation -and $image.title -and $image.title.Trim().Length -gt 1 -and $image.title -notmatch '^AutoScape') {
-            $cleanLocation = $image.title.Trim()
-        }
-        if (-not $cleanLocation -and $image.copyright -and $image.source -ne 'Local') {
-            $rawLoc = ($image.copyright -replace '\s*\(.*?\)', '') -replace '^Photo by .+? on Pexels', ''
-            $rawLoc = ($rawLoc -replace '^[©\s]+', '').Trim()
-            if ($rawLoc.Length -gt 2) {
-                $cleanLocation = $rawLoc
-            }
-        }
+        $cleanLocation = Get-CleanGeographicLocation $image
 
         if ($cleanLocation) {
             $cardMenu = New-Object System.Windows.Controls.ContextMenu
