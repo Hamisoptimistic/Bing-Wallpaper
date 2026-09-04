@@ -1535,8 +1535,18 @@ try { [AppUserModel]::SetCurrentProcessExplicitAppUserModelID("AutoScape.App") }
 $xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="" Height="780" Width="1100" MinWidth="820" MinHeight="560"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="AutoScape" Height="780" Width="1100" MinWidth="820" MinHeight="560"
+        WindowStyle="None"
         Background="Transparent" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen" WindowState="Maximized">
+    
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="48"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
     
     <Window.Resources>
         <Style TargetType="Button">
@@ -1825,9 +1835,72 @@ $xaml = @"
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="CaptionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="BgBorder" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BgBorder" Property="Background" Value="#25FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BgBorder" Property="Background" Value="#35FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CaptionCloseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="BgBorder" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BgBorder" Property="Background" Value="#E81123"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BgBorder" Property="Background" Value="#C4101F"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
+        <!-- Top-right custom window caption buttons (Minimize, Maximize/Restore, Close) -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="999" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <Button Name="CaptionMinBtn" Style="{StaticResource CaptionButtonStyle}" ToolTip="Minimize">
+                <TextBlock Text="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC"/>
+            </Button>
+            <Button Name="CaptionMaxBtn" Style="{StaticResource CaptionButtonStyle}" ToolTip="Restore">
+                <TextBlock Name="CaptionMaxIcon" Text="&#xE923;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC"/>
+            </Button>
+            <Button Name="CaptionCloseBtn" Style="{StaticResource CaptionCloseButtonStyle}" ToolTip="Close">
+                <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#CCCCCC"/>
+            </Button>
+        </StackPanel>
+
         <Grid Name="MainContent" Margin="24,20,24,16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -2234,7 +2307,7 @@ $xaml = @"
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="3" Margin="0,28,16,0">
+            <Grid Grid.Row="3" Margin="0,16,16,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -2341,9 +2414,12 @@ if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 
 function Set-AutoScapeIcon {
     param([System.Windows.Window]$TargetWindow)
+    $parentDir = Split-Path -Parent $scriptDir
     $candidates = @(
         (Join-Path $scriptDir 'assets\app.ico'),
         (Join-Path $scriptDir 'app.ico'),
+        (Join-Path $parentDir 'assets\app.ico'),
+        (Join-Path $parentDir 'app.ico'),
         (Join-Path $scriptDir 'assets\bing.ico'),
         (Join-Path $scriptDir 'bing.ico')
     )
@@ -2388,46 +2464,134 @@ function Set-AutoScapeIcon {
 
 $script:taskbarIconPath = Set-AutoScapeIcon -TargetWindow $window
 
-if (-not ('AutoScapeTitleBarHelper' -as [type])) {
+if (-not ('AutoScapeChromeHelper' -as [type])) {
     try {
         Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
+using System.Windows.Interop;
 
-public static class AutoScapeTitleBarHelper
+public static class AutoScapeChromeHelper
 {
-    [DllImport("user32.dll")]
-    public static extern int GetWindowLong(IntPtr hwnd, int index);
+    private const int WM_GETMINMAXINFO = 0x0024;
+    private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
 
     [DllImport("user32.dll")]
-    public static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
 
-    [DllImport("user32.dll")]
-    public static extern bool SetWindowPos(IntPtr hwnd, IntPtr hwndInsertAfter, int x, int y, int width, int height, uint flags);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
-    public const int GWL_EXSTYLE = -20;
-    public const int WS_EX_DLGMODALFRAME = 0x0001;
-    public const uint SWP_FRAMECHANGED = 0x0020;
-    public const uint SWP_NOMOVE = 0x0002;
-    public const uint SWP_NOSIZE = 0x0001;
-    public const uint SWP_NOZORDER = 0x0004;
-    public const uint WM_SETICON = 0x0080;
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern IntPtr LoadImage(IntPtr hinst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
 
-    public static void RemoveTitleBarIcon(IntPtr hwnd)
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int x;
+        public int y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MINMAXINFO
+    {
+        public POINT ptReserved;
+        public POINT ptMaxSize;
+        public POINT ptMaxPosition;
+        public POINT ptMinTrackSize;
+        public POINT ptMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    public struct RECT
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    public struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    public const uint WM_SETICON = 0x0080;
+    public const uint IMAGE_ICON = 1;
+    public const uint LR_LOADFROMFILE = 0x0010;
+    public const uint LR_DEFAULTSIZE = 0x0040;
+
+    public static void Attach(IntPtr hwnd)
     {
         try {
-            SendMessage(hwnd, WM_SETICON, new IntPtr(0), IntPtr.Zero);
-            SendMessage(hwnd, WM_SETICON, new IntPtr(1), IntPtr.Zero);
-            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
-            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle | WS_EX_DLGMODALFRAME);
-            SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            HwndSource source = HwndSource.FromHwnd(hwnd);
+            if (source != null)
+            {
+                source.AddHook(new HwndSourceHook(HookProc));
+            }
+        } catch {}
+    }
+
+    public static IntPtr HookProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_GETMINMAXINFO)
+        {
+            try {
+                IntPtr hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                if (hMonitor != IntPtr.Zero)
+                {
+                    MONITORINFO mi = new MONITORINFO();
+                    mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                    if (GetMonitorInfo(hMonitor, ref mi))
+                    {
+                        MINMAXINFO mmi = (MINMAXINFO)Marshal.PtrToStructure(lParam, typeof(MINMAXINFO));
+                        
+                        mmi.ptMaxPosition.x = Math.Abs(mi.rcWork.left - mi.rcMonitor.left);
+                        mmi.ptMaxPosition.y = Math.Abs(mi.rcWork.top - mi.rcMonitor.top);
+                        mmi.ptMaxSize.x = Math.Abs(mi.rcWork.right - mi.rcWork.left);
+                        mmi.ptMaxSize.y = Math.Abs(mi.rcWork.bottom - mi.rcWork.top);
+                        mmi.ptMaxTrackSize.x = mmi.ptMaxSize.x;
+                        mmi.ptMaxTrackSize.y = mmi.ptMaxSize.y;
+
+                        Marshal.StructureToPtr(mmi, lParam, true);
+                        handled = true;
+                    }
+                }
+            } catch {}
+        }
+        return IntPtr.Zero;
+    }
+
+    public static void ApplyAppIcon(IntPtr hwnd, string iconPath)
+    {
+        try {
+            if (!string.IsNullOrEmpty(iconPath) && System.IO.File.Exists(iconPath))
+            {
+                // 1. Big icon (32x32 / 48x48) for Taskbar button and Alt+Tab
+                IntPtr hBigIcon = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+                if (hBigIcon != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, new IntPtr(1), hBigIcon);
+                }
+
+                // 2. Small icon (16x16) for Taskbar hover preview header and Alt+Tab corner badge
+                IntPtr hSmallIcon = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+                if (hSmallIcon != IntPtr.Zero)
+                {
+                    SendMessage(hwnd, WM_SETICON, new IntPtr(0), hSmallIcon);
+                }
+            }
         } catch {}
     }
 }
-"@ -ErrorAction SilentlyContinue
+"@ -ReferencedAssemblies WindowsBase, PresentationCore, PresentationFramework -ErrorAction SilentlyContinue
     } catch {}
 }
 
@@ -2435,7 +2599,8 @@ $applyDarkTitleBar = {
     try {
         $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
         if ($helper.Handle -ne [IntPtr]::Zero) {
-            try { [AutoScapeTitleBarHelper]::RemoveTitleBarIcon($helper.Handle) } catch {}
+            try { [AutoScapeChromeHelper]::Attach($helper.Handle) } catch {}
+            try { [AutoScapeChromeHelper]::ApplyAppIcon($helper.Handle, $script:taskbarIconPath) } catch {}
             [BingWallpaperNative]::EnableDarkTitleBar($helper.Handle, -1)
 
             # Explicitly require Windows 11 (Build 22000+) to prevent the pitch-black Transparent bug on Win10
@@ -2504,6 +2669,11 @@ $window.Add_StateChanged({
         }
         if ($script:activeDialogModalControl) {
             Close-DialogModal
+        }
+        if ($CaptionMaxIcon) {
+            $isMax = ($window.WindowState -eq [System.Windows.WindowState]::Maximized)
+            $CaptionMaxIcon.Text = if ($isMax) { [char]0xE923 } else { [char]0xE922 }
+            if ($CaptionMaxBtn) { $CaptionMaxBtn.ToolTip = if ($isMax) { 'Restore' } else { 'Maximize' } }
         }
     })
 $script:appSettings = Load-Settings
@@ -2741,6 +2911,27 @@ Enable-StrictToolTipDelay $InfoBtn
 $CheckUpdateBtn = $null
 $DownloadBtn = $window.FindName('DownloadBtn')
 $UpdateBtn = $window.FindName('UpdateBtn')
+
+$CaptionMinBtn = $window.FindName('CaptionMinBtn')
+$CaptionMaxBtn = $window.FindName('CaptionMaxBtn')
+$CaptionCloseBtn = $window.FindName('CaptionCloseBtn')
+$CaptionMaxIcon = $window.FindName('CaptionMaxIcon')
+
+if ($CaptionMinBtn) {
+    $CaptionMinBtn.Add_Click({ $window.WindowState = [System.Windows.WindowState]::Minimized })
+}
+if ($CaptionMaxBtn) {
+    $CaptionMaxBtn.Add_Click({
+        $window.WindowState = if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
+            [System.Windows.WindowState]::Normal
+        } else {
+            [System.Windows.WindowState]::Maximized
+        }
+    })
+}
+if ($CaptionCloseBtn) {
+    $CaptionCloseBtn.Add_Click({ $window.Close() })
+}
 
 # --- Source toggle pill -----------------
 $SourceBingBtn = $window.FindName('SourceBingBtn')
