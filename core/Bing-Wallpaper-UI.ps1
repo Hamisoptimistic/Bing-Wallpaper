@@ -12,7 +12,58 @@ param(
 
 $script:startStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
-$script:timingLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\startup-timing.log'
+# Unified industry-standard directory structure under %LOCALAPPDATA%\AutoScape
+$script:autoScapeRoot = Join-Path $env:LOCALAPPDATA 'AutoScape'
+$script:logsDir       = Join-Path $script:autoScapeRoot 'logs'
+$script:cacheDir      = Join-Path $script:autoScapeRoot 'cache'
+$script:settingsPath  = Join-Path $script:autoScapeRoot 'settings.json'
+
+function Initialize-AutoScapeDirectories {
+    try {
+        foreach ($d in @($script:autoScapeRoot, $script:logsDir, $script:cacheDir)) {
+            if (-not (Test-Path -LiteralPath $d)) {
+                New-Item -ItemType Directory -Path $d -Force | Out-Null
+            }
+        }
+
+        # 1. Seamless migration: copy legacy settings.json if new one doesn't exist yet
+        $legacySettingsPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\settings.json'
+        if (-not (Test-Path -LiteralPath $script:settingsPath) -and (Test-Path -LiteralPath $legacySettingsPath)) {
+            Copy-Item -LiteralPath $legacySettingsPath -Destination $script:settingsPath -Force
+        }
+
+        # 2. Seamless migration: copy legacy cache & thumbnails if new cache is empty
+        $legacyCacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
+        if (Test-Path -LiteralPath $legacyCacheDir) {
+            $legacyThumbs = Join-Path $legacyCacheDir 'Thumbnails'
+            $newThumbs = Join-Path $script:cacheDir 'Thumbnails'
+            if (-not (Test-Path -LiteralPath $newThumbs) -and (Test-Path -LiteralPath $legacyThumbs)) {
+                Copy-Item -Path $legacyThumbs -Destination $newThumbs -Recurse -Force
+            }
+            $legacyCurrent = Join-Path $legacyCacheDir 'current_wallpaper.jpg'
+            $newCurrent = Join-Path $script:cacheDir 'current_wallpaper.jpg'
+            if (-not (Test-Path -LiteralPath $newCurrent) -and (Test-Path -LiteralPath $legacyCurrent)) {
+                Copy-Item -LiteralPath $legacyCurrent -Destination $newCurrent -Force
+            }
+        }
+
+        # 3. Seamless migration: move root-level local_index.json into cache
+        $legacyIndex = Join-Path $script:autoScapeRoot 'local_index.json'
+        $newIndex = Join-Path $script:cacheDir 'local_index.json'
+        if (Test-Path -LiteralPath $legacyIndex) {
+            if (-not (Test-Path -LiteralPath $newIndex)) {
+                Move-Item -LiteralPath $legacyIndex -Destination $newIndex -Force
+            }
+            else {
+                Remove-Item -LiteralPath $legacyIndex -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    catch {}
+}
+Initialize-AutoScapeDirectories
+
+$script:timingLogPath = Join-Path $script:logsDir 'startup-timing.log'
 function Write-TimingLog {
     param([string]$Message)
     try {
@@ -231,7 +282,7 @@ function Show-AppErrorDialog {
 # extracted, cached, or written to disk, so there is no unsigned binary for
 # Smart App Control to evaluate or block. csc.exe (Microsoft-signed) does the
 # compiling; the resulting assembly lives only in this process's memory.
-$script:nativeLoadLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\native-load.log'
+$script:nativeLoadLogPath = Join-Path $script:logsDir 'native-load.log'
 function Write-NativeLoadLog {
     param([string]$Message)
     try {
@@ -1245,7 +1296,7 @@ function Set-BingImage {
         [string]$Style = 'Fit'
     )
 
-    $cacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
+    $cacheDir = $script:cacheDir
     if (!(Test-Path -LiteralPath $cacheDir)) {
         New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
     }
@@ -1312,7 +1363,7 @@ function Save-BingImage {
     return $downloadPath
 }
 
-$script:settingsPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\settings.json'
+$script:settingsPath = Join-Path $script:autoScapeRoot 'settings.json'
 
 function Load-Settings {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -3083,7 +3134,7 @@ function Select-LocalWallpaperFolder {
 
     if ($picked -and (Test-Path -LiteralPath $picked)) {
         if ($script:localFolderPath -ne $picked) {
-            $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+            $indexPath = Join-Path $script:cacheDir 'local_index.json'
             if (Test-Path -LiteralPath $indexPath) { Remove-Item -LiteralPath $indexPath -Force -ErrorAction SilentlyContinue }
         }
         $script:localFolderPath = $picked
@@ -3754,7 +3805,7 @@ function Start-RefreshAnimation {
             $finishedRotation.Angle = 0
             try {
                 if ($script:currentSource -eq 'Local') {
-                    $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+                    $indexPath = Join-Path $script:cacheDir 'local_index.json'
                     if (Test-Path -LiteralPath $indexPath) { Remove-Item -LiteralPath $indexPath -Force -ErrorAction SilentlyContinue }
                 }
                 Load-Gallery
@@ -4061,7 +4112,7 @@ function Apply-WallpaperAsync {
     if ($Card) { Start-CardDownloadAnimation $Card }
 
     $imageUri = Get-BingImageUri -Image $Image -Resolution $Resolution
-    $cacheDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
+    $cacheDir = $script:cacheDir
     if (-not (Test-Path -LiteralPath $cacheDir)) {
         try { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null } catch {}
     }
@@ -5273,7 +5324,7 @@ function Load-Gallery {
             return
         }
     }
-    $cacheBaseDir = Join-Path $env:LOCALAPPDATA 'BingWallpaper\Cache'
+    $cacheBaseDir = $script:cacheDir
     $thumbCacheDir = Join-Path $cacheBaseDir 'Thumbnails'
     
     if ($fetchSource -eq 'Bing') {

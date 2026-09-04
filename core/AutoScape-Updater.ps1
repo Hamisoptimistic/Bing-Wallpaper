@@ -15,7 +15,7 @@ $script:updateDlTimer = $null
 # guesswork. The background helper process (spawned during install) writes
 # to this same file via its own copy of this function, since it's a plain
 # text file append and needs no cross-process coordination.
-$script:updateLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\update.log'
+$script:updateLogPath = Join-Path $env:LOCALAPPDATA 'AutoScape\logs\update.log'
 function Write-UpdateLog {
     param([string]$Message)
     try {
@@ -426,7 +426,7 @@ catch {
     try {
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show(
-            "AutoScape could not complete the update.`n`n$($_.Exception.Message)`n`nSee update.log in %LOCALAPPDATA%\BingWallpaper for details.",
+            "AutoScape could not complete the update.`n`n$($_.Exception.Message)`n`nSee update.log in %LOCALAPPDATA%\AutoScape\logs for details.",
             'AutoScape Update',
             [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Error

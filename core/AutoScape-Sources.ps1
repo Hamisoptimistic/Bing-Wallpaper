@@ -893,7 +893,15 @@ namespace AutoScapeLocal
                 catch {}
             }
             # Fast safe file discovery & caching
-            $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+            $indexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\cache\local_index.json'
+            $legacyIndexPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_index.json'
+            if (-not (Test-Path -LiteralPath $indexPath) -and (Test-Path -LiteralPath $legacyIndexPath)) {
+                try {
+                    $cacheDir = Split-Path -Parent $indexPath
+                    if (-not (Test-Path -LiteralPath $cacheDir)) { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null }
+                    Move-Item -LiteralPath $legacyIndexPath -Destination $indexPath -Force
+                } catch {}
+            }
             $foundFiles = $null
             if (Test-Path -LiteralPath $indexPath) {
                 try {
@@ -924,6 +932,8 @@ namespace AutoScapeLocal
                 }
                 if ($foundFiles -and $foundFiles.Count -gt 0) {
                     try {
+                        $indexDir = Split-Path -Parent $indexPath
+                        if (-not (Test-Path -LiteralPath $indexDir)) { New-Item -ItemType Directory -Path $indexDir -Force | Out-Null }
                         $foundFiles.ToArray() | ConvertTo-Json -Depth 1 -Compress | Set-Content -LiteralPath $indexPath -Encoding UTF8 -Force
                     }
                     catch {}
@@ -2232,7 +2242,9 @@ namespace AutoScapeLocal
         $stack = $_.ScriptStackTrace
         if ($Source -eq 'Local') {
             try {
-                $logPath = Join-Path $env:LOCALAPPDATA 'AutoScape\local_error.log'
+                $logPath = Join-Path $env:LOCALAPPDATA 'AutoScape\logs\local_error.log'
+                $logDir = Split-Path -Parent $logPath
+                if (-not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
                 Add-Content -Path $logPath -Value "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] ERROR fetching Local Gallery:`n$errMsg`n$stack`n------------------------"
             }
             catch {}

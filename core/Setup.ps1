@@ -17,7 +17,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$setupLogPath = Join-Path $env:LOCALAPPDATA 'BingWallpaper\setup.log'
+$setupLogPath = Join-Path $env:LOCALAPPDATA 'AutoScape\logs\setup.log'
 function Write-SetupLog {
     param([string]$Message)
     try {
