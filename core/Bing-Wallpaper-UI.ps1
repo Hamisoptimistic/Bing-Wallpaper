@@ -828,7 +828,7 @@ namespace BingWallpaper
     {
         // Approximate dominant-color extraction: downsample and average, biased
         // away from near-black/near-white pixels so the accent isn't washed out.
-        public static SolidColorBrush ExtractBrush(string imagePath)
+        public static byte[] ExtractRgb(string imagePath)
         {
             try
             {
@@ -837,7 +837,7 @@ namespace BingWallpaper
                     BitmapCreateOptions.IgnoreColorProfile,
                     BitmapCacheOption.OnLoad);
                 if (decoder.Frames.Count == 0)
-                    return new SolidColorBrush(Color.FromArgb(235, 0, 120, 215));
+                    return new byte[] { 0, 120, 215 };
 
                 var frame = new TransformedBitmap(decoder.Frames[0],
                     new ScaleTransform(
@@ -862,35 +862,51 @@ namespace BingWallpaper
                     r += rr; g += gg; b += bb;
                     count++;
                 }
-                byte finalR, finalG, finalB;
                 if (count > 0)
-                {
-                    finalR = (byte)(r / count);
-                    finalG = (byte)(g / count);
-                    finalB = (byte)(b / count);
-                }
+                    return new byte[] { (byte)(r / count), (byte)(g / count), (byte)(b / count) };
                 else if (pixels.Length >= 4)
                 {
                     int totalPix = pixels.Length / 4;
-                    finalR = (byte)(rAll / totalPix);
-                    finalG = (byte)(gAll / totalPix);
-                    finalB = (byte)(bAll / totalPix);
+                    return new byte[] { (byte)(rAll / totalPix), (byte)(gAll / totalPix), (byte)(bAll / totalPix) };
                 }
-                else
-                {
-                    finalR = 0; finalG = 120; finalB = 215;
-                }
-
-                var brush = new SolidColorBrush(Color.FromArgb(235, finalR, finalG, finalB));
-                brush.Freeze();
-                return brush;
+                return new byte[] { 0, 120, 215 };
             }
             catch
             {
-                var brush = new SolidColorBrush(Color.FromArgb(235, 0, 120, 215));
-                brush.Freeze();
-                return brush;
+                return new byte[] { 0, 120, 215 };
             }
+        }
+
+        public static void ExtractBatchRgb(string[] paths, out byte[] rOut, out byte[] gOut, out byte[] bOut)
+        {
+            int n = paths == null ? 0 : paths.Length;
+            byte[] r = new byte[n];
+            byte[] g = new byte[n];
+            byte[] b = new byte[n];
+            if (n == 0) { rOut = r; gOut = g; bOut = b; return; }
+
+            Parallel.For(0, n, i => {
+                if (string.IsNullOrEmpty(paths[i]) || !System.IO.File.Exists(paths[i])) {
+                    r[i] = 0; g[i] = 120; b[i] = 215;
+                    return;
+                }
+                byte[] rgb = ExtractRgb(paths[i]);
+                r[i] = rgb[0];
+                g[i] = rgb[1];
+                b[i] = rgb[2];
+            });
+
+            rOut = r;
+            gOut = g;
+            bOut = b;
+        }
+
+        public static SolidColorBrush ExtractBrush(string imagePath)
+        {
+            byte[] rgb = ExtractRgb(imagePath);
+            var brush = new SolidColorBrush(Color.FromArgb(235, rgb[0], rgb[1], rgb[2]));
+            brush.Freeze();
+            return brush;
         }
     }
 
@@ -7227,9 +7243,9 @@ if ($FetchArchiveBtn) {
                         enddate      = ($parsedDate -replace '-', '')
                         resX         = 3840
                         resY         = 2160
-                        accentR      = 0
-                        accentG      = 120
-                        accentB      = 215
+                        accentR      = $null
+                        accentG      = $null
+                        accentB      = $null
                     }
                 }
 
@@ -7258,9 +7274,27 @@ if ($FetchArchiveBtn) {
                                 $items[$k].thumbUrl = $thumbTargets[$k]
                             }
                         }
-                        LogMsg "Downloaded and verified $($items.Count) thumbnails in $ThumbDir"
+
+                        # Extract dynamic accent colors in parallel on the background worker thread (ZERO UI freeze!)
+                        if ('BingWallpaper.FastAccent' -as [type]) {
+                            [byte[]]$rOut = $null
+                            [byte[]]$gOut = $null
+                            [byte[]]$bOut = $null
+                            [BingWallpaper.FastAccent]::ExtractBatchRgb($thumbTargets, [ref]$rOut, [ref]$gOut, [ref]$bOut)
+                            for ($k = 0; $k -lt $items.Count; $k++) {
+                                if ($rOut -and $k -lt $rOut.Length) {
+                                    $items[$k].accentR = $rOut[$k]
+                                    $items[$k].accentG = $gOut[$k]
+                                    $items[$k].accentB = $bOut[$k]
+                                }
+                            }
+                            # RAM optimization: clean up temporary image decoding memory in background runspace
+                            [System.GC]::Collect(0, [System.GCCollectionMode]::Forced, $false)
+                        }
+
+                        LogMsg "Downloaded and verified $($items.Count) thumbnails with dynamic accents in $ThumbDir"
                     } catch {
-                        LogMsg "Error during parallel thumbnail download: $($_.Exception.Message)"
+                        LogMsg "Error during parallel thumbnail download/accent extraction: $($_.Exception.Message)"
                     }
                 }
 
