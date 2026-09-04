@@ -785,6 +785,7 @@ namespace AutoScapeLocal
                         }
                     }
 
+                    BitmapSource accentSource = null;
                     if (!File.Exists(item.ThumbPath))
                     {
                         var bmp = new BitmapImage();
@@ -805,10 +806,29 @@ namespace AutoScapeLocal
                         {
                             encoder.Save(fs);
                         }
-
+                        accentSource = bmp;
+                    }
+                    else
+                    {
                         try
                         {
-                            var frame = new TransformedBitmap(bmp, new ScaleTransform(32.0 / bmp.PixelWidth, 32.0 / bmp.PixelHeight));
+                            var bmp = new BitmapImage();
+                            bmp.BeginInit();
+                            bmp.UriSource = new Uri(item.ThumbPath);
+                            bmp.DecodePixelWidth = 32;
+                            bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.EndInit();
+                            bmp.Freeze();
+                            accentSource = bmp;
+                        }
+                        catch {}
+                    }
+
+                    if (accentSource != null)
+                    {
+                        try
+                        {
+                            var frame = new TransformedBitmap(accentSource, new ScaleTransform(32.0 / accentSource.PixelWidth, 32.0 / accentSource.PixelHeight));
                             var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
                             int w = converted.PixelWidth, h = converted.PixelHeight;
                             int stride = w * 4;
@@ -816,33 +836,48 @@ namespace AutoScapeLocal
                             converted.CopyPixels(pixels, stride, 0);
 
                             long r = 0, g = 0, b = 0;
+                            long rAll = 0, gAll = 0, bAll = 0;
                             int count = 0;
                             for (int p = 0; p < pixels.Length; p += 4)
                             {
                                 byte bb = pixels[p], gg = pixels[p + 1], rr = pixels[p + 2];
+                                rAll += rr; gAll += gg; bAll += bb;
                                 int lum = (rr + gg + bb) / 3;
                                 if (lum < 18 || lum > 238) continue;
                                 r += rr; g += gg; b += bb;
                                 count++;
                             }
-                            if (count == 0) count = 1;
-                            item.R = (byte)(r / count);
-                            item.G = (byte)(g / count);
-                            item.B = (byte)(b / count);
+                            if (count > 0)
+                            {
+                                item.R = (byte)(r / count);
+                                item.G = (byte)(g / count);
+                                item.B = (byte)(b / count);
+                            }
+                            else if (pixels.Length >= 4)
+                            {
+                                int totalPix = pixels.Length / 4;
+                                item.R = (byte)(rAll / totalPix);
+                                item.G = (byte)(gAll / totalPix);
+                                item.B = (byte)(bAll / totalPix);
+                            }
+                            else
+                            {
+                                item.R = 0; item.G = 120; item.B = 215;
+                            }
                         }
                         catch
                         {
-                            item.R = 70; item.G = 70; item.B = 70;
+                            item.R = 0; item.G = 120; item.B = 215;
                         }
                     }
                     else
                     {
-                        item.R = 70; item.G = 70; item.B = 70;
+                        item.R = 0; item.G = 120; item.B = 215;
                     }
                 }
                 catch
                 {
-                    item.R = 70; item.G = 70; item.B = 70;
+                    item.R = 0; item.G = 120; item.B = 215;
                 }
 
                 results[i] = item;
@@ -966,9 +1001,9 @@ namespace AutoScapeLocal
                             resY      = 0
                             fileSize  = $fi.Length
                             fileType  = $fi.Extension.TrimStart('.').ToUpperInvariant()
-                            accentR   = 70
-                            accentG   = 70
-                            accentB   = 70
+                            accentR   = $null
+                            accentG   = $null
+                            accentB   = $null
                         }
                     }
                 }

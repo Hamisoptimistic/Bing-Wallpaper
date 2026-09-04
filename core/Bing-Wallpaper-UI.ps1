@@ -685,36 +685,67 @@ namespace BingWallpaper
         // away from near-black/near-white pixels so the accent isn't washed out.
         public static SolidColorBrush ExtractBrush(string imagePath)
         {
-            var decoder = BitmapDecoder.Create(
-                new Uri(imagePath),
-                BitmapCreateOptions.IgnoreColorProfile,
-                BitmapCacheOption.OnLoad);
-            var frame = new TransformedBitmap(decoder.Frames[0],
-                new System.Windows.Media.ScaleTransform(
-                    32.0 / decoder.Frames[0].PixelWidth,
-                    32.0 / decoder.Frames[0].PixelHeight));
-            var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
-
-            int w = converted.PixelWidth, h = converted.PixelHeight;
-            int stride = w * 4;
-            byte[] pixels = new byte[h * stride];
-            converted.CopyPixels(pixels, stride, 0);
-
-            long r = 0, g = 0, b = 0;
-            int count = 0;
-            for (int i = 0; i < pixels.Length; i += 4)
+            try
             {
-                byte bb = pixels[i], gg = pixels[i + 1], rr = pixels[i + 2];
-                int lum = (rr + gg + bb) / 3;
-                if (lum < 18 || lum > 238) continue; // skip near-black / near-white
-                r += rr; g += gg; b += bb;
-                count++;
-            }
-            if (count == 0) count = 1;
+                var decoder = BitmapDecoder.Create(
+                    new Uri(System.IO.Path.GetFullPath(imagePath)),
+                    BitmapCreateOptions.IgnoreColorProfile,
+                    BitmapCacheOption.OnLoad);
+                if (decoder.Frames.Count == 0)
+                    return new SolidColorBrush(Color.FromArgb(235, 0, 120, 215));
 
-            var brush = new SolidColorBrush(Color.FromRgb((byte)(r / count), (byte)(g / count), (byte)(b / count)));
-            brush.Freeze();
-            return brush;
+                var frame = new TransformedBitmap(decoder.Frames[0],
+                    new ScaleTransform(
+                        32.0 / decoder.Frames[0].PixelWidth,
+                        32.0 / decoder.Frames[0].PixelHeight));
+                var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+
+                int w = converted.PixelWidth, h = converted.PixelHeight;
+                int stride = w * 4;
+                byte[] pixels = new byte[h * stride];
+                converted.CopyPixels(pixels, stride, 0);
+
+                long r = 0, g = 0, b = 0;
+                long rAll = 0, gAll = 0, bAll = 0;
+                int count = 0;
+                for (int i = 0; i < pixels.Length; i += 4)
+                {
+                    byte bb = pixels[i], gg = pixels[i + 1], rr = pixels[i + 2];
+                    rAll += rr; gAll += gg; bAll += bb;
+                    int lum = (rr + gg + bb) / 3;
+                    if (lum < 18 || lum > 238) continue; // skip near-black / near-white
+                    r += rr; g += gg; b += bb;
+                    count++;
+                }
+                byte finalR, finalG, finalB;
+                if (count > 0)
+                {
+                    finalR = (byte)(r / count);
+                    finalG = (byte)(g / count);
+                    finalB = (byte)(b / count);
+                }
+                else if (pixels.Length >= 4)
+                {
+                    int totalPix = pixels.Length / 4;
+                    finalR = (byte)(rAll / totalPix);
+                    finalG = (byte)(gAll / totalPix);
+                    finalB = (byte)(bAll / totalPix);
+                }
+                else
+                {
+                    finalR = 0; finalG = 120; finalB = 215;
+                }
+
+                var brush = new SolidColorBrush(Color.FromArgb(235, finalR, finalG, finalB));
+                brush.Freeze();
+                return brush;
+            }
+            catch
+            {
+                var brush = new SolidColorBrush(Color.FromArgb(235, 0, 120, 215));
+                brush.Freeze();
+                return brush;
+            }
         }
     }
 
@@ -3898,17 +3929,15 @@ $cardHoverBg = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.
 
 function Get-ImageAccentBrush([string]$imagePath) {
     try {
-        # ExtractBrush lives in the deferred/background-compiled extra
-        # native type. Cards are built shortly after that compile is
-        # kicked off, and the accent brush is only ever computed once per
-        # card (cached in card.Resources) - so without waiting here, every
-        # card would silently and permanently fall back to the flat gray
-        # brush below if the compile hadn't finished yet.
+        if (-not $imagePath -or -not (Test-Path -LiteralPath $imagePath)) {
+            return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 0, 120, 215))
+        }
         [void](Wait-NativeExtraCompile)
-        return [BingWallpaper.FastAccent]::ExtractBrush($imagePath)
+        $resolved = (Resolve-Path -LiteralPath $imagePath).Path
+        return [BingWallpaper.FastAccent]::ExtractBrush($resolved)
     }
     catch {
-        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 70, 70, 70))
+        return New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, 0, 120, 215))
     }
 }
 
@@ -4966,7 +4995,7 @@ function Render-GalleryGrid {
             elseif ($image.thumbUrl -and (Test-Path -LiteralPath $image.thumbUrl)) {
                 $imagePathToLoad = $image.thumbUrl
             }
-            elseif ($image.source -ne 'Local' -and $image.url -and (Test-Path -LiteralPath $image.url)) {
+            elseif ($image.url -and (Test-Path -LiteralPath $image.url)) {
                 $imagePathToLoad = $image.url
             }
 
@@ -4982,7 +5011,8 @@ function Render-GalleryGrid {
                 $imageControl.Source = $bitmap
 
                 # Use pre-computed accent color from background worker (ZERO UI freeze!)
-                if ($image.accentR -ne $null -and $image.accentG -ne $null -and $image.accentB -ne $null) {
+                $hasValidAccent = ($image.accentR -ne $null -and $image.accentG -ne $null -and $image.accentB -ne $null -and -not ($image.accentR -eq 70 -and $image.accentG -eq 70 -and $image.accentB -eq 70))
+                if ($hasValidAccent) {
                     $accentBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(235, [byte]$image.accentR, [byte]$image.accentG, [byte]$image.accentB))
                     $accentBrush.Freeze()
                     $card.Resources.Add('ImageAccentBrush', $accentBrush)
