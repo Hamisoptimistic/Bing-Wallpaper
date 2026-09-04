@@ -1922,35 +1922,36 @@ $xaml = @"
 
                 <!-- Bing / Spotlight / Wallhaven / Pexels source toggle pill centered in header -->
                 <Border Name="SourceTogglePill" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3">
-                    <StackPanel Orientation="Horizontal">
-                        <Grid>
+                        Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <StackPanel Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                 <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="16,6,16,7"/>
                             </Button>
                         </Grid>
-                        <Grid>
+                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                 <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
                             </Button>
                         </Grid>
-                        <Grid>
+                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                 <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
                             </Button>
                         </Grid>
-                        <Grid>
+                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Border Name="SourcePexelsIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                            <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                 <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
                             </Button>
                         </Grid>
-                        <Grid>
+                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
                             <Border Name="SourceLocalIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                            <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                                 <TextBlock Name="SourceLocalLabel" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
                             </Button>
                         </Grid>
@@ -2931,6 +2932,23 @@ if ($CaptionMaxBtn) {
 }
 if ($CaptionCloseBtn) {
     $CaptionCloseBtn.Add_Click({ $window.Close() })
+}
+
+$HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
+if ($HeaderTitlePanel) {
+    $HeaderTitlePanel.Add_MouseLeftButtonDown({
+        param($s, $e)
+        if ($e.ClickCount -ge 2) {
+            $window.WindowState = if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
+                [System.Windows.WindowState]::Normal
+            } else {
+                [System.Windows.WindowState]::Maximized
+            }
+        }
+        else {
+            try { $window.DragMove() } catch {}
+        }
+    })
 }
 
 # --- Source toggle pill -----------------
