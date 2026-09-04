@@ -343,10 +343,17 @@ public static class BingWallpaperNative
 
     private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
     private const int DWMSBT_MAINWINDOW = 2; // Mica
+    private const int DWMSBT_TRANSIENTWINDOW = 3; // Acrylic
 
     public static int EnableMica(IntPtr hwnd)
     {
         int backdrop = DWMSBT_MAINWINDOW;
+        return DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
+    }
+
+    public static int EnableTransientBackdrop(IntPtr hwnd)
+    {
+        int backdrop = DWMSBT_TRANSIENTWINDOW;
         return DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
     }
 
@@ -1642,7 +1649,7 @@ $xaml = @"
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1659,12 +1666,13 @@ $xaml = @"
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#F0F0F0"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#15FFFFFF"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="10,0,10,0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                        <Border Name="RevealBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1674,8 +1682,8 @@ $xaml = @"
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="RevealBorder" Property="Background" Value="#25FFFFFF"/>
-                                <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#0078D4"/>
-                                <Setter Property="Foreground" Value="#0078D4"/>
+                                <Setter TargetName="RevealBorder" Property="BorderBrush" Value="#10FFFFFF"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1747,12 +1755,12 @@ $xaml = @"
                             <Popup Name="PART_Popup"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
-                                   VerticalOffset="8"
+                                   VerticalOffset="6"
                                    PopupAnimation="None"
                                    AllowsTransparency="True"
                                    StaysOpen="False"
                                    Focusable="False">
-                                <Border Background="#F21E1E1E" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Margin="0" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
+                                <Border Background="#1a1a1a" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="8" Margin="0,2,0,8" MinWidth="{TemplateBinding ActualWidth}" Padding="4">
                                     <ScrollViewer CanContentScroll="False" MaxHeight="260" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                     </ScrollViewer>
@@ -1991,375 +1999,443 @@ $xaml = @"
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Grid Name="HeaderGrid" Margin="0,0,0,24">
+            <Grid Name="HeaderGrid" Margin="0,0,0,16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
+                <!-- Left: Logo and Title -->
                 <StackPanel Name="HeaderTitlePanel" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <Border Name="LogoBorder" Background="Transparent" Width="42" Height="42" Margin="0,0,12,0" VerticalAlignment="Center"/>
                     <TextBlock Text="AutoScape" FontSize="25" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Bing / Spotlight / Wallhaven / Pexels source toggle pill centered in header -->
-                <Border Name="SourceTogglePill" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3"
+                <!-- Center: 2-Tier Floating Control Deck (Tabs on Top, Action Controls Below - No Gray Box, No Divider) -->
+                <Border Name="ControlDeckCard" Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="Transparent" BorderThickness="0" Padding="0"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <StackPanel Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="16,6,16,7"/>
-                            </Button>
-                        </Grid>
-                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
-                            </Button>
-                        </Grid>
-                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
-                            </Button>
-                        </Grid>
-                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border Name="SourcePexelsIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
-                            </Button>
-                        </Grid>
-                        <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                            <Border Name="SourceLocalIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                            <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                <TextBlock Name="SourceLocalLabel" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="16,6,16,7"/>
-                            </Button>
-                        </Grid>
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        
+                        <!-- Tier 1: Source Toggle Pill (Restored earlier standalone pill look) -->
+                        <Border Name="SourceTogglePill" HorizontalAlignment="Center" VerticalAlignment="Center" Height="41"
+                                Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                            <StackPanel Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <Border Name="SourceBingIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                    <Button Name="SourceBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceBingLabel" Text="Bing" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    </Button>
+                                </Grid>
+                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <Border Name="SourceSpotlightIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                    <Button Name="SourceSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceSpotlightLabel" Text="Spotlight" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    </Button>
+                                </Grid>
+                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <Border Name="SourceWallhavenIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                    <Button Name="SourceWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceWallhavenLabel" Text="Wallhaven" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    </Button>
+                                </Grid>
+                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <Border Name="SourcePexelsIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                    <Button Name="SourcePexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourcePexelsLabel" Text="Pexels" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    </Button>
+                                </Grid>
+                                <Grid shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <Border Name="SourceLocalIndicator" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                    <Button Name="SourceLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="SourceLocalLabel" Text="Local" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="18,7,18,8"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Name="HeaderActionPill" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10,0,0" Height="41"
+                                Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                            <StackPanel Name="HeaderActionRow" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                
+                                <!-- Refresh gallery button (left) -->
+                                <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Width="36" Height="33" Padding="0" Margin="0" ToolTip="Refresh Gallery (F5)" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <Viewbox Width="16" Height="16">
+                                        <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+                                            <Canvas.RenderTransform>
+                                                <RotateTransform/>
+                                            </Canvas.RenderTransform>
+                                            <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                            <Path Data="M18.5,5 V10 H13.5"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Button>
+
+                                
+
+                                <!-- Automation unified pill button (middle) -->
+                                <Button Name="AutoUnifiedButton" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="0,0,6,0" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Name="AutoLabel" Text="Auto" FontSize="13.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" Margin="12,0,8,0"/>
+
+                                        <Grid Name="AutoPillRow" VerticalAlignment="Center" Margin="0,0,4,0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                            <Border Name="SpotlightPill" Width="42" Height="19" CornerRadius="9.5"
+                                                    Background="#404040" BorderBrush="#5A5A5A" BorderThickness="1"
+                                                    Cursor="Hand" VerticalAlignment="Center"
+                                                    SnapsToDevicePixels="True" UseLayoutRounding="True">
+                                                <Ellipse Name="SpotlightThumb" Width="13" Height="13" Fill="#C8C8C8"
+                                                         HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0"
+                                                         SnapsToDevicePixels="True" UseLayoutRounding="True">
+                                                    <Ellipse.RenderTransform>
+                                                        <TranslateTransform X="0" Y="0"/>
+                                                    </Ellipse.RenderTransform>
+                                                </Ellipse>
+                                            </Border>
+                                        </Grid>
+                
+                                        <Button Name="SpotlightSetBtn" Width="26" Height="26" Margin="0,0,3,0" VerticalAlignment="Center"
+                                                Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
+                                                Background="Transparent" BorderBrush="Transparent" BorderThickness="0" Foreground="#777"
+                                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Name="ChevronBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="ChevronBorder" Property="Background" Value="#15FFFFFF"/>
+                                                                        <Setter Property="Foreground" Value="#DDD"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsPressed" Value="True">
+                                                                        <Setter TargetName="ChevronBorder" Property="Background" Value="#25FFFFFF"/>
+                                                                        <Setter Property="Foreground" Value="#0078D4"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </Button.Style>
+
+                                            <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Button>
+
+                                
+
+                                <!-- Filters quick-settings button (right) -->
+                                <Button Name="FiltersBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="16,0,16,0" ToolTip="Filters &amp; Settings" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <TextBlock Text="&#xE71C;" FontFamily="Segoe MDL2 Assets" FontSize="13.5" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Name="FiltersBtnText" Text="Filters" FontSize="13.5" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </Grid>
 
-            <WrapPanel Grid.Row="1" Name="ToolbarWrap" Orientation="Horizontal" Margin="0,0,0,20">
+            <!-- Spotlight Automation Options Popup -->
+            <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=AutoUnifiedButton}"
+                   Placement="Bottom" VerticalOffset="6" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
+                   PopupAnimation="None" Focusable="False">
+                <Grid Name="SpotlightPopupTransformHost" Margin="0" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <TranslateTransform x:Name="SpotlightPopupTransform" Y="0"/>
+                    </Grid.RenderTransform>
+                    <Border Name="SpotlightPopupCard" Background="#1a1a1a" BorderBrush="#25FFFFFF" BorderThickness="1"
+                            CornerRadius="10" Padding="18" Width="490" Opacity="0" SnapsToDevicePixels="False">
+                        <StackPanel>
+                            <TextBlock Text="Choose your wallpaper source" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,10"/>
+                            <Border Height="1" Background="#15FFFFFF" Margin="0,0,0,14"/>
+                            
+                            <ComboBox Name="AutoDesktopSourceBox" Visibility="Collapsed" />
+                            <ComboBox Name="AutoLockScreenSourceBox" Visibility="Collapsed" />
+                            <ComboBox Name="AutoScheduleBox" Visibility="Collapsed" />
+                            
+                            <TextBlock Text="Desktop" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
+                            <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <Border Name="DeskBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="DeskBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="DeskBingLbl" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="1">
+                                        <Border Name="DeskSpotlightInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="DeskSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="DeskSpotlightLbl" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="2">
+                                        <Border Name="DeskWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="DeskWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="DeskWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="3">
+                                        <Border Name="DeskPexelsInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="DeskPexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="DeskPexelsLbl" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="4">
+                                        <Border Name="DeskLocalInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="DeskLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="DeskLocalLbl" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="5">
+                                        <Border Name="DeskNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="DeskNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="DeskNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            
+                            <TextBlock Text="Lock screen" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
+                            <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <Border Name="LockBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="LockBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="LockBingLbl" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="1">
+                                        <Border Name="LockSpotlightInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="LockSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="LockSpotlightLbl" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="2">
+                                        <Border Name="LockWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="LockWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="LockWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="3">
+                                        <Border Name="LockPexelsInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="LockPexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="LockPexelsLbl" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="4">
+                                        <Border Name="LockLocalInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="LockLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="LockLocalLbl" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="5">
+                                        <Border Name="LockNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="LockNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="LockNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            
+                            <TextBlock Text="Schedule" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
+                            <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <Border Name="SchedEverydayInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="SchedEverydayBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="SchedEverydayLbl" Text="Everyday" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                    <Grid Grid.Column="1">
+                                        <Border Name="SchedTestInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                                        <Button Name="SchedTestBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
+                                            <TextBlock Name="SchedTestLbl" Text="1 Minute (Test)" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            
+                            <TextBlock Text="Changes are saved Automatically" FontSize="11" Foreground="#888888" HorizontalAlignment="Left" Margin="6,0,0,0" FontStyle="Italic"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Popup>
 
-                <StackPanel Name="ColRegion" Margin="0,0,16,16">
-                    <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="RegionBox" Width="235" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Ellipse Canvas.Left="6" Canvas.Top="1" Width="8" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Line X1="1" Y1="10" X2="19" Y2="10" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                </Canvas>
-                            </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                    <!-- Universal API Key Grid for all current and future sources (Wallhaven, Pexels, NASA, etc.) -->
-                    <Grid Name="ApiKeyGrid" Visibility="Collapsed">
-                        <TextBox Name="ApiKeyBox" Width="235" FontSize="13.5" Height="38" Padding="36,0,32,0">
-                            <TextBox.Tag>
-                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
-                            </TextBox.Tag>
-                        </TextBox>
-                        <TextBlock Name="ApiKeyPlaceholder" Text="Paste API key here" Foreground="#55FFFFFF" 
-                                   FontSize="{Binding FontSize, ElementName=ApiKeyBox}" 
-                                   IsHitTestVisible="False" VerticalAlignment="Center" Margin="36,-1,32,0"/>
-                        <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="Clear API Key" Visibility="Collapsed">
-                            <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Button>
-                    </Grid>
-                    <!-- Local Folder Selection Button in Toolbar -->
-                    <Border Name="LocalFolderBorder" Visibility="Collapsed" Width="235" Height="38" Background="#18FFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="8">
-                        <Button Name="LocalFolderBtn" Background="Transparent" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" Padding="12,0,10,0">
-                            <Grid>
+            <!-- Filters & Preferences Popup -->
+            <Popup Name="FiltersPopup" PlacementTarget="{Binding ElementName=FiltersBtn}"
+                   Placement="Bottom" VerticalOffset="6" HorizontalOffset="-180" AllowsTransparency="True" StaysOpen="False"
+                   PopupAnimation="None" Focusable="False">
+                <Grid Name="FiltersPopupTransformHost" Margin="0" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform>
+                        <TranslateTransform x:Name="FiltersPopupTransform" Y="0"/>
+                    </Grid.RenderTransform>
+                    <Border Name="FiltersPopupCard" Background="#1a1a1a" BorderBrush="#25FFFFFF" BorderThickness="1"
+                            CornerRadius="10" Padding="18" Width="440" Opacity="0" SnapsToDevicePixels="False">
+                        <!-- Removed DropShadowEffect to prevent gray box background bug -->
+                        <StackPanel>
+                            <!-- Title -->
+                            <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Name="LocalFolderLabel" Grid.Column="1" Text="Select Folder..." FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#888888" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                            </Grid>
-                        </Button>
-                    </Border>
-                </StackPanel>
-
-                <StackPanel Name="ColRefresh" Margin="0,0,16,16">
-                    <TextBlock Name="LabelRefresh" Text=" " FontSize="13" FontWeight="SemiBold" Margin="4,0,0,8" IsHitTestVisible="False"/>
-                    <Button Name="RefreshBtn" Style="{StaticResource ModernIconButton}" Width="38" Height="38" ToolTip="Refresh Gallery">
-                        <Viewbox Width="19" Height="19" Margin="0,2,0,0">
-                            <Canvas Name="RefreshIcon" Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
-                                <Canvas.RenderTransform>
-                                <RotateTransform/>
-                                </Canvas.RenderTransform>
-                                <Path Data="M18.5,10 A7,7 0 1,0 16.6,15.7"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                <Path Data="M18.5,5 V10 H13.5"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                            </Canvas>
-                        </Viewbox>
-                    </Button>
-                </StackPanel>
-
-                <StackPanel Name="ColResolution" Margin="0,0,16,16">
-                    <TextBlock Name="LabelResolution" Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="ResolutionBox" Width="110" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#9E9E9E"/>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
-
-                <StackPanel Name="ColApplyTo" Margin="0,0,16,16">
-                    <TextBlock Name="LabelApplyTo" Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="TargetBox" Width="155" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
-                                    <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
-
-                <StackPanel Name="ColStyle" Margin="0,0,16,16">
-                    <TextBlock Name="LabelStyle" Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    <ComboBox Name="StyleBox" Width="125" FontSize="13.5" Height="38">
-                        <ComboBox.Tag>
-                            <Viewbox Width="16.5" Height="16.5">
-                                <Canvas Width="20" Height="20">
-                                    <Path Data="M2,7 V2 H7" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                    <Path Data="M18,13 V18 H13" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
-                                </Canvas>
-                            </Viewbox>
-                        </ComboBox.Tag>
-                    </ComboBox>
-                </StackPanel>
-
-                <StackPanel Name="ColDownloadTo" Margin="0,0,16,14" Width="190">
-                    <TextBlock Name="LabelDownloadTo" Text="Download Image To" HorizontalAlignment="Left" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8" TextTrimming="CharacterEllipsis"/>
-                    <TextBox Name="FolderBox" Height="38" HorizontalAlignment="Stretch" FontSize="13.5" IsReadOnly="True" Cursor="Hand">
-                        <TextBox.Tag>
-                            <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#9E9E9E"/>
-                        </TextBox.Tag>
-                    </TextBox>
-                </StackPanel>
-
-                <StackPanel Name="ColAuto" Margin="0,0,16,14">
-                    <TextBlock Name="LabelAuto" Text="Automation" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="4,0,0,8"/>
-                    
-                    <Button Name="AutoUnifiedButton" Style="{StaticResource ModernIconButton}" Height="38" Padding="0,0,8,0">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Auto" FontSize="13" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" Margin="12,0,8,0"/>
-
-                            <Grid Name="AutoPillRow" VerticalAlignment="Center" Margin="0,0,4,0">
-                                <Border Name="SpotlightPill" Width="44" Height="20" CornerRadius="10"
-                                        Background="#404040" BorderBrush="#5A5A5A" BorderThickness="1"
-                                        Cursor="Hand" VerticalAlignment="Center"
-                                        SnapsToDevicePixels="True" UseLayoutRounding="True">
-                                    <Ellipse Name="SpotlightThumb" Width="14" Height="14" Fill="#C8C8C8"
-                                             HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0"
-                                             SnapsToDevicePixels="True" UseLayoutRounding="True">
-                                        <Ellipse.RenderTransform>
-                                            <TranslateTransform X="0" Y="0"/>
-                                        </Ellipse.RenderTransform>
-                                    </Ellipse>
+                                <TextBlock Text="Filters &amp; Preferences" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Background="#18FFFFFF" CornerRadius="4" Padding="7,2">
+                                    <TextBlock Text="Quick Settings" FontSize="11" Foreground="#9E9E9E"/>
                                 </Border>
                             </Grid>
-    
-                            <Button Name="SpotlightSetBtn" Width="30" Height="30" Margin="0,0,4,0" VerticalAlignment="Center"
-                                    Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
-                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="0" Foreground="#777">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border Name="ChevronBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True">
-                                                            <Setter TargetName="ChevronBorder" Property="Background" Value="#15FFFFFF"/>
-                                                            <Setter Property="Foreground" Value="#DDD"/>
-                                                        </Trigger>
-                                                        <Trigger Property="IsPressed" Value="True">
-                                                            <Setter TargetName="ChevronBorder" Property="Background" Value="#25FFFFFF"/>
-                                                            <Setter Property="Foreground" Value="#0078D4"/>
-                                                        </Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </Button.Style>
+                            <Border Height="1" Background="#15FFFFFF" Margin="0,0,0,14"/>
 
-                                <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Button>
+                            <!-- 1. Dynamic Source Section (Region / API Key / Local Folder) -->
+                            <StackPanel Name="ColRegion" Margin="0,0,0,14">
+                                <TextBlock Name="LabelRegion" Text="Region" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
+                                <ComboBox Name="RegionBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
+                                    <ComboBox.Tag>
+                                        <Viewbox Width="16.5" Height="16.5">
+                                            <Canvas Width="20" Height="20">
+                                                <Ellipse Canvas.Left="1" Canvas.Top="1" Width="18" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                <Ellipse Canvas.Left="6" Canvas.Top="1" Width="8" Height="18" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                <Line X1="1" Y1="10" X2="19" Y2="10" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                            </Canvas>
+                                        </Viewbox>
+                                    </ComboBox.Tag>
+                                </ComboBox>
+                                <!-- Universal API Key Grid for Wallhaven, Pexels, etc. -->
+                                <Grid Name="ApiKeyGrid" Visibility="Collapsed">
+                                    <TextBox Name="ApiKeyBox" HorizontalAlignment="Stretch" FontSize="13" Height="38" Padding="36,0,32,0">
+                                        <TextBox.Tag>
+                                            <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E"/>
+                                        </TextBox.Tag>
+                                    </TextBox>
+                                    <TextBlock Name="ApiKeyPlaceholder" Text="Paste API key here" Foreground="#55FFFFFF" 
+                                               FontSize="{Binding FontSize, ElementName=ApiKeyBox}" 
+                                               IsHitTestVisible="False" VerticalAlignment="Center" Margin="36,-1,32,0"/>
+                                    <Button Name="ClearApiKeyBtn" Style="{StaticResource ModernIconButton}" Width="26" Height="26" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" ToolTip="Clear API Key" Visibility="Collapsed">
+                                        <TextBlock Text="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="10" Foreground="#9E9E9E" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+                                </Grid>
+                                <!-- Local Folder Selection Button -->
+                                <Border Name="LocalFolderBorder" Visibility="Collapsed" HorizontalAlignment="Stretch" Height="38" Background="#18FFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="6">
+                                    <Button Name="LocalFolderBtn" Background="Transparent" BorderThickness="0" Cursor="Hand" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" Padding="12,0,10,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="&#xED25;" FontFamily="Segoe MDL2 Assets" FontSize="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Name="LocalFolderLabel" Grid.Column="1" Text="Select Folder..." FontSize="13" Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="11" Foreground="#888888" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                        </Grid>
+                                    </Button>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- 2. Display Options: Resolution & Apply To -->
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Name="ColResolution" Grid.Column="0">
+                                    <TextBlock Name="LabelResolution" Text="Resolution" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
+                                    <ComboBox Name="ResolutionBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
+                                        <ComboBox.Tag>
+                                            <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#9E9E9E"/>
+                                        </ComboBox.Tag>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Name="ColApplyTo" Grid.Column="2">
+                                    <TextBlock Name="LabelApplyTo" Text="Apply To" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
+                                    <ComboBox Name="TargetBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
+                                        <ComboBox.Tag>
+                                            <Viewbox Width="15.5" Height="15.5">
+                                                <Canvas Width="20" Height="20">
+                                                    <Rectangle Canvas.Left="1" Canvas.Top="2" Width="18" Height="12" RadiusX="1.5" RadiusY="1.5" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                    <Line X1="10" Y1="14" X2="10" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6"/>
+                                                    <Line X1="6" Y1="17" X2="14" Y2="17" Stroke="#9E9E9E" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </ComboBox.Tag>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- 3. Style & Download Folder -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Name="ColStyle" Grid.Column="0">
+                                    <TextBlock Name="LabelStyle" Text="Style" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6"/>
+                                    <ComboBox Name="StyleBox" HorizontalAlignment="Stretch" FontSize="13" Height="38">
+                                        <ComboBox.Tag>
+                                            <Viewbox Width="15.5" Height="15.5">
+                                                <Canvas Width="20" Height="20">
+                                                    <Path Data="M2,7 V2 H7" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                                    <Path Data="M18,13 V18 H13" Stroke="#9E9E9E" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                                </Canvas>
+                                            </Viewbox>
+                                        </ComboBox.Tag>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Name="ColDownloadTo" Grid.Column="2">
+                                    <TextBlock Name="LabelDownloadTo" Text="Download Folder" FontSize="13" FontWeight="SemiBold" Foreground="White" Margin="2,0,0,6" TextTrimming="CharacterEllipsis"/>
+                                    <TextBox Name="FolderBox" HorizontalAlignment="Stretch" Height="38" FontSize="13" IsReadOnly="True" Cursor="Hand">
+                                        <TextBox.Tag>
+                                            <TextBlock Text="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#9E9E9E"/>
+                                        </TextBox.Tag>
+                                    </TextBox>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
-                    </Button>
+                    </Border>
+                </Grid>
+            </Popup>
 
-                    <Popup Name="SpotlightOptionsPopup" PlacementTarget="{Binding ElementName=AutoUnifiedButton}"
-                               Placement="Bottom" VerticalOffset="6" HorizontalOffset="0" AllowsTransparency="True" StaysOpen="False"
-                               PopupAnimation="None" Focusable="False">
-                            <Grid Name="SpotlightPopupTransformHost" Margin="14" RenderTransformOrigin="0.5,0.5">
-                                <Grid.RenderTransform>
-                                    <TranslateTransform x:Name="SpotlightPopupTransform" Y="-8"/>
-                                </Grid.RenderTransform>
-                                <Border Name="SpotlightPopupCard" Background="#F21E1E1E" BorderBrush="#15FFFFFF" BorderThickness="1"
-                                        CornerRadius="8" Padding="16" Width="490" Opacity="0" SnapsToDevicePixels="False">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#000000" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
-                                    </Border.Effect>
-                                    <StackPanel>
-                                        <TextBlock Text="Choose your wallpaper source" FontSize="14" FontWeight="SemiBold" Foreground="#FAFAFA" Margin="0,0,0,10"/>
-                                        <Border Height="1" Background="#2A2A2A" Margin="0,0,0,14"/>
-                                        
-                                        <!-- Hidden ComboBoxes for logic retention -->
-                                        <ComboBox Name="AutoDesktopSourceBox" Visibility="Collapsed" />
-                                        <ComboBox Name="AutoLockScreenSourceBox" Visibility="Collapsed" />
-                                        <ComboBox Name="AutoScheduleBox" Visibility="Collapsed" />
-                                        
-                                        <TextBlock Text="Desktop" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
-                                        <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid Grid.Column="0">
-                                                    <Border Name="DeskBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="DeskBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="DeskBingLbl" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="1">
-                                                    <Border Name="DeskSpotlightInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="DeskSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="DeskSpotlightLbl" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="2">
-                                                    <Border Name="DeskWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="DeskWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="DeskWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="3">
-                                                    <Border Name="DeskPexelsInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="DeskPexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="DeskPexelsLbl" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="4">
-                                                    <Border Name="DeskLocalInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="DeskLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="DeskLocalLbl" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="5">
-                                                    <Border Name="DeskNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="DeskNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="DeskNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                            </Grid>
-                                        </Border>
-                                        
-                                        <TextBlock Text="Lock screen" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
-                                        <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid Grid.Column="0">
-                                                    <Border Name="LockBingInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="LockBingBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="LockBingLbl" Text="Bing" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="1">
-                                                    <Border Name="LockSpotlightInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="LockSpotlightBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="LockSpotlightLbl" Text="Spotlight" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="2">
-                                                    <Border Name="LockWallhavenInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="LockWallhavenBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="LockWallhavenLbl" Text="Wallhaven" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="3">
-                                                    <Border Name="LockPexelsInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="LockPexelsBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="LockPexelsLbl" Text="Pexels" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="4">
-                                                    <Border Name="LockLocalInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="LockLocalBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="LockLocalLbl" Text="Local" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="5">
-                                                    <Border Name="LockNoneInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="LockNoneBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="LockNoneLbl" Text="None" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                            </Grid>
-                                        </Border>
-                                        
-                                        <TextBlock Text="Schedule" FontSize="15" FontWeight="Bold" Foreground="#FAFAFA" Margin="0,0,0,8"/>
-                                        <Border HorizontalAlignment="Stretch" Background="Transparent" BorderBrush="#15FFFFFF" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid Grid.Column="0">
-                                                    <Border Name="SchedEverydayInd" Background="#25FFFFFF" CornerRadius="5" Opacity="1" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="SchedEverydayBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="SchedEverydayLbl" Text="Everyday" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                                <Grid Grid.Column="1">
-                                                    <Border Name="SchedTestInd" Background="#25FFFFFF" CornerRadius="5" Opacity="0" BorderBrush="#10FFFFFF" BorderThickness="1"/>
-                                                    <Button Name="SchedTestBtn" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand">
-                                                        <TextBlock Name="SchedTestLbl" Text="1 Minute (Test)" FontSize="13" FontWeight="SemiBold" Foreground="#9E9E9E" HorizontalAlignment="Center" Margin="0,6,0,7"/>
-                                                    </Button>
-                                                </Grid>
-                                            </Grid>
-                                        </Border>
-                                        
-                                        <TextBlock Text="Changes are saved Automatically" FontSize="11" Foreground="#888888" HorizontalAlignment="Left" Margin="6,0,0,0" FontStyle="Italic"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </Popup>
-                </StackPanel>
-
-            </WrapPanel>
+            <Grid Grid.Row="1" Name="ToolbarWrap" Visibility="Collapsed" Height="0" />
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Top">
                 <Grid>
@@ -2977,9 +3053,26 @@ $ResolutionBox = $window.FindName('ResolutionBox')
 $TargetBox = $window.FindName('TargetBox')
 $StyleBox = $window.FindName('StyleBox')
 $FolderBox = $window.FindName('FolderBox')
+$FiltersBtn = $window.FindName('FiltersBtn')
+$FiltersBtnText = $window.FindName('FiltersBtnText')
+Enable-StrictToolTipDelay $FiltersBtn
+$FiltersPopup = $window.FindName('FiltersPopup')
+$FiltersPopupCard = $window.FindName('FiltersPopupCard')
+$FiltersPopupTransform = $window.FindName('FiltersPopupTransform')
+$LabelRegion = $window.FindName('LabelRegion')
 $RefreshBtn = $window.FindName('RefreshBtn')
 Enable-StrictToolTipDelay $RefreshBtn
 $RefreshIcon = $window.FindName('RefreshIcon')
+
+function Update-FiltersBtnText {
+    if ($FiltersBtnText -and $ResolutionBox -and $ResolutionBox.SelectedItem) {
+        $res = [string]$ResolutionBox.SelectedItem
+        $FiltersBtnText.Text = "Filters $([char]183) $res"
+    }
+    elseif ($FiltersBtnText) {
+        $FiltersBtnText.Text = "Filters"
+    }
+}
 $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
 if ($GalleryScrollViewer -and ('AutoScapeSmoothScroll' -as [type])) {
@@ -3392,6 +3485,9 @@ $LabelDownloadTo = $window.FindName('LabelDownloadTo')
 $LabelAuto = $window.FindName('LabelAuto')
 $LabelRefresh = $window.FindName('LabelRefresh')
 $HeaderGrid = $window.FindName('HeaderGrid')
+$ControlDeckCard = $window.FindName('ControlDeckCard')
+$HeaderActionRow = $window.FindName('HeaderActionRow')
+$AutoLabel = $window.FindName('AutoLabel')
 $MainContent = $window.FindName('MainContent')
 $SourceTogglePill = $window.FindName('SourceTogglePill')
 $HeaderTitlePanel = $window.FindName('HeaderTitlePanel')
@@ -3881,6 +3977,8 @@ $saveHandler = { Save-Settings }
 $RegionBox.Add_SelectionChanged($saveHandler)
 if ($ApiKeyBox) { $ApiKeyBox.Add_LostFocus($saveHandler) }
 $ResolutionBox.Add_SelectionChanged($saveHandler)
+$ResolutionBox.Add_SelectionChanged({ Update-FiltersBtnText })
+Update-FiltersBtnText
 $TargetBox.Add_SelectionChanged($saveHandler)
 $StyleBox.Add_SelectionChanged($saveHandler)
 
@@ -3905,10 +4003,25 @@ foreach ($combo in $script:toolbarDropdowns) {
                     }
                 }
             })
+        $combo.Add_DropDownOpened({
+                if ($FiltersPopup) { $FiltersPopup.StaysOpen = $true }
+            })
+        $combo.Add_DropDownClosed({
+                if ($FiltersPopup) {
+                    $stayTimer = New-Object System.Windows.Threading.DispatcherTimer
+                    $stayTimer.Interval = [TimeSpan]::FromMilliseconds(160)
+                    $stayTimer.Add_Tick({
+                            $this.Stop()
+                            if ($FiltersPopup) { $FiltersPopup.StaysOpen = $false }
+                        })
+                    $stayTimer.Start()
+                }
+            })
     }
 }
 
 $FolderBox.Add_PreviewMouseLeftButtonDown({
+        if ($FiltersPopup) { $FiltersPopup.IsOpen = $false }
         $picked = $null
         $modernFailed = $false
 
@@ -4774,43 +4887,8 @@ function Set-ToolbarCompact {
     param([bool]$Compact)
 
     $script:ToolbarIsCompact = $Compact
-    $tc = New-Object System.Windows.ThicknessConverter
-    $colMargin = $tc.ConvertFromString($(if ($Compact) { '0,0,8,10' } else { '0,0,16,16' }))
-    $comboHeight = if ($Compact) { 34 } else { 38 }
-    $comboFont = if ($Compact) { 12.5 } else { 13.5 }
-    $labelFont = if ($Compact) { 12 } else { 13 }
-    $iconSize = if ($Compact) { 34 } else { 38 }
-
-    foreach ($col in @($ColRegion, $ColRefresh, $ColResolution, $ColApplyTo, $ColStyle, $ColDownloadTo, $ColAuto)) {
-        if ($col) { $col.Margin = $colMargin }
-    }
-
-    foreach ($box in @($RegionBox, $ApiKeyBox, $ResolutionBox, $TargetBox, $StyleBox, $FolderBox)) {
-        if ($box) { $box.Height = $comboHeight; $box.FontSize = $comboFont }
-    }
-    if ($ApiKeyPlaceholder) { $ApiKeyPlaceholder.FontSize = $comboFont }
-    if ($RefreshBtn) { $RefreshBtn.Width = $iconSize; $RefreshBtn.Height = $iconSize }
-    if ($AutoUnifiedButton) { $AutoUnifiedButton.Height = $comboHeight }
-    if ($SpotlightSetBtn) {
-        $btnSz = if ($Compact) { 26 } else { 30 }
-        $SpotlightSetBtn.Width = $btnSz
-        $SpotlightSetBtn.Height = $btnSz
-    }
-    foreach ($label in @($LabelRegion, $LabelRefresh, $LabelResolution, $LabelApplyTo, $LabelStyle, $LabelDownloadTo, $LabelAuto)) {
-        if ($label) { $label.FontSize = $labelFont }
-    }
-    if ($AutoPillRow) { $AutoPillRow.Height = $comboHeight }
-
-    $keyBoxWidth = if ($Compact) { 185 } else { 235 }
-    if ($RegionBox) { $RegionBox.Width = $keyBoxWidth }
-    if ($ApiKeyBox) { $ApiKeyBox.Width = $keyBoxWidth }
-    if ($ResolutionBox) { $ResolutionBox.Width = if ($Compact) { 95 } else { 110 } }
-    if ($TargetBox) { $TargetBox.Width = if ($Compact) { 135 } else { 155 } }
-    if ($StyleBox) { $StyleBox.Width = if ($Compact) { 105 } else { 125 } }
-    if ($ColDownloadTo) { $ColDownloadTo.Width = if ($Compact) { 160 } else { 190 } }
-
     if ($MainContent) {
-        $MainContent.Margin = if ($Compact) { [System.Windows.Thickness]::new(20, 14, 20, 14) } else { [System.Windows.Thickness]::new(24, 20, 24, 16) }
+        $MainContent.Margin = if ($Compact) { [System.Windows.Thickness]::new(20, 14, 20, 14) } else { [System.Windows.Thickness]::new(24, 18, 24, 16) }
     }
 
     if ($script:DownloadFolderPath) {
@@ -4829,20 +4907,27 @@ function Update-ToolbarCompactState {
         Set-ToolbarCompact -Compact $false
     }
 
-    # Responsive Header: center source tabs pill in header, or wrap under title when window is narrow
-    if ($SourceTogglePill) {
+    if ($AutoLabel) {
+        $AutoLabel.Visibility = if ($width -lt 980) { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+    }
+    if ($FiltersBtnText) {
+        if ($width -lt 980) { $FiltersBtnText.Text = "Filters" } else { Update-FiltersBtnText }
+    }
+
+    # Responsive Header: center ControlDeckCard, or wrap under title on very narrow screens
+    if ($ControlDeckCard) {
         if ($width -lt 860) {
-            [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 1)
-            $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
+            [System.Windows.Controls.Grid]::SetRow($ControlDeckCard, 1)
+            $ControlDeckCard.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+            $ControlDeckCard.Margin = [System.Windows.Thickness]::new(0, 10, 0, 0)
             if ($HeaderTitlePanel) {
                 $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
             }
         }
         else {
-            [System.Windows.Controls.Grid]::SetRow($SourceTogglePill, 0)
-            $SourceTogglePill.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
-            $SourceTogglePill.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
+            [System.Windows.Controls.Grid]::SetRow($ControlDeckCard, 0)
+            $ControlDeckCard.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+            $ControlDeckCard.Margin = [System.Windows.Thickness]::new(0, 0, 0, 0)
             if ($HeaderTitlePanel) {
                 $HeaderTitlePanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Left
             }
@@ -5990,6 +6075,9 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
             if ($msSinceClosed -lt 200) { return }
 
             if (-not $SpotlightOptionsPopup.IsOpen) {
+                if ($FiltersPopup -and $FiltersPopup.IsOpen) {
+                    $FiltersPopup.IsOpen = $false
+                }
                 # Work out where the button actually sits in the window right
                 # now, and clamp the popup's offsets so the card can't render
                 # past any edge of the (possibly small/resized) window. Falls
@@ -6026,30 +6114,121 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     # timing used elsewhere in the toolbar (e.g. Set-SpotlightState's pill
     # animation) so this flyout feels consistent with the rest of the app.
     $SpotlightOptionsPopup.Add_Opened({
+            try {
+                $source = [System.Windows.Interop.HwndSource]::FromVisual($SpotlightOptionsPopup.Child)
+                if ($source -and $source.Handle -ne [IntPtr]::Zero) {
+                    [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
+                }
+            } catch {}
+
+            if ($AutoUnifiedButton) {
+                $AutoUnifiedButton.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
+                $AutoUnifiedButton.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(16, 255, 255, 255))
+            }
+
             $easing = New-Object System.Windows.Media.Animation.CubicEase
             $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-            $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(160))
+            $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
 
             $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, $dur
             $fadeAnim.EasingFunction = $easing
             $SpotlightPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
-
-            $slideAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 0.0, $dur
-            $slideAnim.EasingFunction = $easing
-            $SpotlightPopupTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $slideAnim)
-
-            # (Removed glow/border highlight per user request)
         })
 
     $SpotlightOptionsPopup.Add_Closed({
             $script:spotlightPopupClosedAt = [DateTime]::Now
 
+            if ($AutoUnifiedButton) {
+                $AutoUnifiedButton.Background = [System.Windows.Media.Brushes]::Transparent
+                $AutoUnifiedButton.BorderBrush = [System.Windows.Media.Brushes]::Transparent
+            }
+
             $SpotlightPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
             $SpotlightPopupCard.Opacity = 0
-            $SpotlightPopupTransform.BeginAnimation([System.Windows.Media.TranslateTransform]::YProperty, $null)
-            $SpotlightPopupTransform.Y = -8
+        })
+}
 
-            # (Removed glow/border highlight per user request)
+if ($FiltersBtn -and $FiltersPopup) {
+    $script:filtersPopupClosedAt = [DateTime]::MinValue
+    $filtersPopupCardWidth = 440.0
+    $filtersPopupCardHeight = 240.0
+    $filtersPopupEdgePad = 8.0
+
+    $window.Add_SizeChanged({
+            if ($FiltersPopup -and $FiltersPopup.IsOpen) { $FiltersPopup.IsOpen = $false }
+        })
+
+    $FiltersBtn.Add_Click({
+            param($sender, $e)
+            if ($e) { $e.Handled = $true }
+
+            $msSinceClosed = ([DateTime]::Now - $script:filtersPopupClosedAt).TotalMilliseconds
+            if ($msSinceClosed -lt 200) { return }
+
+            if (-not $FiltersPopup.IsOpen) {
+                if ($SpotlightOptionsPopup -and $SpotlightOptionsPopup.IsOpen) {
+                    $SpotlightOptionsPopup.IsOpen = $false
+                }
+
+                try {
+                    $targetPos = $FiltersBtn.TranslatePoint([System.Windows.Point]::new(0, 0), $window)
+
+                    $hOffset = -180.0
+                    $maxH = ($window.ActualWidth - $filtersPopupEdgePad) - $targetPos.X - $filtersPopupCardWidth
+                    $minH = $filtersPopupEdgePad - $targetPos.X
+                    if ($hOffset -gt $maxH) { $hOffset = $maxH }
+                    if ($hOffset -lt $minH) { $hOffset = $minH }
+                    $FiltersPopup.HorizontalOffset = $hOffset
+
+                    $vOffset = 6.0
+                    $targetBottom = $targetPos.Y + $FiltersBtn.ActualHeight
+                    $roomBelow = $window.ActualHeight - $filtersPopupEdgePad - $targetBottom
+                    if ($roomBelow -lt $filtersPopupCardHeight) {
+                        $vOffset = - ($FiltersBtn.ActualHeight + $filtersPopupCardHeight + 6.0)
+                    }
+                    $FiltersPopup.VerticalOffset = $vOffset
+                }
+                catch {
+                    $FiltersPopup.HorizontalOffset = -180.0
+                    $FiltersPopup.VerticalOffset = 6.0
+                }
+            }
+
+            $FiltersPopup.IsOpen = -not $FiltersPopup.IsOpen
+        })
+
+    $FiltersPopup.Add_Opened({
+            try {
+                $source = [System.Windows.Interop.HwndSource]::FromVisual($FiltersPopup.Child)
+                if ($source -and $source.Handle -ne [IntPtr]::Zero) {
+                    [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
+                }
+            } catch {}
+
+            if ($FiltersBtn) {
+                $FiltersBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
+                $FiltersBtn.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(16, 255, 255, 255))
+            }
+
+            $easing = New-Object System.Windows.Media.Animation.CubicEase
+            $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+            $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
+
+            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, $dur
+            $fadeAnim.EasingFunction = $easing
+            $FiltersPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+        })
+
+    $FiltersPopup.Add_Closed({
+            $script:filtersPopupClosedAt = [DateTime]::Now
+
+            if ($FiltersBtn) {
+                $FiltersBtn.Background = [System.Windows.Media.Brushes]::Transparent
+                $FiltersBtn.BorderBrush = [System.Windows.Media.Brushes]::Transparent
+            }
+
+            $FiltersPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $FiltersPopupCard.Opacity = 0
         })
 }
 
