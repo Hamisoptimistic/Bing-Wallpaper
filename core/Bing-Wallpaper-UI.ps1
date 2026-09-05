@@ -1781,6 +1781,10 @@ $xaml = @"
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.38"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="RevealBorder" Property="Background" Value="#15FFFFFF"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -2329,50 +2333,48 @@ $xaml = @"
 
                                 
 
-                                <!-- Automation unified pill button (middle) -->
-                                <Button Name="AutoUnifiedButton" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="0,0,6,0" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Name="AutoLabel" Text="Auto" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="12,0,8,0"/>
+                                <!-- Automation unified pill (middle) -->
+                                <StackPanel Name="AutoUnifiedButton" Orientation="Horizontal" VerticalAlignment="Center" Height="33" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <TextBlock Name="AutoLabel" Text="Auto" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="12,0,8,0"/>
 
-                                        <CheckBox Name="AutoToggleCheckbox" Style="{StaticResource AutoToggleSwitchStyle}" IsChecked="False" IsHitTestVisible="False" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                
-                                        <Button Name="SpotlightSetBtn" Width="26" Height="26" Margin="0,0,3,0" VerticalAlignment="Center"
-                                                Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
-                                                Background="Transparent" BorderBrush="Transparent" BorderThickness="0" Foreground="#777"
-                                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                            <Button.Style>
-                                                <Style TargetType="Button">
-                                                    <Setter Property="Template">
-                                                        <Setter.Value>
-                                                            <ControlTemplate TargetType="Button">
-                                                                <Border Name="ChevronBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
-                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                                </Border>
-                                                                <ControlTemplate.Triggers>
-                                                                    <Trigger Property="IsEnabled" Value="True">
-                                                                        <Setter Property="Foreground" Value="#FFFFFF"/>
-                                                                    </Trigger>
-                                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                                        <Setter TargetName="ChevronBorder" Property="Background" Value="#15FFFFFF"/>
-                                                                        <Setter Property="Foreground" Value="#DDD"/>
-                                                                    </Trigger>
-                                                                    <Trigger Property="IsPressed" Value="True">
-                                                                        <Setter TargetName="ChevronBorder" Property="Background" Value="#25FFFFFF"/>
-                                                                        <Setter Property="Foreground" Value="#0078D4"/>
-                                                                    </Trigger>
-                                                                </ControlTemplate.Triggers>
-                                                            </ControlTemplate>
-                                                        </Setter.Value>
-                                                    </Setter>
-                                                </Style>
-                                            </Button.Style>
+                                    <CheckBox Name="AutoToggleCheckbox" Style="{StaticResource AutoToggleSwitchStyle}" IsChecked="False" Cursor="Hand" ToolTip="Toggle automatic wallpaper changing" VerticalAlignment="Center" Margin="0,0,4,0" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+            
+                                    <Button Name="SpotlightSetBtn" Width="26" Height="26" Margin="0,0,3,0" VerticalAlignment="Center"
+                                            Cursor="Hand" IsEnabled="False" ToolTip="Configure automatic wallpaper changes"
+                                            Background="Transparent" BorderBrush="Transparent" BorderThickness="0" Foreground="#777"
+                                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Name="ChevronBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsEnabled" Value="True">
+                                                                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="ChevronBorder" Property="Background" Value="#15FFFFFF"/>
+                                                                    <Setter Property="Foreground" Value="#DDD"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter TargetName="ChevronBorder" Property="Background" Value="#25FFFFFF"/>
+                                                                    <Setter Property="Foreground" Value="#0078D4"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
 
-                                            <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Button>
-                                    </StackPanel>
-                                </Button>
+                                        <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+                                </StackPanel>
 
                                 
 
@@ -2385,11 +2387,8 @@ $xaml = @"
                                 </Button>
 
                                 <!-- Archive Search button (right of Preferences) -->
-                                <Button Name="ArchiveSearchBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="14,0,16,0" ToolTip="Search Bing Wallpapers by Date" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                                        <TextBlock Text="&#xE787;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13.5" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Name="ArchiveSearchBtnText" Text="Archive Search" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                <Button Name="ArchiveSearchBtn" Style="{StaticResource ModernIconButton}" BorderThickness="0" Height="33" Padding="14,0,14,0" ToolTip="Search Bing Wallpapers by Date" Margin="0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                                    <TextBlock Name="ArchiveSearchBtnText" Text="Archive Search" FontSize="13.5" FontWeight="SemiBold" Foreground="#9E9E9E" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                                 </Button>
                             </StackPanel>
                         </Border>
@@ -2664,7 +2663,7 @@ $xaml = @"
                         <StackPanel>
                             <!-- Header -->
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,14">
-                                <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#60CDFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="&#xE787;" FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBlock Text="Search Bing wallpapers by date" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
                             </StackPanel>
 
@@ -2697,7 +2696,7 @@ $xaml = @"
                                 </Grid>
                             </Border>
 
-                            <!-- Date Selection Controls (Year, Month, Day) & Year-mode Region Host -->
+                            <!-- Date Selection Controls (Year, Month, Day) & Year-mode Warning -->
                             <Grid Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Name="ColArchiveYear" Width="*"/>
@@ -2725,17 +2724,14 @@ $xaml = @"
                                     <ComboBox Name="ArchiveDayBox" HorizontalAlignment="Stretch" FontSize="13" Height="38"/>
                                 </StackPanel>
 
-                                <!-- Top Region Host (Used in Full Year mode) -->
-                                <Grid Name="RegionTopHost" Grid.Column="2" Grid.ColumnSpan="3" Visibility="Collapsed"/>
+                                <!-- Full Year Notice (Placed next to Year ComboBox in Grid Column 2..4) -->
+                                <StackPanel Name="ArchiveYearNotice" Grid.Column="2" Grid.ColumnSpan="3" Visibility="Collapsed" VerticalAlignment="Center" Margin="6,16,0,0">
+                                    <TextBlock Text="Unstable" FontSize="12" FontWeight="Bold" Foreground="#FFA048" Margin="0,0,0,2"/>
+                                    <TextBlock Text="might take a few minutes to load all wallpapers." FontSize="11" Foreground="#AAAAAA" TextWrapping="Wrap"/>
+                                </StackPanel>
                             </Grid>
 
-                            <!-- Full Year Notice (Shown only when Full Year mode is active) -->
-                            <StackPanel Name="ArchiveYearNotice" Visibility="Collapsed" Margin="2,0,0,12">
-                                <TextBlock Text="Unstable" FontSize="12" FontWeight="Bold" Foreground="#FFA048" Margin="0,0,0,2"/>
-                                <TextBlock Text="might take a few minutes to load all wallpapers." FontSize="11" Foreground="#AAAAAA"/>
-                            </StackPanel>
-
-                            <!-- Bottom Row: Region & Search Button (Day/Month modes) or Full-width Search (Year mode) -->
+                            <!-- Bottom Row: Region & Search Button -->
                             <Grid Name="ArchiveBottomRow" Margin="0,0,0,2">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Name="ColBottomRegion" Width="*"/>
@@ -2743,7 +2739,7 @@ $xaml = @"
                                     <ColumnDefinition Name="ColBottomSearch" Width="130"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Bottom Region Host (Used in Day and Month modes) -->
+                                <!-- Bottom Region -->
                                 <Grid Name="RegionBottomHost" Grid.Column="0">
                                     <StackPanel Name="StackArchiveRegion">
                                         <TextBlock Text="Region" FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="2,0,0,5"/>
@@ -2758,10 +2754,7 @@ $xaml = @"
                                             <Setter Property="CornerRadius" Value="6"/>
                                         </Style>
                                     </Button.Resources>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="13.5" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Name="FetchArchiveBtnText" Text="Search" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                    <TextBlock Name="FetchArchiveBtnText" Text="Search" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Button>
                             </Grid>
                         </StackPanel>
@@ -2906,7 +2899,7 @@ function Test-IsInsideToolbar($visual) {
 
 function Find-RevealBorders($visual) {
     if (-not $visual) { return }
-    if ($visual -is [System.Windows.Controls.Border] -and ($visual.Name -eq "RevealBorder" -or $visual.Name -eq "AutoUnifiedButton")) {
+    if ($visual -is [System.Windows.Controls.Border] -and ($visual.Name -eq "RevealBorder")) {
         $alreadyAdded = $false
         foreach ($item in $script:revealElements) {
             if ($item.Element -eq $visual) { $alreadyAdded = $true; break }
@@ -3471,6 +3464,11 @@ $ScopeYearLabel = $window.FindName('ScopeYearLabel')
 $StackArchiveMonth = $window.FindName('StackArchiveMonth')
 $StackArchiveDay = $window.FindName('StackArchiveDay')
 $ArchiveYearNotice = $window.FindName('ArchiveYearNotice')
+$ColArchiveYear = $window.FindName('ColArchiveYear')
+$ColArchiveMonthGap = $window.FindName('ColArchiveMonthGap')
+$ColArchiveMonth = $window.FindName('ColArchiveMonth')
+$ColArchiveDayGap = $window.FindName('ColArchiveDayGap')
+$ColArchiveDay = $window.FindName('ColArchiveDay')
 
 $ArchiveYearBox = $window.FindName('ArchiveYearBox')
 $ArchiveMonthBox = $window.FindName('ArchiveMonthBox')
@@ -3763,6 +3761,18 @@ function Update-SourceToggleVisual {
         $AppSubtitleText.Text = if ($isSpotlight) { 'Windows Spotlight, curated daily' } elseif ($isWallhaven) { 'Wallhaven #nature wallpapers' } elseif ($isPexels) { 'Pexels 4K nature photography' } elseif ($isLocal) { 'Your local wallpaper collection' } else { 'Bing wallpapers, delivered daily' }
     }
 
+    $isBing = ($script:currentSource -eq 'Bing')
+    if ($ArchiveSearchBtn) {
+        $ArchiveSearchBtn.IsEnabled = $isBing
+        if (-not $isBing -and $ArchiveSearchPopup -and $ArchiveSearchPopup.IsOpen) {
+            $ArchiveSearchPopup.IsOpen = $false
+        }
+        $ArchiveSearchBtn.ToolTip = if ($isBing) { "Search Bing Wallpapers by Date" } else { "Archive search is only available for Bing" }
+        if ($ArchiveSearchBtnText) {
+            $ArchiveSearchBtnText.Foreground = if ($isBing) { $inactiveColor } else { New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(100, 158, 158, 158)) }
+        }
+    }
+
     if ($isLocal) {
         if ($RegionBox) { $RegionBox.Visibility = [System.Windows.Visibility]::Collapsed }
         if ($ApiKeyGrid) { $ApiKeyGrid.Visibility = [System.Windows.Visibility]::Collapsed }
@@ -4013,6 +4023,7 @@ if ($PexelsEmptyGetBtn) {
 # ------------------------------------------------------------------------
 
 $AutoToggleCheckbox = $window.FindName('AutoToggleCheckbox')
+Enable-StrictToolTipDelay $AutoToggleCheckbox
 $SpotlightSetBtn = $window.FindName('SpotlightSetBtn')
 Enable-StrictToolTipDelay $SpotlightSetBtn
 $SpotlightSetBtnGlow = if ($SpotlightSetBtn) { $SpotlightSetBtn.Effect } else { $null }
@@ -6594,33 +6605,32 @@ if ($spotlightWasEnabled) {
     Update-SpotlightScheduledTaskAsync -Enable $true
 }
 
-$AutoUnifiedButton.Add_Click({
-        param($sender, $e)
-        if ($e) {
-            $e.Handled = $true
-            if ($e.Source -ne $AutoUnifiedButton) { return }
-        }
-        $newState = -not $script:SpotlightEnabled
-        Set-SpotlightState -Enabled:$newState
+if ($AutoToggleCheckbox) {
+    $AutoToggleCheckbox.Add_Click({
+            param($sender, $e)
+            if ($e) { $e.Handled = $true }
+            $newState = [bool]$AutoToggleCheckbox.IsChecked
+            Set-SpotlightState -Enabled:$newState
 
-        if ($newState) {
-            Set-TransientStatus -Message "Automatic wallpaper changing enabled. Default schedule: daily at 12:00 AM." -Brush $statusSuccessBrush
-            if ($SpotlightOptionsPopup) {
-                $openPopupTimer = New-Object System.Windows.Threading.DispatcherTimer
-                $openPopupTimer.Interval = [TimeSpan]::FromMilliseconds(240)
-                $openPopupTimer.Add_Tick({
-                        if ($script:SpotlightEnabled -and -not $SpotlightOptionsPopup.IsOpen) {
-                            $SpotlightOptionsPopup.IsOpen = $true
-                        }
-                        $this.Stop()
-                    })
-                $openPopupTimer.Start()
+            if ($newState) {
+                Set-TransientStatus -Message "Automatic wallpaper changing enabled. Default schedule: daily at 12:00 AM." -Brush $statusSuccessBrush
+                if ($SpotlightOptionsPopup) {
+                    $openPopupTimer = New-Object System.Windows.Threading.DispatcherTimer
+                    $openPopupTimer.Interval = [TimeSpan]::FromMilliseconds(240)
+                    $openPopupTimer.Add_Tick({
+                            if ($script:SpotlightEnabled -and -not $SpotlightOptionsPopup.IsOpen) {
+                                $SpotlightOptionsPopup.IsOpen = $true
+                            }
+                            $this.Stop()
+                        })
+                    $openPopupTimer.Start()
+                }
             }
-        }
-        else {
-            Set-TransientStatus -Message "Automatic wallpaper changing disabled." -Brush $statusErrorBrush
-        }
-    })
+            else {
+                Set-TransientStatus -Message "Automatic wallpaper changing disabled." -Brush $statusErrorBrush
+            }
+        })
+}
 
 function Update-AutoOptionUI {
     param([string]$Category, $SelectedItem)
@@ -6803,11 +6813,6 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
                 }
             } catch {}
 
-            if ($AutoUnifiedButton) {
-                $AutoUnifiedButton.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
-                $AutoUnifiedButton.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(16, 255, 255, 255))
-            }
-
             $easing = New-Object System.Windows.Media.Animation.CubicEase
             $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
             $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
@@ -6820,11 +6825,6 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
     $SpotlightOptionsPopup.Add_Closed({
             $script:spotlightPopupClosedAt = [DateTime]::Now
             Write-InteractionLog "[AUTO_OPTIONS_CLOSE] Automatic wallpaper schedule options closed"
-
-            if ($AutoUnifiedButton) {
-                $AutoUnifiedButton.Background = [System.Windows.Media.Brushes]::Transparent
-                $AutoUnifiedButton.BorderBrush = [System.Windows.Media.Brushes]::Transparent
-            }
 
             $SpotlightPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
             $SpotlightPopupCard.Opacity = 0
@@ -6987,35 +6987,6 @@ function Set-ArchiveSearchScope {
     $script:archiveSearchScope = $Scope
     $grayBrush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString("#888888")
 
-    # Move StackArchiveRegion between Top Host (Year mode) and Bottom Host (Day/Month mode)
-    if ($Scope -eq 'Year') {
-        if ($RegionTopHost -and $RegionBottomHost -and $StackArchiveRegion) {
-            if ($RegionBottomHost.Children.Contains($StackArchiveRegion)) {
-                $RegionBottomHost.Children.Remove($StackArchiveRegion)
-            }
-            if (-not $RegionTopHost.Children.Contains($StackArchiveRegion)) {
-                $RegionTopHost.Children.Add($StackArchiveRegion)
-            }
-            $RegionTopHost.Visibility = [System.Windows.Visibility]::Visible
-        }
-        if ($ColBottomRegion) { $ColBottomRegion.Width = New-Object System.Windows.GridLength(0) }
-        if ($ColBottomGap) { $ColBottomGap.Width = New-Object System.Windows.GridLength(0) }
-        if ($ColBottomSearch) { $ColBottomSearch.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
-    } else {
-        if ($RegionTopHost -and $RegionBottomHost -and $StackArchiveRegion) {
-            if ($RegionTopHost.Children.Contains($StackArchiveRegion)) {
-                $RegionTopHost.Children.Remove($StackArchiveRegion)
-            }
-            if (-not $RegionBottomHost.Children.Contains($StackArchiveRegion)) {
-                $RegionBottomHost.Children.Add($StackArchiveRegion)
-            }
-            $RegionTopHost.Visibility = [System.Windows.Visibility]::Collapsed
-        }
-        if ($ColBottomRegion) { $ColBottomRegion.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
-        if ($ColBottomGap) { $ColBottomGap.Width = New-Object System.Windows.GridLength(10) }
-        if ($ColBottomSearch) { $ColBottomSearch.Width = New-Object System.Windows.GridLength(130) }
-    }
-
     if ($Scope -eq 'Day') {
         if ($ScopeDayIndicator) { $ScopeDayIndicator.Opacity = 1 }
         if ($ScopeDayLabel) { $ScopeDayLabel.Foreground = [System.Windows.Media.Brushes]::White }
@@ -7062,7 +7033,7 @@ function Set-ArchiveSearchScope {
 
         if ($ColArchiveYear) { $ColArchiveYear.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
         if ($ColArchiveMonthGap) { $ColArchiveMonthGap.Width = New-Object System.Windows.GridLength(10) }
-        if ($ColArchiveMonth) { $ColArchiveMonth.Width = New-Object System.Windows.GridLength(1, [System.Windows.GridUnitType]::Star) }
+        if ($ColArchiveMonth) { $ColArchiveMonth.Width = New-Object System.Windows.GridLength(2.2, [System.Windows.GridUnitType]::Star) }
         if ($ColArchiveDayGap) { $ColArchiveDayGap.Width = New-Object System.Windows.GridLength(0) }
         if ($ColArchiveDay) { $ColArchiveDay.Width = New-Object System.Windows.GridLength(0) }
 
@@ -7088,6 +7059,7 @@ if ($ArchiveSearchBtn -and $ArchiveSearchPopup) {
 
     $ArchiveSearchBtn.Add_Click({
         param($sender, $e)
+        if ($script:currentSource -ne 'Bing') { return }
         if ($e) { $e.Handled = $true }
 
         $msSinceClosed = ([DateTime]::Now - $script:archivePopupClosedAt).TotalMilliseconds
