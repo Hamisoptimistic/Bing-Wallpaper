@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoScape for Windows - Native 4K Wallpaper & Lock Screen Manager</title>
-    <meta name="description" content="Experience daily 4K Bing photography, Windows Spotlight, Wallhaven, and Pexels on your Desktop and Lock Screen with near-zero resource consumption.">
+    <title>AutoScape - Your Daily Dose of Stunning Wallpapers</title>
+    <meta name="description" content="Curated daily wallpapers from Bing, Windows Spotlight, Wallhaven, and Pexels. Pure Windows native architecture with zero idle RAM.">
     
-    <!-- Microsoft / Fluent Typography -->
+    <!-- Microsoft / Fluent & Poppins Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Segoe+UI:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <style>
         :root {
-            --bg-base: #111215;
-            --bg-subtle: #17191e;
-            --surface-card: #1d2026;
-            --surface-card-hover: #242831;
-            --surface-flyout: #22262f;
+            --bg-base: #0c0d10;
+            --bg-subtle: #14161b;
+            --surface-card: #1a1d24;
+            --surface-card-hover: #222630;
             --border-subtle: rgba(255, 255, 255, 0.08);
             --border-highlight: rgba(255, 255, 255, 0.16);
             --accent: #0078d4;
@@ -25,12 +24,13 @@
             --accent-glow: rgba(0, 120, 212, 0.4);
             --text-primary: #ffffff;
             --text-secondary: #9ea7b3;
-            --text-tertiary: #6b7280;
+            --text-tertiary: #68707c;
             --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            --font-poppins: 'Poppins', var(--font-family);
             --font-mono: 'JetBrains Mono', Consolas, monospace;
             --radius-sm: 6px;
             --radius-md: 10px;
-            --radius-lg: 18px;
+            --radius-lg: 16px;
             --radius-pill: 9999px;
             --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -49,8 +49,8 @@
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(0, 120, 212, 0.09) 0px, transparent 50%),
-                radial-gradient(at 100% 15%, rgba(76, 29, 149, 0.08) 0px, transparent 50%);
+                radial-gradient(circle at 50% 0%, rgba(0, 120, 212, 0.12) 0px, transparent 60%),
+                radial-gradient(circle at 90% 20%, rgba(76, 29, 149, 0.08) 0px, transparent 50%);
             background-attachment: fixed;
         }
 
@@ -61,12 +61,12 @@
             z-index: 100;
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            background: rgba(17, 18, 21, 0.85);
+            background: rgba(12, 13, 16, 0.85);
             border-bottom: 1px solid var(--border-subtle);
         }
 
         .nav-container {
-            max-width: 1200px;
+            max-width: 1300px;
             margin: 0 auto;
             padding: 14px 24px;
             display: flex;
@@ -77,17 +77,18 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
             text-decoration: none;
             color: var(--text-primary);
+            font-family: var(--font-poppins);
             font-weight: 700;
-            font-size: 22px;
+            font-size: 21px;
             letter-spacing: -0.3px;
         }
 
         .brand img {
-            width: 44px;
-            height: 44px;
+            width: 38px;
+            height: 38px;
             filter: drop-shadow(0 4px 12px rgba(0, 120, 212, 0.35));
             transition: var(--transition);
         }
@@ -138,63 +139,63 @@
         .hero {
             max-width: 960px;
             margin: 0 auto;
-            padding: 60px 24px 44px;
+            padding: 56px 24px 36px;
             text-align: center;
         }
 
         .hero-logo-wrapper {
             display: flex;
-            justify-content: center;
-            margin-bottom: 24px;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
         }
 
         .hero-logo {
-            width: 96px;
-            height: 96px;
-            filter: drop-shadow(0 16px 36px rgba(0, 120, 212, 0.35));
+            width: 104px;
+            height: 104px;
+            filter: drop-shadow(0 16px 40px rgba(0, 120, 212, 0.4));
             transition: var(--transition);
         }
 
         .hero-logo:hover {
-            transform: scale(1.06) rotate(2deg);
+            transform: scale(1.05) rotate(2deg);
         }
 
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 16px;
-            border-radius: var(--radius-pill);
-            background: rgba(0, 120, 212, 0.12);
-            border: 1px solid rgba(0, 120, 212, 0.28);
-            color: #60a5fa;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 20px;
-        }
-
-        .hero h1 {
-            font-size: clamp(38px, 6vw, 60px);
+        .hero-app-title {
+            font-family: var(--font-poppins);
+            font-size: clamp(48px, 8vw, 76px);
             font-weight: 800;
-            letter-spacing: -1.2px;
-            line-height: 1.15;
-            margin-bottom: 20px;
+            letter-spacing: -2px;
             color: #ffffff;
+            margin-top: 14px;
+            line-height: 1;
+            background: linear-gradient(180deg, #ffffff 40%, #c9d1d9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        .hero h1 span {
+        .hero-slogan {
+            font-size: clamp(22px, 3.4vw, 32px);
+            font-weight: 700;
+            letter-spacing: -0.6px;
+            color: #ffffff;
+            margin-bottom: 12px;
+            line-height: 1.25;
+        }
+
+        .hero-slogan span {
             background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .hero p.lead {
-            font-size: clamp(16px, 2.4vw, 19px);
+            font-size: clamp(16px, 2.2vw, 18px);
             color: var(--text-secondary);
-            max-width: 680px;
-            margin: 0 auto 36px;
+            max-width: 640px;
+            margin: 0 auto 32px;
             font-weight: 400;
-            line-height: 1.6;
+            line-height: 1.55;
         }
 
         .hero-cta {
@@ -248,18 +249,18 @@
             transform: translateY(-1px);
         }
 
-        /* PowerShell Command Box */
+        /* Fixed Non-Wrapping PowerShell Box */
         .terminal-box {
-            max-width: 640px;
+            max-width: 660px;
             margin: 0 auto;
-            background: #15171c;
+            background: #131519;
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
-            padding: 8px 14px;
+            padding: 10px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 14px;
             box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
         }
 
@@ -268,6 +269,9 @@
             font-family: var(--font-mono);
             font-size: 13px;
             user-select: none;
+            white-space: nowrap;
+            flex-shrink: 0;
+            font-weight: 600;
         }
 
         .terminal-command {
@@ -278,6 +282,8 @@
             white-space: nowrap;
             scrollbar-width: none;
             user-select: all;
+            flex-grow: 1;
+            text-align: left;
         }
 
         .copy-pill {
@@ -294,6 +300,7 @@
             gap: 6px;
             transition: var(--transition);
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .copy-pill:hover {
@@ -301,17 +308,17 @@
             border-color: var(--border-highlight);
         }
 
-        /* ---------------- Pure Image Carousel ---------------- */
+        /* ---------------- Wide Seamless Gallery Carousel ---------------- */
         .carousel-section {
-            max-width: 1140px;
-            margin: 24px auto 84px;
-            padding: 0 24px;
+            max-width: 1440px;
+            width: 95vw;
+            margin: 20px auto 96px;
+            padding: 0 16px;
         }
 
         .carousel-container {
             position: relative;
             background: transparent;
-            border-radius: var(--radius-lg);
             border: none;
             overflow: hidden;
         }
@@ -349,19 +356,19 @@
             object-fit: contain;
             display: block;
             border-radius: var(--radius-lg);
-            filter: drop-shadow(0 20px 50px rgba(0, 0, 0, 0.55));
+            filter: drop-shadow(0 24px 60px rgba(0, 0, 0, 0.65));
         }
 
-        /* Carousel Arrows */
+        /* Carousel Navigation Controls */
         .carousel-arrow {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
             z-index: 10;
-            width: 46px;
-            height: 46px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            background: rgba(18, 20, 25, 0.55);
+            background: rgba(18, 20, 25, 0.6);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: none;
@@ -377,23 +384,22 @@
 
         .carousel-arrow:hover {
             opacity: 1;
-            background: rgba(18, 20, 25, 0.85);
+            background: rgba(18, 20, 25, 0.9);
             transform: translateY(-50%) scale(1.08);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
         }
 
         .carousel-arrow.prev {
-            left: 20px;
+            left: 24px;
         }
 
         .carousel-arrow.next {
-            right: 20px;
+            right: 24px;
         }
 
-        /* Carousel Navigation Dots */
         .carousel-dots {
             position: absolute;
-            bottom: 18px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
@@ -401,7 +407,7 @@
             gap: 10px;
             padding: 8px 16px;
             border-radius: var(--radius-pill);
-            background: rgba(18, 20, 25, 0.55);
+            background: rgba(18, 20, 25, 0.6);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: none;
@@ -425,16 +431,16 @@
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
 
-        /* ---------------- Feature Pillars ---------------- */
-        .features-section {
-            max-width: 1140px;
-            margin: 0 auto 96px;
+        /* ---------------- Visual Auto-Feature Flow Diagram ---------------- */
+        .flow-section {
+            max-width: 1200px;
+            margin: 0 auto 108px;
             padding: 0 24px;
         }
 
         .section-header {
             text-align: center;
-            max-width: 600px;
+            max-width: 640px;
             margin: 0 auto 48px;
         }
 
@@ -448,6 +454,77 @@
         .section-header p {
             color: var(--text-secondary);
             font-size: 16px;
+            line-height: 1.55;
+        }
+
+        .flow-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            position: relative;
+        }
+
+        .flow-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 32px 26px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .flow-card:hover {
+            background: var(--surface-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-3px);
+        }
+
+        .flow-step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(0, 120, 212, 0.15);
+            color: #60a5fa;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 18px;
+            font-family: var(--font-mono);
+        }
+
+        .flow-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .flow-card p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .flow-badge {
+            margin-top: auto;
+            padding-top: 18px;
+            font-size: 12.5px;
+            color: #60a5fa;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ---------------- Feature Pillars ---------------- */
+        .features-section {
+            max-width: 1200px;
+            margin: 0 auto 108px;
+            padding: 0 24px;
         }
 
         .features-grid {
@@ -500,8 +577,8 @@
 
         /* ---------------- Comparison Section ---------------- */
         .compare-section {
-            max-width: 900px;
-            margin: 0 auto 96px;
+            max-width: 960px;
+            margin: 0 auto 108px;
             padding: 0 24px;
         }
 
@@ -548,8 +625,8 @@
 
         /* ---------------- FAQ Accordion ---------------- */
         .faq-section {
-            max-width: 800px;
-            margin: 0 auto 96px;
+            max-width: 860px;
+            margin: 0 auto 108px;
             padding: 0 24px;
         }
 
@@ -602,14 +679,14 @@
         /* ---------------- Footer ---------------- */
         footer {
             border-top: 1px solid var(--border-subtle);
-            background: #0d0e11;
+            background: #090a0d;
             padding: 48px 24px 36px;
             color: var(--text-secondary);
             font-size: 13.5px;
         }
 
         .footer-container {
-            max-width: 1140px;
+            max-width: 1200px;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
@@ -633,10 +710,13 @@
             color: var(--text-primary);
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 860px) {
+            .flow-grid {
+                grid-template-columns: 1fr;
+            }
             .carousel-arrow {
-                width: 38px;
-                height: 38px;
+                width: 40px;
+                height: 40px;
             }
             .carousel-arrow.prev { left: 10px; }
             .carousel-arrow.next { right: 10px; }
@@ -654,6 +734,7 @@
             </a>
             <div class="nav-links">
                 <a href="#screenshots">Screenshots</a>
+                <a href="#how-it-works">How It Works</a>
                 <a href="#features">Features</a>
                 <a href="#compare">Why Native?</a>
                 <a href="#faq">FAQ</a>
@@ -670,13 +751,12 @@
         <section class="hero">
             <div class="hero-logo-wrapper">
                 <img src="assets/logo.svg" alt="AutoScape Logo" class="hero-logo">
+                <div class="hero-app-title">AutoScape</div>
             </div>
-            <div class="hero-badge">
-                <span>✨ Pure Windows 11 Native Architecture</span>
-            </div>
-            <h1>Daily 4K Photography.<br><span>Zero Idle RAM.</span></h1>
+
+            <h2 class="hero-slogan">Your Daily Dose of <span>Stunning Wallpapers</span></h2>
             <p class="lead">
-                Curated daily wallpapers from Bing, Windows Spotlight, Wallhaven, and Pexels. Designed strictly with native Windows components so your PC never slows down.
+                Curated daily wallpapers from Bing, Windows Spotlight, Wallhaven, and Pexels.
             </p>
 
             <div class="hero-cta">
@@ -689,7 +769,7 @@
                 </a>
             </div>
 
-            <!-- PowerShell One-Line Installer -->
+            <!-- Fixed Non-Wrapping PowerShell Box -->
             <div class="terminal-box">
                 <span class="terminal-prefix">PS &gt;</span>
                 <span class="terminal-command" id="psCmd">irm https://hamisoptimistic.github.io/Bing-Wallpaper/install.ps1 | iex</span>
@@ -699,7 +779,7 @@
             </div>
         </section>
 
-        <!-- Pure Image Carousel Showcase -->
+        <!-- Wide Seamless Gallery Carousel -->
         <section class="carousel-section" id="screenshots">
             <div class="carousel-container" id="carouselContainer">
                 
@@ -735,6 +815,37 @@
                     <button class="carousel-dot" onclick="goToSlide(3)" aria-label="Slide 4"></button>
                 </div>
 
+            </div>
+        </section>
+
+        <!-- How Automatic Rotation Works Flow Section -->
+        <section class="flow-section" id="how-it-works">
+            <div class="section-header">
+                <h2>How Auto-Rotation Works</h2>
+                <p>Designed strictly around native Windows APIs. No permanent background service, zero memory leaks, zero battery drain.</p>
+            </div>
+
+            <div class="flow-grid">
+                <div class="flow-card">
+                    <div class="flow-step-num">01</div>
+                    <h3>Choose Wallpaper Engines</h3>
+                    <p>Select your favorite sources for Desktop and Lock Screen independently. Choose Bing 4K, Spotlight, Wallhaven Nature, or Pexels.</p>
+                    <div class="flow-badge">✓ Independent Desktop & Lock Screen</div>
+                </div>
+
+                <div class="flow-card">
+                    <div class="flow-step-num">02</div>
+                    <h3>Select Rotation Interval</h3>
+                    <p>Toggle Auto on and pick your schedule: On Login, Hourly, Every 6 Hours, or Daily at 12:00 AM. Settings save automatically.</p>
+                    <div class="flow-badge">✓ Flexible intervals</div>
+                </div>
+
+                <div class="flow-card">
+                    <div class="flow-step-num">03</div>
+                    <h3>Close the App &amp; Relax</h3>
+                    <p>Windows Task Scheduler triggers a silent 1-second native background job at the scheduled time and exits immediately. 0 MB idle RAM.</p>
+                    <div class="flow-badge">✓ True 0 MB Idle RAM</div>
+                </div>
             </div>
         </section>
 
@@ -829,11 +940,11 @@
             </table>
         </section>
 
-        <!-- FAQ Section -->
+        <!-- Comprehensive FAQ Section -->
         <section class="faq-section" id="faq">
             <div class="section-header">
                 <h2>Frequently Asked Questions</h2>
-                <p>Have questions? We’ve got answers.</p>
+                <p>Everything you need to know about AutoScape and how it works on Windows.</p>
             </div>
 
             <div class="faq-item open">
@@ -843,6 +954,16 @@
                 </div>
                 <div class="faq-answer">
                     AutoScape registers a native Windows Scheduled Task via Task Scheduler instead of leaving a memory-heavy app running in the background. When your scheduled time arrives (e.g. Daily or Hourly), Windows silently invokes a 1-second native script, updates your wallpaper, and immediately terminates.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFaq(this)">
+                    <span>Can I have different wallpapers on my Desktop and Lock Screen?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    Yes! AutoScape features independent source routing. For example, you can set your Desktop to fetch fresh Wallhaven 4K Nature imagery while your Lock Screen displays the daily Microsoft Bing photography.
                 </div>
             </div>
 
@@ -862,7 +983,7 @@
                     <span class="faq-icon">+</span>
                 </div>
                 <div class="faq-answer">
-                    Wallhaven works completely keyless out-of-the-box for all SFW Nature wallpapers! Pexels offers a free API key with generous limits on their website, which you can paste directly into AutoScape's Preferences popup.
+                    Wallhaven works completely keyless out-of-the-box for all SFW Nature wallpapers. Pexels offers a free API key with generous limits on their website, which you can paste directly into AutoScape's Preferences popup.
                 </div>
             </div>
 
@@ -875,6 +996,36 @@
                     Yes, AutoScape supports all native Windows wallpaper fit styles including Fit, Fill, Stretch, Center, and Span across multi-monitor setups.
                 </div>
             </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFaq(this)">
+                    <span>Does AutoScape require administrative privileges?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    No. AutoScape is designed to operate entirely in standard user space (%LOCALAPPDATA%). Changing desktop wallpapers and creating scheduled tasks for the current user requires no administrator rights or UAC prompts.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFaq(this)">
+                    <span>Will it work on both Windows 10 and Windows 11?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    Yes. AutoScape is fully compatible with 64-bit editions of Windows 10 and Windows 11 using built-in Windows PowerShell 5.1 and .NET framework components.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFaq(this)">
+                    <span>How do I uninstall or remove the auto-rotation task?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    Simply open AutoScape and toggle the <strong>Auto</strong> switch to <strong>OFF</strong>. This cleanly deletes the Windows Scheduled Task. To remove the files, delete the <code>%LOCALAPPDATA%\AutoScape</code> folder.
+                </div>
+            </div>
         </section>
     </main>
 
@@ -882,7 +1033,7 @@
     <footer>
         <div class="footer-container">
             <div>
-                <strong>AutoScape for Windows</strong> — Built natively for enthusiasts.
+                <strong>AutoScape for Windows</strong> — Open-source native wallpaper manager.
             </div>
             <div class="footer-links">
                 <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper" target="_blank">GitHub Repository</a>
