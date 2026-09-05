@@ -3579,33 +3579,39 @@ function Update-FiltersBtnText {
 }
 $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
+$script:galleryScrollBar = $null
+$script:scrollHideTimer = $null
+
 if ($GalleryScrollViewer) {
     if ('AutoScapeSmoothScroll' -as [type]) {
         [AutoScapeSmoothScroll]::Attach($GalleryScrollViewer)
     }
     $window.Add_Loaded({
-        $sb = $GalleryScrollViewer.Template.FindName('PART_VerticalScrollBar', $GalleryScrollViewer)
-        if ($sb) {
-            $scrollHideTimer = [System.Windows.Threading.DispatcherTimer]::new()
-            $scrollHideTimer.Interval = [TimeSpan]::FromMilliseconds(1000)
-            $scrollHideTimer.Add_Tick({
-                $scrollHideTimer.Stop()
-                if (-not $GalleryScrollViewer.IsMouseOver -and -not $sb.IsMouseOver) {
+        if ($GalleryScrollViewer.Template) {
+            $script:galleryScrollBar = $GalleryScrollViewer.Template.FindName('PART_VerticalScrollBar', $GalleryScrollViewer)
+        }
+        if ($script:galleryScrollBar) {
+            $script:scrollHideTimer = [System.Windows.Threading.DispatcherTimer]::new()
+            $script:scrollHideTimer.Interval = [TimeSpan]::FromMilliseconds(1000)
+            $script:scrollHideTimer.Add_Tick({
+                if ($script:scrollHideTimer) { $script:scrollHideTimer.Stop() }
+                if ($script:galleryScrollBar -and -not $GalleryScrollViewer.IsMouseOver -and -not $script:galleryScrollBar.IsMouseOver) {
                     $fadeAnim = [System.Windows.Media.Animation.DoubleAnimation]::new(0.0, [TimeSpan]::FromMilliseconds(450))
                     $fadeAnim.EasingFunction = [System.Windows.Media.Animation.CubicEase]::new()
-                    $sb.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+                    $script:galleryScrollBar.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
                 }
             })
-            $GalleryScrollViewer.Add_ScrollChanged({
-                param($s, $e)
-                if ([Math]::Abs($e.VerticalChange) -gt 0.001) {
-                    $fadeAnim = [System.Windows.Media.Animation.DoubleAnimation]::new(1.0, [TimeSpan]::FromMilliseconds(250))
-                    $fadeAnim.EasingFunction = [System.Windows.Media.Animation.CubicEase]::new()
-                    $sb.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
-                    $scrollHideTimer.Stop()
-                    $scrollHideTimer.Start()
-                }
-            })
+        }
+    })
+
+    $GalleryScrollViewer.Add_ScrollChanged({
+        param($s, $e)
+        if ($script:galleryScrollBar -and $script:scrollHideTimer -and [Math]::Abs($e.VerticalChange) -gt 0.001) {
+            $fadeAnim = [System.Windows.Media.Animation.DoubleAnimation]::new(1.0, [TimeSpan]::FromMilliseconds(250))
+            $fadeAnim.EasingFunction = [System.Windows.Media.Animation.CubicEase]::new()
+            $script:galleryScrollBar.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+            $script:scrollHideTimer.Stop()
+            $script:scrollHideTimer.Start()
         }
     })
 }
