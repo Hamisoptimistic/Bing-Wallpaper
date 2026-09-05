@@ -14,9 +14,9 @@ $script:startStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 # Unified industry-standard directory structure under %LOCALAPPDATA%\AutoScape
 $script:autoScapeRoot = Join-Path $env:LOCALAPPDATA 'AutoScape'
-$script:logsDir       = Join-Path $script:autoScapeRoot 'logs'
-$script:cacheDir      = Join-Path $script:autoScapeRoot 'cache'
-$script:settingsPath  = Join-Path $script:autoScapeRoot 'settings.json'
+$script:logsDir = Join-Path $script:autoScapeRoot 'logs'
+$script:cacheDir = Join-Path $script:autoScapeRoot 'cache'
+$script:settingsPath = Join-Path $script:autoScapeRoot 'settings.json'
 
 function Initialize-AutoScapeDirectories {
     try {
@@ -76,7 +76,7 @@ function Write-TimingLog {
 Write-TimingLog "SCRIPT: first line executing (in-process launch)"
 
 $script:interactionLogPath = Join-Path $script:logsDir 'autoscape-interactions.log'
-$script:archiveLogPath     = $script:interactionLogPath
+$script:archiveLogPath = $script:interactionLogPath
 
 function Write-InteractionLog {
     param([string]$Message)
@@ -87,7 +87,8 @@ function Write-InteractionLog {
         $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff")
         $memMB = [Math]::Round(([System.Diagnostics.Process]::GetCurrentProcess().WorkingSet64 / 1MB), 1)
         Add-Content -Path $script:interactionLogPath -Value "[$ts] [MEM: ${memMB}MB] $Message" -ErrorAction SilentlyContinue
-    } catch {}
+    }
+    catch {}
 }
 
 function Write-ArchiveLog {
@@ -107,7 +108,8 @@ function Invoke-MemoryFlush {
             try {
                 [BingWallpaperNative]::FlushMemoryBackground($script:interactionLogPath, $Reason)
                 return
-            } catch {}
+            }
+            catch {}
         }
     }
 
@@ -125,7 +127,8 @@ function Invoke-MemoryFlush {
         if ($Reason) {
             Write-InteractionLog "[MEM_FLUSH] ($Reason) WorkingSet: ${beforeMemMB}MB -> ${afterMemMB}MB"
         }
-    } catch {}
+    }
+    catch {}
 }
 $script:galleryIdleSettleTimer = $null
 Write-InteractionLog "[APP_INIT] AutoScape initialized. Initial WorkingSet recorded."
@@ -2086,8 +2089,8 @@ $xaml = @"
 
         <Style TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Width" Value="6"/>
-            <Setter Property="MinWidth" Value="6"/>
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="MinWidth" Value="4"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollBar">
@@ -2100,13 +2103,17 @@ $xaml = @"
                                     <Thumb BorderThickness="0">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Name="ThumbBorder" Background="#555555" CornerRadius="3" Margin="0,2"/>
+                                                <Border Name="ThumbBorder" HorizontalAlignment="Right" Width="4" Background="#888888" CornerRadius="2" Margin="0,2,2,2"/>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#0078D4"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Width" Value="6"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#A0A0A0"/>
+                                                        <Setter TargetName="ThumbBorder" Property="CornerRadius" Value="3"/>
                                                     </Trigger>
                                                     <Trigger Property="IsDragging" Value="True">
-                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#005A9E"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Width" Value="6"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#0078D4"/>
+                                                        <Setter TargetName="ThumbBorder" Property="CornerRadius" Value="3"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -2123,8 +2130,8 @@ $xaml = @"
             </Setter>
             <Style.Triggers>
                 <Trigger Property="Orientation" Value="Horizontal">
-                    <Setter Property="Height" Value="6"/>
-                    <Setter Property="MinHeight" Value="6"/>
+                    <Setter Property="Height" Value="8"/>
+                    <Setter Property="MinHeight" Value="4"/>
                     <Setter Property="Width" Value="Auto"/>
                 </Trigger>
             </Style.Triggers>
@@ -2140,13 +2147,44 @@ $xaml = @"
                                        Orientation="Vertical"
                                        HorizontalAlignment="Right"
                                        VerticalAlignment="Stretch"
-                                       Width="6"
-                                       Margin="0,4,4,4"
+                                       Width="8"
+                                       Margin="0,4,0,4"
+                                       Opacity="0"
                                        Value="{TemplateBinding VerticalOffset}"
                                        Maximum="{TemplateBinding ScrollableHeight}"
                                        ViewportSize="{TemplateBinding ViewportHeight}"
                                        Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
                         </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="PART_VerticalScrollBar"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.3">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="PART_VerticalScrollBar"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.45">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -2766,7 +2804,7 @@ $xaml = @"
 
             <Border Grid.Row="2" Background="Transparent" CornerRadius="18" BorderThickness="0" ClipToBounds="True" VerticalAlignment="Center">
                 <Grid>
-                    <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="0,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Center" FocusVisualStyle="{x:Null}">
+                    <ScrollViewer Name="GalleryScrollViewer" CanContentScroll="False" Margin="8,16,0,16" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Center" FocusVisualStyle="{x:Null}">
                         <UniformGrid Name="GalleryPanel" Columns="4" VerticalAlignment="Center" />
                     </ScrollViewer>
                     <!-- Centered Empty State for Local Tab when no folder is selected -->
@@ -3146,7 +3184,8 @@ public static class AutoScapeChromeHelper
     }
 }
 "@ -ReferencedAssemblies WindowsBase, PresentationCore, PresentationFramework -ErrorAction SilentlyContinue
-    } catch {}
+    }
+    catch {}
 }
 
 $applyDarkTitleBar = {
@@ -3540,8 +3579,35 @@ function Update-FiltersBtnText {
 }
 $GalleryPanel = $window.FindName('GalleryPanel')
 $GalleryScrollViewer = $window.FindName('GalleryScrollViewer')
-if ($GalleryScrollViewer -and ('AutoScapeSmoothScroll' -as [type])) {
-    [AutoScapeSmoothScroll]::Attach($GalleryScrollViewer)
+if ($GalleryScrollViewer) {
+    if ('AutoScapeSmoothScroll' -as [type]) {
+        [AutoScapeSmoothScroll]::Attach($GalleryScrollViewer)
+    }
+    $window.Add_Loaded({
+        $sb = $GalleryScrollViewer.Template.FindName('PART_VerticalScrollBar', $GalleryScrollViewer)
+        if ($sb) {
+            $scrollHideTimer = [System.Windows.Threading.DispatcherTimer]::new()
+            $scrollHideTimer.Interval = [TimeSpan]::FromMilliseconds(1000)
+            $scrollHideTimer.Add_Tick({
+                $scrollHideTimer.Stop()
+                if (-not $GalleryScrollViewer.IsMouseOver -and -not $sb.IsMouseOver) {
+                    $fadeAnim = [System.Windows.Media.Animation.DoubleAnimation]::new(0.0, [TimeSpan]::FromMilliseconds(450))
+                    $fadeAnim.EasingFunction = [System.Windows.Media.Animation.CubicEase]::new()
+                    $sb.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+                }
+            })
+            $GalleryScrollViewer.Add_ScrollChanged({
+                param($s, $e)
+                if ([Math]::Abs($e.VerticalChange) -gt 0.001) {
+                    $fadeAnim = [System.Windows.Media.Animation.DoubleAnimation]::new(1.0, [TimeSpan]::FromMilliseconds(250))
+                    $fadeAnim.EasingFunction = [System.Windows.Media.Animation.CubicEase]::new()
+                    $sb.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+                    $scrollHideTimer.Stop()
+                    $scrollHideTimer.Start()
+                }
+            })
+        }
+    })
 }
 $StatusText = $window.FindName('StatusText')
 $script:StatusText = $StatusText
@@ -3565,12 +3631,13 @@ if ($CaptionMinBtn) {
 }
 if ($CaptionMaxBtn) {
     $CaptionMaxBtn.Add_Click({
-        if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
-            [System.Windows.SystemCommands]::RestoreWindow($window)
-        } else {
-            [System.Windows.SystemCommands]::MaximizeWindow($window)
-        }
-    })
+            if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
+                [System.Windows.SystemCommands]::RestoreWindow($window)
+            }
+            else {
+                [System.Windows.SystemCommands]::MaximizeWindow($window)
+            }
+        })
 }
 if ($CaptionCloseBtn) {
     $CaptionCloseBtn.Add_Click({ [System.Windows.SystemCommands]::CloseWindow($window) })
@@ -3579,19 +3646,20 @@ if ($CaptionCloseBtn) {
 $HeaderGrid = $window.FindName('HeaderGrid')
 if ($HeaderGrid) {
     $HeaderGrid.Add_MouseLeftButtonDown({
-        param($s, $e)
-        if ($e.OriginalSource -and ($e.OriginalSource -is [System.Windows.Controls.Button] -or $e.OriginalSource -is [System.Windows.Controls.Primitives.ButtonBase])) { return }
-        if ($e.ClickCount -ge 2) {
-            if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
-                [System.Windows.SystemCommands]::RestoreWindow($window)
-            } else {
-                [System.Windows.SystemCommands]::MaximizeWindow($window)
+            param($s, $e)
+            if ($e.OriginalSource -and ($e.OriginalSource -is [System.Windows.Controls.Button] -or $e.OriginalSource -is [System.Windows.Controls.Primitives.ButtonBase])) { return }
+            if ($e.ClickCount -ge 2) {
+                if ($window.WindowState -eq [System.Windows.WindowState]::Maximized) {
+                    [System.Windows.SystemCommands]::RestoreWindow($window)
+                }
+                else {
+                    [System.Windows.SystemCommands]::MaximizeWindow($window)
+                }
             }
-        }
-        else {
-            try { $window.DragMove() } catch {}
-        }
-    })
+            else {
+                try { $window.DragMove() } catch {}
+            }
+        })
 }
 
 # --- Source toggle pill -----------------
@@ -3599,10 +3667,10 @@ $SourceTogglePill = $window.FindName('SourceTogglePill')
 $HeaderActionPill = $window.FindName('HeaderActionPill')
 if ($SourceTogglePill -and $HeaderActionPill) {
     $HeaderActionPill.Add_SizeChanged({
-        if ($HeaderActionPill.ActualWidth -gt 0) {
-            $SourceTogglePill.Width = $HeaderActionPill.ActualWidth
-        }
-    })
+            if ($HeaderActionPill.ActualWidth -gt 0) {
+                $SourceTogglePill.Width = $HeaderActionPill.ActualWidth
+            }
+        })
 }
 $SourceBingBtn = $window.FindName('SourceBingBtn')
 $SourceSpotlightBtn = $window.FindName('SourceSpotlightBtn')
@@ -3959,66 +4027,66 @@ if ($EmptyStateSelectFolderBtn) {
 
 if ($PexelsEmptyKeyBox) {
     $PexelsEmptyKeyBox.Add_TextChanged({
-        if ($PexelsEmptyKeyPlaceholder) {
-            $txt = $PexelsEmptyKeyBox.Text.Trim()
-            $PexelsEmptyKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
-        }
-    })
-    $PexelsEmptyKeyBox.Add_GotFocus({
-        if ($PexelsEmptyKeyPlaceholder) {
-            $PexelsEmptyKeyPlaceholder.Visibility = [System.Windows.Visibility]::Collapsed
-        }
-    })
-    $PexelsEmptyKeyBox.Add_LostFocus({
-        if ($PexelsEmptyKeyPlaceholder) {
-            $txt = $PexelsEmptyKeyBox.Text.Trim()
-            $PexelsEmptyKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
-        }
-    })
-    $PexelsEmptyKeyBox.Add_KeyDown({
-        param($s, $e)
-        if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
-            $e.Handled = $true
-            if ($PexelsEmptySaveBtn) {
-                $PexelsEmptySaveBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+            if ($PexelsEmptyKeyPlaceholder) {
+                $txt = $PexelsEmptyKeyBox.Text.Trim()
+                $PexelsEmptyKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
             }
-        }
-    })
+        })
+    $PexelsEmptyKeyBox.Add_GotFocus({
+            if ($PexelsEmptyKeyPlaceholder) {
+                $PexelsEmptyKeyPlaceholder.Visibility = [System.Windows.Visibility]::Collapsed
+            }
+        })
+    $PexelsEmptyKeyBox.Add_LostFocus({
+            if ($PexelsEmptyKeyPlaceholder) {
+                $txt = $PexelsEmptyKeyBox.Text.Trim()
+                $PexelsEmptyKeyPlaceholder.Visibility = if ([string]::IsNullOrEmpty($txt)) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+            }
+        })
+    $PexelsEmptyKeyBox.Add_KeyDown({
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Enter) {
+                $e.Handled = $true
+                if ($PexelsEmptySaveBtn) {
+                    $PexelsEmptySaveBtn.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+                }
+            }
+        })
 }
 
 if ($PexelsEmptySaveBtn) {
     $PexelsEmptySaveBtn.Add_Click({
-        $raw = if ($PexelsEmptyKeyBox) { $PexelsEmptyKeyBox.Text.Trim() } else { '' }
-        $validation = Test-SourceApiKey -Source 'Pexels' -Key $raw
-        if (-not $validation.Valid) {
-            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-            $StatusText.Opacity = 1
-            $StatusText.Foreground = $statusErrorBrush
-            $StatusText.Text = $validation.Error
-            return
-        }
+            $raw = if ($PexelsEmptyKeyBox) { $PexelsEmptyKeyBox.Text.Trim() } else { '' }
+            $validation = Test-SourceApiKey -Source 'Pexels' -Key $raw
+            if (-not $validation.Valid) {
+                $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+                $StatusText.Opacity = 1
+                $StatusText.Foreground = $statusErrorBrush
+                $StatusText.Text = $validation.Error
+                return
+            }
 
-        Set-SourceApiKey -Source 'Pexels' -Key $raw
-        Update-GlobalApiKeyBoxState -Key $raw
-        if ($PexelsEmptyKeyBox) { $PexelsEmptyKeyBox.Text = '' }
-        if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
-        if ($window) { $window.Focus() }
-        Load-Gallery
-    })
+            Set-SourceApiKey -Source 'Pexels' -Key $raw
+            Update-GlobalApiKeyBoxState -Key $raw
+            if ($PexelsEmptyKeyBox) { $PexelsEmptyKeyBox.Text = '' }
+            if ($PexelsEmptyStatePanel) { $PexelsEmptyStatePanel.Visibility = [System.Windows.Visibility]::Collapsed }
+            if ($window) { $window.Focus() }
+            Load-Gallery
+        })
 }
 
 if ($PexelsEmptyGetBtn) {
     $PexelsEmptyGetBtn.Add_Click({
-        try {
-            [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo -Property @{
-                FileName = 'https://www.pexels.com/api/'
-                UseShellExecute = $true
-            })) | Out-Null
-        }
-        catch {
-            try { Start-Process 'https://www.pexels.com/api/' } catch {}
-        }
-    })
+            try {
+                [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo -Property @{
+                            FileName        = 'https://www.pexels.com/api/'
+                            UseShellExecute = $true
+                        })) | Out-Null
+            }
+            catch {
+                try { Start-Process 'https://www.pexels.com/api/' } catch {}
+            }
+        })
 }
 # ------------------------------------------------------------------------
 
@@ -5186,13 +5254,17 @@ function Show-ModernDialog {
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Name="ThumbBorder" Background="#4A4A4A" CornerRadius="4" Margin="2,0,2,0"/>
+                                                <Border Name="ThumbBorder" HorizontalAlignment="Right" Width="4" Background="#888888" CornerRadius="2" Margin="0,2,2,2"/>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#6E6E6E"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Width" Value="6"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#A0A0A0"/>
+                                                        <Setter TargetName="ThumbBorder" Property="CornerRadius" Value="3"/>
                                                     </Trigger>
                                                     <Trigger Property="IsDragging" Value="True">
-                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#888888"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Width" Value="6"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#0078D4"/>
+                                                        <Setter TargetName="ThumbBorder" Property="CornerRadius" Value="3"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
@@ -5681,29 +5753,29 @@ function Render-GalleryGrid {
             $earthMenuItem.Tag = $earthUrl
 
             $earthMenuItem.Add_Click({
-                param($s, $e)
-                $targetUrl = [string]$s.Tag
-                if ($targetUrl) {
-                    try {
-                        [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo -Property @{
-                            FileName = $targetUrl
-                            UseShellExecute = $true
-                        })) | Out-Null
+                    param($s, $e)
+                    $targetUrl = [string]$s.Tag
+                    if ($targetUrl) {
+                        try {
+                            [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo -Property @{
+                                        FileName        = $targetUrl
+                                        UseShellExecute = $true
+                                    })) | Out-Null
+                        }
+                        catch {
+                            try { Start-Process $targetUrl } catch {}
+                        }
                     }
-                    catch {
-                        try { Start-Process $targetUrl } catch {}
-                    }
-                }
-            })
+                })
 
             $cardMenu.Items.Add($earthMenuItem) | Out-Null
             $card.ContextMenu = $cardMenu
         }
 
         $card.Add_PreviewMouseRightButtonDown({
-            param($evtSender, $e)
-            Select-Card $evtSender $evtSender.Tag
-        })
+                param($evtSender, $e)
+                Select-Card $evtSender $evtSender.Tag
+            })
 
         $card.Add_MouseEnter({ 
                 param($evtSender, $e)
@@ -5995,10 +6067,10 @@ function Render-GalleryGrid {
             $script:galleryIdleSettleTimer = New-Object System.Windows.Threading.DispatcherTimer
             $script:galleryIdleSettleTimer.Interval = [TimeSpan]::FromSeconds(5)
             $script:galleryIdleSettleTimer.Add_Tick({
-                $script:galleryIdleSettleTimer.Stop()
-                $script:galleryIdleSettleTimer = $null
-                Invoke-MemoryFlush -Reason "GalleryIdleSettle" -Async
-            })
+                    $script:galleryIdleSettleTimer.Stop()
+                    $script:galleryIdleSettleTimer = $null
+                    Invoke-MemoryFlush -Reason "GalleryIdleSettle" -Async
+                })
             $script:galleryIdleSettleTimer.Start()
         })
     $script:qualityUpgradeTimer.Start()
@@ -6811,7 +6883,8 @@ if ($SpotlightSetBtn -and $SpotlightOptionsPopup) {
                 if ($source -and $source.Handle -ne [IntPtr]::Zero) {
                     [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
                 }
-            } catch {}
+            }
+            catch {}
 
             $easing = New-Object System.Windows.Media.Animation.CubicEase
             $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
@@ -6891,7 +6964,8 @@ if ($FiltersBtn -and $FiltersPopup) {
                 if ($source -and $source.Handle -ne [IntPtr]::Zero) {
                     [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
                 }
-            } catch {}
+            }
+            catch {}
 
             if ($FiltersBtn) {
                 $FiltersBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
@@ -6935,7 +7009,8 @@ function Get-PeapixBingMonth {
     try {
         $response = Invoke-WebRequest -Uri $url -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -UseBasicParsing -TimeoutSec 10
         $html = $response.Content
-    } catch {
+    }
+    catch {
         return @()
     }
 
@@ -6945,19 +7020,20 @@ function Get-PeapixBingMonth {
     $results = @()
     foreach ($m in $matches) {
         $thumbUrl = $m.Groups[1].Value
-        $pageUrl  = "https://peapix.com" + $m.Groups[2].Value
+        $pageUrl = "https://peapix.com" + $m.Groups[2].Value
         $rawTitle = $m.Groups[3].Value.Trim()
-        $title    = [System.Net.WebUtility]::HtmlDecode($rawTitle)
+        $title = [System.Net.WebUtility]::HtmlDecode($rawTitle)
         $dateText = $m.Groups[4].Value.Trim()
 
-        $baseImg  = $thumbUrl -replace '_640\.jpg$', ''
+        $baseImg = $thumbUrl -replace '_640\.jpg$', ''
         $full1080 = $baseImg + '_1920.jpg'
-        $full4k   = $baseImg + '.jpg'
+        $full4k = $baseImg + '.jpg'
 
         $parsedDate = $null
         try {
             $parsedDate = [DateTime]::ParseExact("$dateText $Year", "MMMM dd yyyy", [System.Globalization.CultureInfo]::InvariantCulture).ToString("yyyy-MM-dd")
-        } catch {
+        }
+        catch {
             $parsedDate = "$Year-$monthStr"
         }
 
@@ -7054,392 +7130,402 @@ if ($ArchiveSearchBtn -and $ArchiveSearchPopup) {
     $archivePopupEdgePad = 8.0
 
     $window.Add_SizeChanged({
-        if ($ArchiveSearchPopup -and $ArchiveSearchPopup.IsOpen) { $ArchiveSearchPopup.IsOpen = $false }
-    })
+            if ($ArchiveSearchPopup -and $ArchiveSearchPopup.IsOpen) { $ArchiveSearchPopup.IsOpen = $false }
+        })
 
     $ArchiveSearchBtn.Add_Click({
-        param($sender, $e)
-        if ($script:currentSource -ne 'Bing') { return }
-        if ($e) { $e.Handled = $true }
+            param($sender, $e)
+            if ($script:currentSource -ne 'Bing') { return }
+            if ($e) { $e.Handled = $true }
 
-        $msSinceClosed = ([DateTime]::Now - $script:archivePopupClosedAt).TotalMilliseconds
-        if ($msSinceClosed -lt 200) { return }
+            $msSinceClosed = ([DateTime]::Now - $script:archivePopupClosedAt).TotalMilliseconds
+            if ($msSinceClosed -lt 200) { return }
 
-        if (-not $ArchiveSearchPopup.IsOpen) {
-            if ($FiltersPopup -and $FiltersPopup.IsOpen) { $FiltersPopup.IsOpen = $false }
-            if ($SpotlightOptionsPopup -and $SpotlightOptionsPopup.IsOpen) { $SpotlightOptionsPopup.IsOpen = $false }
+            if (-not $ArchiveSearchPopup.IsOpen) {
+                if ($FiltersPopup -and $FiltersPopup.IsOpen) { $FiltersPopup.IsOpen = $false }
+                if ($SpotlightOptionsPopup -and $SpotlightOptionsPopup.IsOpen) { $SpotlightOptionsPopup.IsOpen = $false }
 
-            try {
-                $targetPos = $ArchiveSearchBtn.TranslatePoint([System.Windows.Point]::new(0, 0), $window)
+                try {
+                    $targetPos = $ArchiveSearchBtn.TranslatePoint([System.Windows.Point]::new(0, 0), $window)
 
-                $hOffset = -180.0
-                $maxH = ($window.ActualWidth - $archivePopupEdgePad) - $targetPos.X - $archivePopupCardWidth
-                $minH = $archivePopupEdgePad - $targetPos.X
-                if ($hOffset -gt $maxH) { $hOffset = $maxH }
-                if ($hOffset -lt $minH) { $hOffset = $minH }
-                $ArchiveSearchPopup.HorizontalOffset = $hOffset
+                    $hOffset = -180.0
+                    $maxH = ($window.ActualWidth - $archivePopupEdgePad) - $targetPos.X - $archivePopupCardWidth
+                    $minH = $archivePopupEdgePad - $targetPos.X
+                    if ($hOffset -gt $maxH) { $hOffset = $maxH }
+                    if ($hOffset -lt $minH) { $hOffset = $minH }
+                    $ArchiveSearchPopup.HorizontalOffset = $hOffset
 
-                $vOffset = 16.0
-                $targetBottom = $targetPos.Y + $ArchiveSearchBtn.ActualHeight
-                $roomBelow = $window.ActualHeight - $archivePopupEdgePad - $targetBottom
-                if ($roomBelow -lt $archivePopupCardHeight) {
-                    $vOffset = - ($ArchiveSearchBtn.ActualHeight + $archivePopupCardHeight + 16.0)
+                    $vOffset = 16.0
+                    $targetBottom = $targetPos.Y + $ArchiveSearchBtn.ActualHeight
+                    $roomBelow = $window.ActualHeight - $archivePopupEdgePad - $targetBottom
+                    if ($roomBelow -lt $archivePopupCardHeight) {
+                        $vOffset = - ($ArchiveSearchBtn.ActualHeight + $archivePopupCardHeight + 16.0)
+                    }
+                    $ArchiveSearchPopup.VerticalOffset = $vOffset
                 }
-                $ArchiveSearchPopup.VerticalOffset = $vOffset
+                catch {
+                    $ArchiveSearchPopup.HorizontalOffset = -180.0
+                    $ArchiveSearchPopup.VerticalOffset = 16.0
+                }
             }
-            catch {
-                $ArchiveSearchPopup.HorizontalOffset = -180.0
-                $ArchiveSearchPopup.VerticalOffset = 16.0
-            }
-        }
 
-        $ArchiveSearchPopup.IsOpen = -not $ArchiveSearchPopup.IsOpen
-    })
+            $ArchiveSearchPopup.IsOpen = -not $ArchiveSearchPopup.IsOpen
+        })
 
     $ArchiveSearchPopup.Add_Opened({
-        Write-InteractionLog "[ARCHIVE_POPUP_OPEN] Archive Search popup opened"
-        try {
-            $source = [System.Windows.Interop.HwndSource]::FromVisual($ArchiveSearchPopup.Child)
-            if ($source -and $source.Handle -ne [IntPtr]::Zero) {
-                [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
+            Write-InteractionLog "[ARCHIVE_POPUP_OPEN] Archive Search popup opened"
+            try {
+                $source = [System.Windows.Interop.HwndSource]::FromVisual($ArchiveSearchPopup.Child)
+                if ($source -and $source.Handle -ne [IntPtr]::Zero) {
+                    [BingWallpaperNative]::EnableDarkTitleBar($source.Handle, 1)
+                }
             }
-        } catch {}
+            catch {}
 
-        if ($ArchiveSearchBtn) {
-            $ArchiveSearchBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
-            $ArchiveSearchBtn.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(16, 255, 255, 255))
-        }
+            if ($ArchiveSearchBtn) {
+                $ArchiveSearchBtn.Background = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(37, 255, 255, 255))
+                $ArchiveSearchBtn.BorderBrush = New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromArgb(16, 255, 255, 255))
+            }
 
-        $easing = New-Object System.Windows.Media.Animation.CubicEase
-        $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
-        $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
-        $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, $dur
-        $fadeAnim.EasingFunction = $easing
-        $ArchiveSearchPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
-    })
+            $easing = New-Object System.Windows.Media.Animation.CubicEase
+            $easing.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+            $dur = New-Object System.Windows.Duration([TimeSpan]::FromMilliseconds(150))
+            $fadeAnim = New-Object System.Windows.Media.Animation.DoubleAnimation -ArgumentList 1.0, $dur
+            $fadeAnim.EasingFunction = $easing
+            $ArchiveSearchPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeAnim)
+        })
 
     $ArchiveSearchPopup.Add_Closed({
-        $script:archivePopupClosedAt = [DateTime]::Now
-        Write-InteractionLog "[ARCHIVE_POPUP_CLOSE] Archive Search popup closed"
-        if ($ArchiveSearchBtn) {
-            $ArchiveSearchBtn.Background = [System.Windows.Media.Brushes]::Transparent
-            $ArchiveSearchBtn.BorderBrush = [System.Windows.Media.Brushes]::Transparent
-        }
-        $ArchiveSearchPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        $ArchiveSearchPopupCard.Opacity = 0
-        Invoke-MemoryFlush -Reason "ArchivePopupClosed" -Async
-    })
+            $script:archivePopupClosedAt = [DateTime]::Now
+            Write-InteractionLog "[ARCHIVE_POPUP_CLOSE] Archive Search popup closed"
+            if ($ArchiveSearchBtn) {
+                $ArchiveSearchBtn.Background = [System.Windows.Media.Brushes]::Transparent
+                $ArchiveSearchBtn.BorderBrush = [System.Windows.Media.Brushes]::Transparent
+            }
+            $ArchiveSearchPopupCard.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $ArchiveSearchPopupCard.Opacity = 0
+            Invoke-MemoryFlush -Reason "ArchivePopupClosed" -Async
+        })
 }
 
 if ($FetchArchiveBtn) {
     $script:archiveSearchContext = $null
 
     $FetchArchiveBtn.Add_Click({
-        if ($ArchiveSearchPopup) { $ArchiveSearchPopup.IsOpen = $false }
+            if ($ArchiveSearchPopup) { $ArchiveSearchPopup.IsOpen = $false }
 
-        # Cancel any previous running search
-        if ($script:archiveSearchContext) {
-            try { $script:archiveSearchContext.Timer.Stop() } catch {}
-            try { $script:archiveSearchContext.PS.Stop() } catch {}
-            try { $script:archiveSearchContext.PS.Dispose() } catch {}
-            $script:archiveSearchContext = $null
-        }
-
-        $selYear = if ($ArchiveYearBox -and $ArchiveYearBox.SelectedItem) { [int]$ArchiveYearBox.SelectedItem } else { [DateTime]::Now.Year }
-        $selMonth = if ($ArchiveMonthBox) { $ArchiveMonthBox.SelectedIndex + 1 } else { [DateTime]::Now.Month }
-        $selDay = if ($ArchiveDayBox -and $ArchiveDayBox.SelectedItem) { [int]$ArchiveDayBox.SelectedItem } else { 1 }
-        $selRegionCode = if ($ArchiveRegionBox -and $ArchiveRegionBox.SelectedItem -and $ArchiveRegionBox.SelectedItem.Tag) { [string]$ArchiveRegionBox.SelectedItem.Tag } else { 'us' }
-        $scope = $script:archiveSearchScope
-
-        # Switch visually to Bing tab
-        if ($script:currentSource -ne 'Bing') {
-            $script:currentSource = 'Bing'
-            Update-SourceToggleVisual
-        }
-
-        $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
-        $StatusText.Opacity = 1
-        $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
-
-        $thumbDir = Join-Path $script:cacheDir "Thumbnails\Bing_$selRegionCode"
-        if (-not (Test-Path -LiteralPath $thumbDir)) {
-            try { New-Item -ItemType Directory -Path $thumbDir -Force | Out-Null } catch {}
-        }
-
-        if ($scope -eq 'Day') {
-            $targetDateStr = "$selYear-" + $selMonth.ToString("00") + "-" + $selDay.ToString("00")
-            $StatusText.Text = "Searching Bing archive for $targetDateStr..."
-        }
-        elseif ($scope -eq 'Month') {
-            $monthStr = $selMonth.ToString("00")
-            $StatusText.Text = "Loading Bing wallpapers for $selYear-$monthStr..."
-        }
-        elseif ($scope -eq 'Year') {
-            $StatusText.Text = "Loading full year archive for $selYear (this may take a few seconds)..."
-        }
-
-        $queue = [System.Collections.Queue]::Synchronized((New-Object System.Collections.Queue))
-        $ps = [PowerShell]::Create()
-        [void]$ps.AddScript({
-            param($Scope, $Country, $Year, $Month, $Day, $Queue, $LogPath, $ThumbDir)
-
-            function LogMsg($msg) {
-                if ($LogPath) {
-                    $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff")
-                    Add-Content -Path $LogPath -Value "[$ts] $msg" -ErrorAction SilentlyContinue
-                }
+            # Cancel any previous running search
+            if ($script:archiveSearchContext) {
+                try { $script:archiveSearchContext.Timer.Stop() } catch {}
+                try { $script:archiveSearchContext.PS.Stop() } catch {}
+                try { $script:archiveSearchContext.PS.Dispose() } catch {}
+                $script:archiveSearchContext = $null
             }
 
-            function FetchMonth($c, $y, $m) {
-                $mStr = $m.ToString("00")
-                $url = "https://peapix.com/bing/$c/$y/$mStr"
-                LogMsg "Requesting URL: $url"
-                try {
-                    $resp = Invoke-WebRequest -Uri $url -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -UseBasicParsing -TimeoutSec 12
-                    LogMsg "Received response: $($resp.StatusCode), Length: $($resp.Content.Length)"
-                    $html = $resp.Content
-                } catch {
-                    LogMsg "HTTP Error for $($url): $($_.Exception.Message)"
-                    return @()
-                }
+            $selYear = if ($ArchiveYearBox -and $ArchiveYearBox.SelectedItem) { [int]$ArchiveYearBox.SelectedItem } else { [DateTime]::Now.Year }
+            $selMonth = if ($ArchiveMonthBox) { $ArchiveMonthBox.SelectedIndex + 1 } else { [DateTime]::Now.Month }
+            $selDay = if ($ArchiveDayBox -and $ArchiveDayBox.SelectedItem) { [int]$ArchiveDayBox.SelectedItem } else { 1 }
+            $selRegionCode = if ($ArchiveRegionBox -and $ArchiveRegionBox.SelectedItem -and $ArchiveRegionBox.SelectedItem.Tag) { [string]$ArchiveRegionBox.SelectedItem.Tag } else { 'us' }
+            $scope = $script:archiveSearchScope
 
-                $pattern = '(?s)<div class="[^"]*rounded-bottom">.*?<img[^>]*data-src="([^"]+)"[^>]*>.*?<a[^>]*href="(/bing/\d+)"[^>]*>([^<]+)</a>.*?<span class="text-body-tertiary fs-sm">([^<]+)</span>'
-                $matches = [regex]::Matches($html, $pattern)
-                LogMsg "Parsed $($matches.Count) wallpapers from $url"
+            # Switch visually to Bing tab
+            if ($script:currentSource -ne 'Bing') {
+                $script:currentSource = 'Bing'
+                Update-SourceToggleVisual
+            }
 
-                $items = @()
-                foreach ($match in $matches) {
-                    $thumbUrl = $match.Groups[1].Value
-                    $pageUrl  = "https://peapix.com" + $match.Groups[2].Value
-                    $rawTitle = $match.Groups[3].Value.Trim()
-                    $title    = [System.Net.WebUtility]::HtmlDecode($rawTitle)
-                    $dateText = $match.Groups[4].Value.Trim()
+            $StatusText.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null)
+            $StatusText.Opacity = 1
+            $StatusText.Foreground = (New-Object System.Windows.Media.SolidColorBrush([System.Windows.Media.Color]::FromRgb(136, 136, 136)))
 
-                    $baseImg  = $thumbUrl -replace '_640\.jpg$', ''
-                    $full1080 = $baseImg + '_1920.jpg'
-                    $full4k   = $baseImg + '.jpg'
+            $thumbDir = Join-Path $script:cacheDir "Thumbnails\Bing_$selRegionCode"
+            if (-not (Test-Path -LiteralPath $thumbDir)) {
+                try { New-Item -ItemType Directory -Path $thumbDir -Force | Out-Null } catch {}
+            }
 
-                    $parsedDate = $null
-                    try {
-                        $parsedDate = [DateTime]::ParseExact("$dateText $y", "MMMM dd yyyy", [System.Globalization.CultureInfo]::InvariantCulture).ToString("yyyy-MM-dd")
-                    } catch {
-                        $parsedDate = "$y-$mStr"
+            if ($scope -eq 'Day') {
+                $targetDateStr = "$selYear-" + $selMonth.ToString("00") + "-" + $selDay.ToString("00")
+                $StatusText.Text = "Searching Bing archive for $targetDateStr..."
+            }
+            elseif ($scope -eq 'Month') {
+                $monthStr = $selMonth.ToString("00")
+                $StatusText.Text = "Loading Bing wallpapers for $selYear-$monthStr..."
+            }
+            elseif ($scope -eq 'Year') {
+                $StatusText.Text = "Loading full year archive for $selYear (this may take a few seconds)..."
+            }
+
+            $queue = [System.Collections.Queue]::Synchronized((New-Object System.Collections.Queue))
+            $ps = [PowerShell]::Create()
+            [void]$ps.AddScript({
+                    param($Scope, $Country, $Year, $Month, $Day, $Queue, $LogPath, $ThumbDir)
+
+                    function LogMsg($msg) {
+                        if ($LogPath) {
+                            $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff")
+                            Add-Content -Path $LogPath -Value "[$ts] $msg" -ErrorAction SilentlyContinue
+                        }
                     }
 
-                    $items += [PSCustomObject]@{
-                        source       = 'Bing'
-                        title        = $title
-                        date         = $parsedDate
-                        dateText     = $dateText
-                        thumbUrl     = $thumbUrl
-                        url          = $full4k
-                        urlbase      = $full1080
-                        copyright    = "Bing Wallpaper - $parsedDate"
-                        photographer = ''
-                        pageUrl      = $pageUrl
-                        enddate      = ($parsedDate -replace '-', '')
-                        resX         = 3840
-                        resY         = 2160
-                        accentR      = $null
-                        accentG      = $null
-                        accentB      = $null
-                    }
-                }
+                    function FetchMonth($c, $y, $m) {
+                        $mStr = $m.ToString("00")
+                        $url = "https://peapix.com/bing/$c/$y/$mStr"
+                        LogMsg "Requesting URL: $url"
+                        try {
+                            $resp = Invoke-WebRequest -Uri $url -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -UseBasicParsing -TimeoutSec 12
+                            LogMsg "Received response: $($resp.StatusCode), Length: $($resp.Content.Length)"
+                            $html = $resp.Content
+                        }
+                        catch {
+                            LogMsg "HTTP Error for $($url): $($_.Exception.Message)"
+                            return @()
+                        }
 
-                # Download thumbnails in parallel in the background runspace before rendering
-                if ($items.Count -gt 0 -and $ThumbDir) {
-                    try {
-                        $thumbUrls = [string[]]($items | ForEach-Object { [string]$_.thumbUrl })
-                        $thumbTargets = [string[]]($items | ForEach-Object {
-                            $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
-                            Join-Path $ThumbDir "${safe}_thumb.jpg"
-                        })
-                        if ('BingWallpaper.FastDownloader' -as [type]) {
-                            [BingWallpaper.FastDownloader]::DownloadUrlsParallel($thumbUrls, $thumbTargets, 10)
-                        } else {
-                            $wc = New-Object System.Net.WebClient
-                            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-                            for ($k = 0; $k -lt $thumbUrls.Length; $k++) {
-                                if (-not (Test-Path -LiteralPath $thumbTargets[$k])) {
-                                    try { $wc.DownloadFile($thumbUrls[$k], $thumbTargets[$k]) } catch {}
+                        $pattern = '(?s)<div class="[^"]*rounded-bottom">.*?<img[^>]*data-src="([^"]+)"[^>]*>.*?<a[^>]*href="(/bing/\d+)"[^>]*>([^<]+)</a>.*?<span class="text-body-tertiary fs-sm">([^<]+)</span>'
+                        $matches = [regex]::Matches($html, $pattern)
+                        LogMsg "Parsed $($matches.Count) wallpapers from $url"
+
+                        $items = @()
+                        foreach ($match in $matches) {
+                            $thumbUrl = $match.Groups[1].Value
+                            $pageUrl = "https://peapix.com" + $match.Groups[2].Value
+                            $rawTitle = $match.Groups[3].Value.Trim()
+                            $title = [System.Net.WebUtility]::HtmlDecode($rawTitle)
+                            $dateText = $match.Groups[4].Value.Trim()
+
+                            $baseImg = $thumbUrl -replace '_640\.jpg$', ''
+                            $full1080 = $baseImg + '_1920.jpg'
+                            $full4k = $baseImg + '.jpg'
+
+                            $parsedDate = $null
+                            try {
+                                $parsedDate = [DateTime]::ParseExact("$dateText $y", "MMMM dd yyyy", [System.Globalization.CultureInfo]::InvariantCulture).ToString("yyyy-MM-dd")
+                            }
+                            catch {
+                                $parsedDate = "$y-$mStr"
+                            }
+
+                            $items += [PSCustomObject]@{
+                                source       = 'Bing'
+                                title        = $title
+                                date         = $parsedDate
+                                dateText     = $dateText
+                                thumbUrl     = $thumbUrl
+                                url          = $full4k
+                                urlbase      = $full1080
+                                copyright    = "Bing Wallpaper - $parsedDate"
+                                photographer = ''
+                                pageUrl      = $pageUrl
+                                enddate      = ($parsedDate -replace '-', '')
+                                resX         = 3840
+                                resY         = 2160
+                                accentR      = $null
+                                accentG      = $null
+                                accentB      = $null
+                            }
+                        }
+
+                        # Download thumbnails in parallel in the background runspace before rendering
+                        if ($items.Count -gt 0 -and $ThumbDir) {
+                            try {
+                                $thumbUrls = [string[]]($items | ForEach-Object { [string]$_.thumbUrl })
+                                $thumbTargets = [string[]]($items | ForEach-Object {
+                                        $safe = $_.urlbase -replace '[^a-zA-Z0-9]', ''
+                                        Join-Path $ThumbDir "${safe}_thumb.jpg"
+                                    })
+                                if ('BingWallpaper.FastDownloader' -as [type]) {
+                                    [BingWallpaper.FastDownloader]::DownloadUrlsParallel($thumbUrls, $thumbTargets, 10)
                                 }
-                            }
-                            $wc.Dispose()
-                        }
-                        for ($k = 0; $k -lt $items.Count; $k++) {
-                            if (Test-Path -LiteralPath $thumbTargets[$k]) {
-                                $items[$k].thumbUrl = $thumbTargets[$k]
-                            }
-                        }
-
-                        # Extract dynamic accent colors in parallel on the background worker thread (ZERO UI freeze!)
-                        if ('BingWallpaper.FastAccent' -as [type]) {
-                            [byte[]]$rOut = $null
-                            [byte[]]$gOut = $null
-                            [byte[]]$bOut = $null
-                            [BingWallpaper.FastAccent]::ExtractBatchRgb($thumbTargets, [ref]$rOut, [ref]$gOut, [ref]$bOut)
-                            for ($k = 0; $k -lt $items.Count; $k++) {
-                                if ($rOut -and $k -lt $rOut.Length) {
-                                    $items[$k].accentR = $rOut[$k]
-                                    $items[$k].accentG = $gOut[$k]
-                                    $items[$k].accentB = $bOut[$k]
+                                else {
+                                    $wc = New-Object System.Net.WebClient
+                                    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+                                    for ($k = 0; $k -lt $thumbUrls.Length; $k++) {
+                                        if (-not (Test-Path -LiteralPath $thumbTargets[$k])) {
+                                            try { $wc.DownloadFile($thumbUrls[$k], $thumbTargets[$k]) } catch {}
+                                        }
+                                    }
+                                    $wc.Dispose()
                                 }
+                                for ($k = 0; $k -lt $items.Count; $k++) {
+                                    if (Test-Path -LiteralPath $thumbTargets[$k]) {
+                                        $items[$k].thumbUrl = $thumbTargets[$k]
+                                    }
+                                }
+
+                                # Extract dynamic accent colors in parallel on the background worker thread (ZERO UI freeze!)
+                                if ('BingWallpaper.FastAccent' -as [type]) {
+                                    [byte[]]$rOut = $null
+                                    [byte[]]$gOut = $null
+                                    [byte[]]$bOut = $null
+                                    [BingWallpaper.FastAccent]::ExtractBatchRgb($thumbTargets, [ref]$rOut, [ref]$gOut, [ref]$bOut)
+                                    for ($k = 0; $k -lt $items.Count; $k++) {
+                                        if ($rOut -and $k -lt $rOut.Length) {
+                                            $items[$k].accentR = $rOut[$k]
+                                            $items[$k].accentG = $gOut[$k]
+                                            $items[$k].accentB = $bOut[$k]
+                                        }
+                                    }
+                                    # RAM optimization: clean up temporary image decoding memory in background runspace
+                                    [System.GC]::Collect(0, [System.GCCollectionMode]::Forced, $false)
+                                }
+
+                                LogMsg "Downloaded and verified $($items.Count) thumbnails with dynamic accents in $ThumbDir"
                             }
-                            # RAM optimization: clean up temporary image decoding memory in background runspace
-                            [System.GC]::Collect(0, [System.GCCollectionMode]::Forced, $false)
+                            catch {
+                                LogMsg "Error during parallel thumbnail download/accent extraction: $($_.Exception.Message)"
+                            }
                         }
 
-                        LogMsg "Downloaded and verified $($items.Count) thumbnails with dynamic accents in $ThumbDir"
-                    } catch {
-                        LogMsg "Error during parallel thumbnail download/accent extraction: $($_.Exception.Message)"
+                        return $items
                     }
-                }
 
-                return $items
-            }
-
-            try {
-                if ($Scope -eq 'Day') {
-                    $targetDateStr = "$Year-" + $Month.ToString("00") + "-" + $Day.ToString("00")
-                    LogMsg "Executing Day search for $targetDateStr in region $Country..."
-                    $monthItems = FetchMonth $Country $Year $Month
-                    $matched = $monthItems | Where-Object { $_.date -eq $targetDateStr }
-                    if (-not $matched -and $monthItems.Count -gt 0) {
-                        $matched = $monthItems | Where-Object { $_.dateText -match "\b0?$Day\b" }
-                    }
-                    if ($matched) {
-                        LogMsg "Found matching wallpaper: $($matched.title) ($($matched.date))"
-                    } else {
-                        LogMsg "No wallpaper matched $targetDateStr in $($monthItems.Count) month items"
-                    }
-                    $Queue.Enqueue(@{ Type = 'DayResult'; Date = $targetDateStr; Matched = $matched })
-                }
-                elseif ($Scope -eq 'Month') {
-                    $mStr = $Month.ToString("00")
-                    LogMsg "Executing Month search for $Year-$mStr in region $Country..."
-                    $monthItems = FetchMonth $Country $Year $Month
-                    $Queue.Enqueue(@{ Type = 'MonthResult'; MonthStr = "$Year-$mStr"; Items = $monthItems })
-                }
-                elseif ($Scope -eq 'Year') {
-                    LogMsg "Executing Year search for $Year in region $Country..."
-                    $maxM = if ($Year -eq [DateTime]::Now.Year) { [DateTime]::Now.Month } else { 12 }
-                    for ($m = $maxM; $m -ge 1; $m--) {
-                        $mItems = FetchMonth $Country $Year $m
-                        $Queue.Enqueue(@{ Type = 'YearMonthChunk'; Month = $m; Items = $mItems })
-                        Start-Sleep -Milliseconds 120
-                    }
-                }
-            }
-            catch {
-                LogMsg "Fatal error in archive worker: $($_.Exception.ToString())"
-                $Queue.Enqueue(@{ Type = 'Error'; Message = $_.Exception.Message })
-            }
-            finally {
-                $Queue.Enqueue(@{ Type = 'Completed' })
-            }
-        })
-
-        [void]$ps.AddArgument($scope)
-        [void]$ps.AddArgument($selRegionCode)
-        [void]$ps.AddArgument($selYear)
-        [void]$ps.AddArgument($selMonth)
-        [void]$ps.AddArgument($selDay)
-        [void]$ps.AddArgument($queue)
-        [void]$ps.AddArgument($script:archiveLogPath)
-        [void]$ps.AddArgument($thumbDir)
-
-        Write-ArchiveLog "[SEARCH_START] Scope=$scope, Year=$selYear, Month=$selMonth, Day=$selDay, Region=$selRegionCode"
-
-        $asyncHandle = $ps.BeginInvoke()
-
-        $script:archiveSearchTimer = New-Object System.Windows.Threading.DispatcherTimer
-        $script:archiveSearchTimer.Interval = [TimeSpan]::FromMilliseconds(40)
-
-        $script:archiveSearchContext = @{
-            PS           = $ps
-            Handle       = $asyncHandle
-            Queue        = $queue
-            Scope        = $scope
-            Year         = $selYear
-            ThumbDir     = $thumbDir
-            TotalCount   = 0
-            IsFirstChunk = $true
-            Timer        = $script:archiveSearchTimer
-        }
-
-        $script:archiveSearchTimer.Add_Tick({
-            param($timerSender, $timerArgs)
-            if (-not $script:archiveSearchContext) {
-                $timerSender.Stop()
-                return
-            }
-
-            $ctx = $script:archiveSearchContext
-            while ($ctx.Queue.Count -gt 0) {
-                $msg = $ctx.Queue.Dequeue()
-                if ($msg.Type -eq 'DayResult') {
-                    if ($msg.Matched) {
-                        $StatusText.Text = "Loaded wallpaper for $($msg.Date)"
-                        Render-GalleryGrid -Images @($msg.Matched) -ThumbCacheDir $ctx.ThumbDir
-                        Write-ArchiveLog "[UI_RENDER] Rendered wallpaper for $($msg.Date): $($msg.Matched.title)"
-                    } else {
-                        $StatusText.Foreground = $statusErrorBrush
-                        $StatusText.Text = "No Bing wallpaper found for $($msg.Date)"
-                        Write-ArchiveLog "[UI_RESULT] No wallpaper found for $($msg.Date)"
-                    }
-                }
-                elseif ($msg.Type -eq 'MonthResult') {
-                    if ($msg.Items -and $msg.Items.Count -gt 0) {
-                        $StatusText.Text = "Loaded $($msg.Items.Count) wallpapers for $($msg.MonthStr)"
-                        Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir
-                        Write-ArchiveLog "[UI_RENDER] Rendered $($msg.Items.Count) wallpapers for $($msg.MonthStr)"
-                    } else {
-                        $StatusText.Foreground = $statusErrorBrush
-                        $StatusText.Text = "No Bing wallpapers found for $($msg.MonthStr)"
-                        Write-ArchiveLog "[UI_RESULT] No wallpapers found for $($msg.MonthStr)"
-                    }
-                }
-                elseif ($msg.Type -eq 'YearMonthChunk') {
-                    if ($msg.Items -and $msg.Items.Count -gt 0) {
-                        $ctx.TotalCount += $msg.Items.Count
-                        $curCount = $ctx.TotalCount
-                        $mNum = $msg.Month
-                        $StatusText.Text = "Loading $($ctx.Year) archive: $curCount wallpapers loaded (Month $mNum)..."
-                        if ($ctx.IsFirstChunk) {
-                            $ctx.IsFirstChunk = $false
-                            Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir
-                        } else {
-                            Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir -Append
+                    try {
+                        if ($Scope -eq 'Day') {
+                            $targetDateStr = "$Year-" + $Month.ToString("00") + "-" + $Day.ToString("00")
+                            LogMsg "Executing Day search for $targetDateStr in region $Country..."
+                            $monthItems = FetchMonth $Country $Year $Month
+                            $matched = $monthItems | Where-Object { $_.date -eq $targetDateStr }
+                            if (-not $matched -and $monthItems.Count -gt 0) {
+                                $matched = $monthItems | Where-Object { $_.dateText -match "\b0?$Day\b" }
+                            }
+                            if ($matched) {
+                                LogMsg "Found matching wallpaper: $($matched.title) ($($matched.date))"
+                            }
+                            else {
+                                LogMsg "No wallpaper matched $targetDateStr in $($monthItems.Count) month items"
+                            }
+                            $Queue.Enqueue(@{ Type = 'DayResult'; Date = $targetDateStr; Matched = $matched })
                         }
-                        Write-ArchiveLog "[UI_RENDER] Appended Month $mNum ($($msg.Items.Count) items). Total: $curCount"
+                        elseif ($Scope -eq 'Month') {
+                            $mStr = $Month.ToString("00")
+                            LogMsg "Executing Month search for $Year-$mStr in region $Country..."
+                            $monthItems = FetchMonth $Country $Year $Month
+                            $Queue.Enqueue(@{ Type = 'MonthResult'; MonthStr = "$Year-$mStr"; Items = $monthItems })
+                        }
+                        elseif ($Scope -eq 'Year') {
+                            LogMsg "Executing Year search for $Year in region $Country..."
+                            $maxM = if ($Year -eq [DateTime]::Now.Year) { [DateTime]::Now.Month } else { 12 }
+                            for ($m = $maxM; $m -ge 1; $m--) {
+                                $mItems = FetchMonth $Country $Year $m
+                                $Queue.Enqueue(@{ Type = 'YearMonthChunk'; Month = $m; Items = $mItems })
+                                Start-Sleep -Milliseconds 120
+                            }
+                        }
                     }
-                }
-                elseif ($msg.Type -eq 'Error') {
-                    $StatusText.Foreground = $statusErrorBrush
-                    $StatusText.Text = "Archive error: $($msg.Message)"
-                    Write-ArchiveLog "[UI_ERROR] $($msg.Message)"
-                }
-                elseif ($msg.Type -eq 'Completed') {
-                    $timerSender.Stop()
-                    if ($ctx.Scope -eq 'Year') {
-                        if ($ctx.TotalCount -gt 0) {
-                            $StatusText.Text = "Loaded $($ctx.TotalCount) wallpapers for year $($ctx.Year)"
-                        } else {
+                    catch {
+                        LogMsg "Fatal error in archive worker: $($_.Exception.ToString())"
+                        $Queue.Enqueue(@{ Type = 'Error'; Message = $_.Exception.Message })
+                    }
+                    finally {
+                        $Queue.Enqueue(@{ Type = 'Completed' })
+                    }
+                })
+
+            [void]$ps.AddArgument($scope)
+            [void]$ps.AddArgument($selRegionCode)
+            [void]$ps.AddArgument($selYear)
+            [void]$ps.AddArgument($selMonth)
+            [void]$ps.AddArgument($selDay)
+            [void]$ps.AddArgument($queue)
+            [void]$ps.AddArgument($script:archiveLogPath)
+            [void]$ps.AddArgument($thumbDir)
+
+            Write-ArchiveLog "[SEARCH_START] Scope=$scope, Year=$selYear, Month=$selMonth, Day=$selDay, Region=$selRegionCode"
+
+            $asyncHandle = $ps.BeginInvoke()
+
+            $script:archiveSearchTimer = New-Object System.Windows.Threading.DispatcherTimer
+            $script:archiveSearchTimer.Interval = [TimeSpan]::FromMilliseconds(40)
+
+            $script:archiveSearchContext = @{
+                PS           = $ps
+                Handle       = $asyncHandle
+                Queue        = $queue
+                Scope        = $scope
+                Year         = $selYear
+                ThumbDir     = $thumbDir
+                TotalCount   = 0
+                IsFirstChunk = $true
+                Timer        = $script:archiveSearchTimer
+            }
+
+            $script:archiveSearchTimer.Add_Tick({
+                    param($timerSender, $timerArgs)
+                    if (-not $script:archiveSearchContext) {
+                        $timerSender.Stop()
+                        return
+                    }
+
+                    $ctx = $script:archiveSearchContext
+                    while ($ctx.Queue.Count -gt 0) {
+                        $msg = $ctx.Queue.Dequeue()
+                        if ($msg.Type -eq 'DayResult') {
+                            if ($msg.Matched) {
+                                $StatusText.Text = "Loaded wallpaper for $($msg.Date)"
+                                Render-GalleryGrid -Images @($msg.Matched) -ThumbCacheDir $ctx.ThumbDir
+                                Write-ArchiveLog "[UI_RENDER] Rendered wallpaper for $($msg.Date): $($msg.Matched.title)"
+                            }
+                            else {
+                                $StatusText.Foreground = $statusErrorBrush
+                                $StatusText.Text = "No Bing wallpaper found for $($msg.Date)"
+                                Write-ArchiveLog "[UI_RESULT] No wallpaper found for $($msg.Date)"
+                            }
+                        }
+                        elseif ($msg.Type -eq 'MonthResult') {
+                            if ($msg.Items -and $msg.Items.Count -gt 0) {
+                                $StatusText.Text = "Loaded $($msg.Items.Count) wallpapers for $($msg.MonthStr)"
+                                Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir
+                                Write-ArchiveLog "[UI_RENDER] Rendered $($msg.Items.Count) wallpapers for $($msg.MonthStr)"
+                            }
+                            else {
+                                $StatusText.Foreground = $statusErrorBrush
+                                $StatusText.Text = "No Bing wallpapers found for $($msg.MonthStr)"
+                                Write-ArchiveLog "[UI_RESULT] No wallpapers found for $($msg.MonthStr)"
+                            }
+                        }
+                        elseif ($msg.Type -eq 'YearMonthChunk') {
+                            if ($msg.Items -and $msg.Items.Count -gt 0) {
+                                $ctx.TotalCount += $msg.Items.Count
+                                $curCount = $ctx.TotalCount
+                                $mNum = $msg.Month
+                                $StatusText.Text = "Loading $($ctx.Year) archive: $curCount wallpapers loaded (Month $mNum)..."
+                                if ($ctx.IsFirstChunk) {
+                                    $ctx.IsFirstChunk = $false
+                                    Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir
+                                }
+                                else {
+                                    Render-GalleryGrid -Images $msg.Items -ThumbCacheDir $ctx.ThumbDir -Append
+                                }
+                                Write-ArchiveLog "[UI_RENDER] Appended Month $mNum ($($msg.Items.Count) items). Total: $curCount"
+                            }
+                        }
+                        elseif ($msg.Type -eq 'Error') {
                             $StatusText.Foreground = $statusErrorBrush
-                            $StatusText.Text = "No Bing wallpapers found for year $($ctx.Year)"
+                            $StatusText.Text = "Archive error: $($msg.Message)"
+                            Write-ArchiveLog "[UI_ERROR] $($msg.Message)"
+                        }
+                        elseif ($msg.Type -eq 'Completed') {
+                            $timerSender.Stop()
+                            if ($ctx.Scope -eq 'Year') {
+                                if ($ctx.TotalCount -gt 0) {
+                                    $StatusText.Text = "Loaded $($ctx.TotalCount) wallpapers for year $($ctx.Year)"
+                                }
+                                else {
+                                    $StatusText.Foreground = $statusErrorBrush
+                                    $StatusText.Text = "No Bing wallpapers found for year $($ctx.Year)"
+                                }
+                            }
+                            Write-ArchiveLog "[SEARCH_COMPLETE] Finished processing $($ctx.Scope) for $($ctx.Year)"
+                            try { $ctx.PS.Dispose() } catch {}
+                            $script:archiveSearchContext = $null
+                            Invoke-MemoryFlush -Reason "ArchiveSearchComplete" -Async
+                            return
                         }
                     }
-                    Write-ArchiveLog "[SEARCH_COMPLETE] Finished processing $($ctx.Scope) for $($ctx.Year)"
-                    try { $ctx.PS.Dispose() } catch {}
-                    $script:archiveSearchContext = $null
-                    Invoke-MemoryFlush -Reason "ArchiveSearchComplete" -Async
-                    return
-                }
-            }
-        })
+                })
 
-        $script:archiveSearchTimer.Start()
-    })
+            $script:archiveSearchTimer.Start()
+        })
 }
 
 
@@ -7471,10 +7557,10 @@ $window.Add_ContentRendered({
         $script:initSettleTimer = New-Object System.Windows.Threading.DispatcherTimer
         $script:initSettleTimer.Interval = [TimeSpan]::FromMilliseconds(2800)
         $script:initSettleTimer.Add_Tick({
-            $script:initSettleTimer.Stop()
-            $script:initSettleTimer = $null
-            Invoke-MemoryFlush -Reason "PostStartup-InitialSettle" -Async
-        })
+                $script:initSettleTimer.Stop()
+                $script:initSettleTimer = $null
+                Invoke-MemoryFlush -Reason "PostStartup-InitialSettle" -Async
+            })
         $script:initSettleTimer.Start()
     })
 

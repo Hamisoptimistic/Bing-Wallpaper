@@ -181,6 +181,7 @@ function Get-PexelsImages {
 
     # Curated premium landscape wallpaper queries requested by user
     $wallpaperQueries = @(
+        '4k wallpaper',
         'beautiful scenery',
         'beautiful view',
         'peaceful nature',
@@ -302,7 +303,7 @@ function Get-PexelsImages {
     }
 
     if ($data.Count -eq 0) {
-        $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
+        $fallbackQueries = @('4k wallpaper', 'beautiful scenery', 'mountain landscape', 'lakes')
         foreach ($fq in $fallbackQueries) {
             try {
                 $fEsc = [System.Uri]::EscapeDataString($fq)
@@ -1621,6 +1622,7 @@ namespace AutoScapeLocal
 
             # Curated premium landscape wallpaper queries requested by user
             $wallpaperQueries = @(
+                '4k wallpaper',
                 'beautiful scenery',
                 'beautiful view',
                 'peaceful nature',
@@ -1722,7 +1724,7 @@ namespace AutoScapeLocal
 
             # If all multi-queries failed (e.g. timeout), attempt fallback single query
             if ($pooled.Count -eq 0) {
-                $fallbackQueries = @('beautiful scenery', 'mountain landscape', 'lakes')
+                $fallbackQueries = @('4k wallpaper', 'beautiful scenery', 'mountain landscape', 'lakes')
                 foreach ($fq in $fallbackQueries) {
                     try {
                         $fEsc = [System.Uri]::EscapeDataString($fq)
