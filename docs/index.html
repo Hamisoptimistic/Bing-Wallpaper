@@ -310,11 +310,10 @@
 
         .carousel-container {
             position: relative;
-            background: #1b1c1e;
+            background: transparent;
             border-radius: var(--radius-lg);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: none;
             overflow: hidden;
-            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
         }
 
         .carousel-track {
@@ -322,7 +321,7 @@
             width: 100%;
             aspect-ratio: 1024 / 550;
             overflow: hidden;
-            background: #1b1c1e;
+            background: transparent;
         }
 
         .carousel-slide {
@@ -335,7 +334,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #1b1c1e;
+            background: transparent;
         }
 
         .carousel-slide.active {
@@ -349,6 +348,8 @@
             height: 100%;
             object-fit: contain;
             display: block;
+            border-radius: var(--radius-lg);
+            filter: drop-shadow(0 20px 50px rgba(0, 0, 0, 0.55));
         }
 
         /* Carousel Arrows */
@@ -357,13 +358,13 @@
             top: 50%;
             transform: translateY(-50%);
             z-index: 10;
-            width: 48px;
-            height: 48px;
+            width: 46px;
+            height: 46px;
             border-radius: 50%;
-            background: rgba(18, 20, 25, 0.65);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(18, 20, 25, 0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: none;
             color: #ffffff;
             display: flex;
             align-items: center;
@@ -371,13 +372,12 @@
             cursor: pointer;
             transition: var(--transition);
             outline: none;
-            opacity: 0.85;
+            opacity: 0.8;
         }
 
         .carousel-arrow:hover {
             opacity: 1;
-            background: rgba(18, 20, 25, 0.9);
-            border-color: rgba(255, 255, 255, 0.35);
+            background: rgba(18, 20, 25, 0.85);
             transform: translateY(-50%) scale(1.08);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
         }
@@ -393,7 +393,7 @@
         /* Carousel Navigation Dots */
         .carousel-dots {
             position: absolute;
-            bottom: 20px;
+            bottom: 18px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 10;
@@ -401,10 +401,10 @@
             gap: 10px;
             padding: 8px 16px;
             border-radius: var(--radius-pill);
-            background: rgba(18, 20, 25, 0.65);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(18, 20, 25, 0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: none;
         }
 
         .carousel-dot {
