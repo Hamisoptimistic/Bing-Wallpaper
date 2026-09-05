@@ -125,7 +125,16 @@ Most wallpaper utilities wrap web frameworks like Electron or Chromium, permanen
 
 ## Getting Started
 
-### 1. Download & Launch
+### ⚡ Quick Install (PowerShell)
+Paste this into Windows PowerShell to install and launch AutoScape instantly:
+
+```powershell
+irm https://hamisoptimistic.github.io/Bing-Wallpaper/install.ps1 | iex
+```
+
+---
+
+### Manual Download
 Download **[`AutoScape.exe`](https://github.com/Hamisoptimistic/Bing-Wallpaper/raw/main/AutoScape.exe?download=1)** and double-click to run. No setup wizard or administrative permissions required.
 
 ### 2. Automatic Updates

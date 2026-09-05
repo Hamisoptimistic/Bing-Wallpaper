@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoScape - The Ultimate 4K Wallpaper Experience for Windows</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --surface-color: #161b22;
+            --surface-hover: #1f242c;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #0078d4;
+            --accent-hover: #1084d8;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --font-main: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', Consolas, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(0, 120, 212, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(138, 43, 226, 0.12) 0%, transparent 40%);
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            background: rgba(0, 120, 212, 0.15);
+            border: 1px solid rgba(0, 120, 212, 0.3);
+            color: #58a6ff;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #ffffff 40%, #8b949e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 36px;
+            line-height: 1.6;
+        }
+
+        .command-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 36px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+            text-align: left;
+        }
+
+        .command-text {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: #79c0ff;
+            word-break: break-all;
+            user-select: all;
+        }
+
+        .copy-btn {
+            background: var(--accent-color);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .copy-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            text-align: left;
+            margin-top: 10px;
+        }
+
+        .feature-item {
+            background: rgba(22, 27, 34, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .feature-item h3 {
+            font-size: 15px;
+            margin-bottom: 6px;
+            color: #f0f6fc;
+        }
+
+        .feature-item p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .footer a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="badge">✨ Windows 11 Fluent 4K Wallpaper Hub</div>
+        <h1>AutoScape 2.0</h1>
+        <p class="subtitle">Curated daily wallpapers from Bing, Windows Spotlight, Wallhaven & Pexels with seamless auto-rotation and hotkeys.</p>
+
+        <div class="command-card">
+            <span class="command-text" id="cmd">irm https://hamisoptimistic.github.io/Bing-Wallpaper/install.ps1 | iex</span>
+            <button class="copy-btn" onclick="copyCommand()">
+                <span id="btnText">Copy Command</span>
+            </button>
+        </div>
+
+        <div class="features">
+            <div class="feature-item">
+                <h3>⚡ One-Line Install</h3>
+                <p>No installer wizards or bloatware. Runs directly via native Windows PowerShell.</p>
+            </div>
+            <div class="feature-item">
+                <h3>🎯 4K Sources</h3>
+                <p>Bing Daily, Windows Spotlight archive, Wallhaven (Nature/Landscape), and Pexels 4K.</p>
+            </div>
+            <div class="feature-item">
+                <h3>⌨️ Global Hotkeys</h3>
+                <p>Press <code>Win + Shift + N</code> anytime to immediately cycle your desktop wallpaper.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            View source code on <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper" target="_blank">GitHub</a>. Open source under MIT License.
+        </div>
+    </div>
+
+    <script>
+        function copyCommand() {
+            const text = document.getElementById('cmd').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('btnText');
+                btn.innerText = "Copied! ✓";
+                setTimeout(() => {
+                    btn.innerText = "Copy Command";
+                }, 2500);
+            });
+        }
+    </script>
+</body>
+</html>
