@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,16 +11,14 @@
     <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
     <link rel="apple-touch-icon" href="assets/logo.png">
 
-    <!-- Theme Initialization (prevents flash of incorrect theme) -->
+    <!-- Theme Initialization (Defaults to Light Mode, prevents theme flicker) -->
     <script>
         (function() {
-            var saved = localStorage.getItem('autoscape-theme');
-            if (saved === 'light' || saved === 'dark') {
-                document.documentElement.setAttribute('data-theme', saved);
-            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-                document.documentElement.setAttribute('data-theme', 'light');
-            } else {
+            var saved = localStorage.getItem('autoscape-theme-v2');
+            if (saved === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
             }
         })();
     </script>
@@ -31,8 +29,56 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800;900&family=Segoe+UI:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <style>
-        :root {
-            /* Dark Theme Default (Windows 11 Fluent Dark) */
+        :root, [data-theme="light"] {
+            /* Default: Windows 11 Soft Slate/Mica (Eye-friendly, Subdued & Non-Glaring) */
+            --bg-base: #e9ecf1;
+            --bg-subtle: #f1f4f8;
+            --surface-card: #f6f8fb;
+            --surface-card-hover: #ffffff;
+            --border-subtle: rgba(15, 23, 42, 0.08);
+            --border-highlight: rgba(15, 23, 42, 0.16);
+            --accent: #0078d4;
+            --accent-hover: #0067b8;
+            --accent-glow: rgba(0, 120, 212, 0.22);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-tertiary: #64748b;
+            --nav-bg: rgba(233, 236, 241, 0.9);
+            --hero-title-grad: linear-gradient(180deg, #0f172a 35%, #334155 100%);
+            --hero-slogan-span: linear-gradient(135deg, #0284c7 0%, #0078d4 100%);
+            --btn-secondary-bg: #f6f8fb;
+            --btn-secondary-hover: #ffffff;
+            --btn-subtle-bg: rgba(15, 23, 42, 0.05);
+            --btn-subtle-hover: rgba(15, 23, 42, 0.1);
+            --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+            --img-shadow: drop-shadow(0 16px 36px rgba(15, 23, 42, 0.12));
+            --footer-bg: #dde2ea;
+            --terminal-bg: #141720;
+            --terminal-border: rgba(15, 23, 42, 0.14);
+            --badge-bg: rgba(0, 120, 212, 0.08);
+            --badge-good-color: #15803d;
+            --badge-bad-color: #b91c1c;
+            --arrow-bg: rgba(246, 248, 251, 0.9);
+            --arrow-bg-hover: #ffffff;
+            --arrow-color: #1e293b;
+            --dots-bg: rgba(246, 248, 251, 0.9);
+            --dot-active-bg: #0078d4;
+            --table-header-bg: rgba(15, 23, 42, 0.04);
+            --bg-radial-1: rgba(0, 120, 212, 0.06);
+            --bg-radial-2: rgba(99, 102, 241, 0.03);
+            
+            --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            --font-poppins: 'Poppins', var(--font-family);
+            --font-mono: 'JetBrains Mono', Consolas, monospace;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+            --radius-pill: 9999px;
+            --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        [data-theme="dark"] {
+            /* Dark Theme (Windows 11 Fluent Dark) */
             --bg-base: #0c0d10;
             --bg-subtle: #14161b;
             --surface-card: #1a1d24;
@@ -68,54 +114,6 @@
             --table-header-bg: rgba(255, 255, 255, 0.02);
             --bg-radial-1: rgba(0, 120, 212, 0.12);
             --bg-radial-2: rgba(76, 29, 149, 0.08);
-            
-            --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-            --font-poppins: 'Poppins', var(--font-family);
-            --font-mono: 'JetBrains Mono', Consolas, monospace;
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 16px;
-            --radius-pill: 9999px;
-            --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        [data-theme="light"] {
-            /* Light Theme (Windows 11 Fluent Light) */
-            --bg-base: #f7f9fc;
-            --bg-subtle: #ffffff;
-            --surface-card: #ffffff;
-            --surface-card-hover: #f3f5f9;
-            --border-subtle: rgba(0, 0, 0, 0.08);
-            --border-highlight: rgba(0, 0, 0, 0.16);
-            --accent: #0078d4;
-            --accent-hover: #0067b8;
-            --accent-glow: rgba(0, 120, 212, 0.25);
-            --text-primary: #1a1e24;
-            --text-secondary: #57606e;
-            --text-tertiary: #8490a0;
-            --nav-bg: rgba(247, 249, 252, 0.88);
-            --hero-title-grad: linear-gradient(180deg, #111827 40%, #4b5563 100%);
-            --hero-slogan-span: linear-gradient(135deg, #0284c7 0%, #0078d4 100%);
-            --btn-secondary-bg: #ffffff;
-            --btn-secondary-hover: #f1f5f9;
-            --btn-subtle-bg: rgba(0, 0, 0, 0.05);
-            --btn-subtle-hover: rgba(0, 0, 0, 0.1);
-            --card-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
-            --img-shadow: drop-shadow(0 20px 48px rgba(0, 0, 0, 0.14));
-            --footer-bg: #eaedf2;
-            --terminal-bg: #14171f;
-            --terminal-border: rgba(0, 0, 0, 0.12);
-            --badge-bg: rgba(0, 120, 212, 0.08);
-            --badge-good-color: #16a34a;
-            --badge-bad-color: #dc2626;
-            --arrow-bg: rgba(255, 255, 255, 0.9);
-            --arrow-bg-hover: #ffffff;
-            --arrow-color: #1a1e24;
-            --dots-bg: rgba(255, 255, 255, 0.9);
-            --dot-active-bg: #0078d4;
-            --table-header-bg: rgba(0, 0, 0, 0.03);
-            --bg-radial-1: rgba(0, 120, 212, 0.08);
-            --bg-radial-2: rgba(147, 51, 234, 0.04);
         }
 
         * {
@@ -232,28 +230,28 @@
             transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
         }
 
-        /* Dark mode: Sun active, Moon rotated out */
+        /* Light mode (Default): Moon active, Sun rotated out */
         .theme-toggle-icon.sun {
-            opacity: 1;
-            transform: scale(1) rotate(0deg);
+            opacity: 0;
+            transform: scale(0.5) rotate(90deg);
             color: #fbbf24;
         }
 
         .theme-toggle-icon.moon {
-            opacity: 0;
-            transform: scale(0.5) rotate(-90deg);
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
             color: #0078d4;
         }
 
-        /* Light mode: Moon active, Sun rotated out */
-        [data-theme="light"] .theme-toggle-icon.sun {
-            opacity: 0;
-            transform: scale(0.5) rotate(90deg);
-        }
-
-        [data-theme="light"] .theme-toggle-icon.moon {
+        /* Dark mode: Sun active, Moon rotated out */
+        [data-theme="dark"] .theme-toggle-icon.sun {
             opacity: 1;
             transform: scale(1) rotate(0deg);
+        }
+
+        [data-theme="dark"] .theme-toggle-icon.moon {
+            opacity: 0;
+            transform: scale(0.5) rotate(-90deg);
         }
 
         .github-btn {
@@ -1219,21 +1217,12 @@
     <script>
         // ---------------- Theme Switcher ----------------
         function toggleTheme() {
-            var currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-            var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            var currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            var newTheme = currentTheme === 'light' ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', newTheme);
             try {
-                localStorage.setItem('autoscape-theme', newTheme);
+                localStorage.setItem('autoscape-theme-v2', newTheme);
             } catch (e) {}
-        }
-
-        // Listen for OS theme changes if user hasn't explicitly set a preference
-        if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
-                if (!localStorage.getItem('autoscape-theme')) {
-                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
-                }
-            });
         }
 
         // ---------------- Carousel Logic ----------------
