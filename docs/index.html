@@ -13,16 +13,16 @@
     
     <style>
         :root {
-            --bg-base: #121316;
-            --bg-subtle: #181a1f;
-            --surface-card: #1f2228;
-            --surface-card-hover: #262a32;
-            --surface-flyout: #23272f;
+            --bg-base: #111215;
+            --bg-subtle: #17191e;
+            --surface-card: #1d2026;
+            --surface-card-hover: #242831;
+            --surface-flyout: #22262f;
             --border-subtle: rgba(255, 255, 255, 0.08);
             --border-highlight: rgba(255, 255, 255, 0.16);
             --accent: #0078d4;
             --accent-hover: #1084d8;
-            --accent-glow: rgba(0, 120, 212, 0.35);
+            --accent-glow: rgba(0, 120, 212, 0.4);
             --text-primary: #ffffff;
             --text-secondary: #9ea7b3;
             --text-tertiary: #6b7280;
@@ -30,7 +30,7 @@
             --font-mono: 'JetBrains Mono', Consolas, monospace;
             --radius-sm: 6px;
             --radius-md: 10px;
-            --radius-lg: 16px;
+            --radius-lg: 18px;
             --radius-pill: 9999px;
             --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -49,8 +49,8 @@
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(0, 120, 212, 0.08) 0px, transparent 50%),
-                radial-gradient(at 100% 20%, rgba(76, 29, 149, 0.06) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, rgba(0, 120, 212, 0.09) 0px, transparent 50%),
+                radial-gradient(at 100% 15%, rgba(76, 29, 149, 0.08) 0px, transparent 50%);
             background-attachment: fixed;
         }
 
@@ -61,7 +61,7 @@
             z-index: 100;
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            background: rgba(18, 19, 22, 0.8);
+            background: rgba(17, 18, 21, 0.85);
             border-bottom: 1px solid var(--border-subtle);
         }
 
@@ -77,32 +77,29 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
             text-decoration: none;
             color: var(--text-primary);
-            font-weight: 600;
-            font-size: 18px;
-            letter-spacing: -0.2px;
+            font-weight: 700;
+            font-size: 22px;
+            letter-spacing: -0.3px;
         }
 
         .brand img {
-            width: 28px;
-            height: 28px;
+            width: 44px;
+            height: 44px;
+            filter: drop-shadow(0 4px 12px rgba(0, 120, 212, 0.35));
+            transition: var(--transition);
         }
 
-        .brand-pill {
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: var(--radius-pill);
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-secondary);
-            font-weight: 500;
+        .brand:hover img {
+            transform: scale(1.05);
         }
 
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 24px;
         }
 
         .nav-links a {
@@ -121,12 +118,12 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 7px 14px;
+            padding: 8px 16px;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-sm);
             color: var(--text-primary) !important;
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 500;
             transition: var(--transition);
         }
@@ -134,34 +131,52 @@
         .github-btn:hover {
             background: rgba(255, 255, 255, 0.12);
             border-color: var(--border-highlight);
+            transform: translateY(-1px);
         }
 
         /* ---------------- Hero Section ---------------- */
         .hero {
             max-width: 960px;
             margin: 0 auto;
-            padding: 72px 24px 48px;
+            padding: 60px 24px 44px;
             text-align: center;
+        }
+
+        .hero-logo-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .hero-logo {
+            width: 96px;
+            height: 96px;
+            filter: drop-shadow(0 16px 36px rgba(0, 120, 212, 0.35));
+            transition: var(--transition);
+        }
+
+        .hero-logo:hover {
+            transform: scale(1.06) rotate(2deg);
         }
 
         .hero-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 14px;
+            padding: 6px 16px;
             border-radius: var(--radius-pill);
             background: rgba(0, 120, 212, 0.12);
-            border: 1px solid rgba(0, 120, 212, 0.25);
+            border: 1px solid rgba(0, 120, 212, 0.28);
             color: #60a5fa;
             font-size: 13px;
             font-weight: 600;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .hero h1 {
-            font-size: clamp(36px, 6vw, 56px);
-            font-weight: 700;
-            letter-spacing: -1px;
+            font-size: clamp(38px, 6vw, 60px);
+            font-weight: 800;
+            letter-spacing: -1.2px;
             line-height: 1.15;
             margin-bottom: 20px;
             color: #ffffff;
@@ -174,7 +189,7 @@
         }
 
         .hero p.lead {
-            font-size: clamp(16px, 2.5vw, 19px);
+            font-size: clamp(16px, 2.4vw, 19px);
             color: var(--text-secondary);
             max-width: 680px;
             margin: 0 auto 36px;
@@ -188,18 +203,18 @@
             align-items: center;
             justify-content: center;
             gap: 16px;
-            margin-bottom: 32px;
+            margin-bottom: 30px;
         }
 
         .btn-primary {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 13px 26px;
+            padding: 14px 28px;
             border-radius: var(--radius-md);
             background: var(--accent);
             color: #ffffff;
-            font-size: 15px;
+            font-size: 15.5px;
             font-weight: 600;
             text-decoration: none;
             box-shadow: 0 8px 24px var(--accent-glow);
@@ -209,19 +224,19 @@
         .btn-primary:hover {
             background: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(0, 120, 212, 0.45);
+            box-shadow: 0 14px 32px rgba(0, 120, 212, 0.48);
         }
 
         .btn-secondary {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 13px 22px;
+            padding: 14px 24px;
             border-radius: var(--radius-md);
             background: var(--surface-card);
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
-            font-size: 15px;
+            font-size: 15.5px;
             font-weight: 500;
             text-decoration: none;
             transition: var(--transition);
@@ -230,13 +245,14 @@
         .btn-secondary:hover {
             background: var(--surface-card-hover);
             border-color: var(--border-highlight);
+            transform: translateY(-1px);
         }
 
         /* PowerShell Command Box */
         .terminal-box {
             max-width: 640px;
             margin: 0 auto;
-            background: #16181d;
+            background: #15171c;
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-md);
             padding: 8px 14px;
@@ -244,7 +260,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
         }
 
         .terminal-prefix {
@@ -270,7 +286,7 @@
             color: var(--text-primary);
             font-size: 12px;
             font-weight: 500;
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: var(--radius-sm);
             cursor: pointer;
             display: inline-flex;
@@ -281,138 +297,134 @@
         }
 
         .copy-pill:hover {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.16);
             border-color: var(--border-highlight);
         }
 
-        /* ---------------- Interactive App Showcase ---------------- */
-        .showcase-section {
+        /* ---------------- Pure Image Carousel ---------------- */
+        .carousel-section {
             max-width: 1140px;
-            margin: 32px auto 80px;
+            margin: 24px auto 84px;
             padding: 0 24px;
         }
 
-        .showcase-wrapper {
-            background: var(--bg-subtle);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: 24px;
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-        }
-
-        /* Segmented App Navigation Switcher */
-        .app-tabs-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 24px;
-        }
-
-        .app-segmented-tabs {
-            display: inline-flex;
-            background: #20232a;
-            padding: 4px;
-            border-radius: var(--radius-pill);
-            border: 1px solid var(--border-subtle);
-            gap: 2px;
-        }
-
-        .segmented-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 8px 20px;
-            border-radius: var(--radius-pill);
-            font-size: 13.5px;
-            font-weight: 600;
-            font-family: var(--font-family);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .segmented-btn:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        .segmented-btn.active {
-            background: #343842;
-            color: #ffffff;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        .showcase-viewport {
+        .carousel-container {
             position: relative;
-            background: #0b0c0e;
-            border-radius: var(--radius-md);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: #000000;
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             overflow: hidden;
-            aspect-ratio: 16 / 9;
-            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.65);
         }
 
-        .showcase-slide {
+        .carousel-track {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
+        }
+
+        .carousel-slide {
             position: absolute;
             inset: 0;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.35s ease, transform 0.35s ease;
+            transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             transform: scale(0.985);
             display: flex;
             align-items: center;
             justify-content: center;
+            background: #0a0b0d;
         }
 
-        .showcase-slide.active {
+        .carousel-slide.active {
             opacity: 1;
             visibility: visible;
             transform: scale(1);
         }
 
-        .showcase-slide img {
+        .carousel-slide img {
             width: 100%;
             height: 100%;
-            object-fit: contain;
+            object-fit: cover;
             display: block;
         }
 
-        .showcase-caption {
-            margin-top: 20px;
+        /* Carousel Arrows */
+        .carousel-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(18, 20, 25, 0.65);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 16px;
-            padding: 16px 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            outline: none;
+            opacity: 0.85;
         }
 
-        .caption-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 2px;
+        .carousel-arrow:hover {
+            opacity: 1;
+            background: rgba(18, 20, 25, 0.9);
+            border-color: rgba(255, 255, 255, 0.35);
+            transform: translateY(-50%) scale(1.08);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
         }
 
-        .caption-desc {
-            font-size: 13.5px;
-            color: var(--text-secondary);
+        .carousel-arrow.prev {
+            left: 20px;
         }
 
-        .caption-tag {
-            font-size: 12px;
-            padding: 4px 10px;
-            background: rgba(0, 120, 212, 0.15);
-            color: #60a5fa;
+        .carousel-arrow.next {
+            right: 20px;
+        }
+
+        /* Carousel Navigation Dots */
+        .carousel-dots {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+            padding: 8px 16px;
             border-radius: var(--radius-pill);
-            font-weight: 500;
+            background: rgba(18, 20, 25, 0.65);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
 
-        /* ---------------- Feature Grid ---------------- */
+        .carousel-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.35);
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            padding: 0;
+        }
+
+        .carousel-dot.active {
+            background: #ffffff;
+            width: 26px;
+            border-radius: var(--radius-pill);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        /* ---------------- Feature Pillars ---------------- */
         .features-section {
             max-width: 1140px;
             margin: 0 auto 96px;
@@ -428,7 +440,7 @@
         .section-header h2 {
             font-size: 32px;
             font-weight: 700;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.6px;
             margin-bottom: 12px;
         }
 
@@ -589,7 +601,7 @@
         /* ---------------- Footer ---------------- */
         footer {
             border-top: 1px solid var(--border-subtle);
-            background: #0f1013;
+            background: #0d0e11;
             padding: 48px 24px 36px;
             color: var(--text-secondary);
             font-size: 13.5px;
@@ -621,18 +633,12 @@
         }
 
         @media (max-width: 768px) {
-            .app-segmented-tabs {
-                flex-wrap: wrap;
-                justify-content: center;
+            .carousel-arrow {
+                width: 38px;
+                height: 38px;
             }
-            .segmented-btn {
-                padding: 6px 14px;
-                font-size: 12.5px;
-            }
-            .showcase-caption {
-                flex-direction: column;
-                align-items: flex-start;
-            }
+            .carousel-arrow.prev { left: 10px; }
+            .carousel-arrow.next { right: 10px; }
         }
     </style>
 </head>
@@ -642,13 +648,12 @@
     <header>
         <div class="nav-container">
             <a href="#" class="brand">
-                <img src="assets/logo.svg" alt="AutoScape" onerror="this.style.display='none'">
+                <img src="assets/logo.svg" alt="AutoScape Logo" onerror="this.style.display='none'">
                 <span>AutoScape</span>
-                <span class="brand-pill">v2.0</span>
             </a>
             <div class="nav-links">
+                <a href="#screenshots">Screenshots</a>
                 <a href="#features">Features</a>
-                <a href="#showcase">Gallery</a>
                 <a href="#compare">Why Native?</a>
                 <a href="#faq">FAQ</a>
                 <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper" target="_blank" class="github-btn">
@@ -662,6 +667,9 @@
     <!-- Hero Section -->
     <main>
         <section class="hero">
+            <div class="hero-logo-wrapper">
+                <img src="assets/logo.svg" alt="AutoScape Logo" class="hero-logo">
+            </div>
             <div class="hero-badge">
                 <span>✨ Pure Windows 11 Native Architecture</span>
             </div>
@@ -671,12 +679,12 @@
             </p>
 
             <div class="hero-cta">
-                <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/archive/refs/heads/main.zip" class="btn-primary">
+                <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/releases/latest/download/AutoScape.zip" class="btn-primary">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                    Download .ZIP Release
+                    Download AutoScape.zip
                 </a>
-                <a href="#showcase" class="btn-secondary">
-                    Explore Gallery UI
+                <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper/releases/latest" target="_blank" class="btn-secondary">
+                    View Release Notes
                 </a>
             </div>
 
@@ -690,51 +698,36 @@
             </div>
         </section>
 
-        <!-- Interactive Tabbed App Showcase -->
-        <section class="showcase-section" id="showcase">
-            <div class="showcase-wrapper">
+        <!-- Pure Image Carousel Showcase -->
+        <section class="carousel-section" id="screenshots">
+            <div class="carousel-container" id="carouselContainer">
                 
-                <!-- Segmented Tabs matching App UI -->
-                <div class="app-tabs-container">
-                    <div class="app-segmented-tabs">
-                        <button class="segmented-btn active" onclick="switchTab(0)">
-                            <span>Bing Daily</span>
-                        </button>
-                        <button class="segmented-btn" onclick="switchTab(1)">
-                            <span>Task Scheduler</span>
-                        </button>
-                        <button class="segmented-btn" onclick="switchTab(2)">
-                            <span>Preferences & APIs</span>
-                        </button>
-                        <button class="segmented-btn" onclick="switchTab(3)">
-                            <span>4K Wallhaven & Pexels</span>
-                        </button>
+                <!-- Navigation Arrows -->
+                <button class="carousel-arrow prev" onclick="prevSlide()" aria-label="Previous image">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button class="carousel-arrow next" onclick="nextSlide()" aria-label="Next image">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+
+                <!-- Slides Track -->
+                <div class="carousel-track">
+                    <div class="carousel-slide active">
+                        <img src="assets/slide-bing.png" alt="AutoScape Bing Gallery View">
+                    </div>
+                    <div class="carousel-slide">
+                        <img src="assets/slide-schedule.png" alt="AutoScape Task Scheduler Settings">
+                    </div>
+                    <div class="carousel-slide">
+                        <img src="assets/slide-preferences.png" alt="AutoScape Preferences and Sources">
                     </div>
                 </div>
 
-                <!-- Showcase Viewport -->
-                <div class="showcase-viewport">
-                    <div class="showcase-slide active" id="slide-0">
-                        <img src="assets/showcase-bing.png" alt="AutoScape Bing Gallery View">
-                    </div>
-                    <div class="showcase-slide" id="slide-1">
-                        <img src="assets/showcase-schedule.png" alt="AutoScape Automatic Scheduler">
-                    </div>
-                    <div class="showcase-slide" id="slide-2">
-                        <img src="assets/showcase-preferences.png" alt="AutoScape Custom Preferences">
-                    </div>
-                    <div class="showcase-slide" id="slide-3">
-                        <img src="assets/showcase-preferences.png" alt="AutoScape Wallhaven and Pexels 4K Wallpapers">
-                    </div>
-                </div>
-
-                <!-- Dynamic Description Caption -->
-                <div class="showcase-caption">
-                    <div>
-                        <div class="caption-title" id="caption-title">Bing Daily Archive & Region Matching</div>
-                        <div class="caption-desc" id="caption-desc">Browse up to 16 days of authentic Microsoft 4K photography with localized descriptions and double-click instant apply.</div>
-                    </div>
-                    <div class="caption-tag" id="caption-tag">40+ Global Regions</div>
+                <!-- Dots Indicator -->
+                <div class="carousel-dots">
+                    <button class="carousel-dot active" onclick="goToSlide(0)" aria-label="Slide 1"></button>
+                    <button class="carousel-dot" onclick="goToSlide(1)" aria-label="Slide 2"></button>
+                    <button class="carousel-dot" onclick="goToSlide(2)" aria-label="Slide 3"></button>
                 </div>
 
             </div>
@@ -775,7 +768,7 @@
                 <div class="feature-card">
                     <div class="feature-icon-wrapper">🎨</div>
                     <h3>Windows 11 Fluent UI</h3>
-                    <p>Crafted with reveal lighting, smooth easing transitions, thin auto-hiding scrollbars, and acrylic dark aesthetics that blend into Windows.</p>
+                    <p>Crafted with reveal lighting, smooth easing transitions, thin auto-hiding scrollbars, and acrylic dark aesthetics that blend seamlessly into Windows.</p>
                 </div>
 
                 <div class="feature-card">
@@ -894,51 +887,74 @@
         </div>
     </footer>
 
-    <!-- Interactive Script -->
+    <!-- Interactive Carousel & Utility Script -->
     <script>
-        const tabData = [
-            {
-                title: "Bing Daily Archive & Region Matching",
-                desc: "Browse up to 16 days of authentic Microsoft 4K photography with localized descriptions and double-click instant apply.",
-                tag: "40+ Global Regions"
-            },
-            {
-                title: "Independent Auto-Rotation Scheduler",
-                desc: "Route different sources to Desktop and Lock Screen with native Task Scheduler intervals without background RAM usage.",
-                tag: "Zero Background Bloat"
-            },
-            {
-                title: "Preferences & API Key Management",
-                desc: "Manage Pexels API tokens, select 4K resolution targets, customize wallpaper layout fits, and configure export directories.",
-                tag: "Secure Local Storage"
-            },
-            {
-                title: "Curated Wallhaven & Pexels 4K Engines",
-                desc: "Filtered high-resolution landscape feeds with automatic human-portrait rejection algorithms for pristine backgrounds.",
-                tag: "Ultra HD / 4K Only"
-            }
-        ];
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.carousel-slide');
+        const dots = document.querySelectorAll('.carousel-dot');
+        const totalSlides = slides.length;
+        let autoPlayTimer = null;
 
-        function switchTab(index) {
-            // Update Tab Buttons
-            const buttons = document.querySelectorAll('.segmented-btn');
-            buttons.forEach((btn, i) => {
-                btn.classList.toggle('active', i === index);
-            });
+        function goToSlide(index) {
+            slides[currentSlide].classList.remove('active');
+            dots[currentSlide].classList.remove('active');
+            
+            currentSlide = (index + totalSlides) % totalSlides;
+            
+            slides[currentSlide].classList.add('active');
+            dots[currentSlide].classList.add('active');
+        }
 
-            // Update Slides
-            const slides = document.querySelectorAll('.showcase-slide');
-            slides.forEach((slide, i) => {
-                slide.classList.toggle('active', i === index);
-            });
+        function nextSlide() {
+            goToSlide(currentSlide + 1);
+        }
 
-            // Update Captions
-            if (tabData[index]) {
-                document.getElementById('caption-title').innerText = tabData[index].title;
-                document.getElementById('caption-desc').innerText = tabData[index].desc;
-                document.getElementById('caption-tag').innerText = tabData[index].tag;
+        function prevSlide() {
+            goToSlide(currentSlide - 1);
+        }
+
+        function startAutoPlay() {
+            stopAutoPlay();
+            autoPlayTimer = setInterval(nextSlide, 4500);
+        }
+
+        function stopAutoPlay() {
+            if (autoPlayTimer) {
+                clearInterval(autoPlayTimer);
+                autoPlayTimer = null;
             }
         }
+
+        const container = document.getElementById('carouselContainer');
+        if (container) {
+            container.addEventListener('mouseenter', stopAutoPlay);
+            container.addEventListener('mouseleave', startAutoPlay);
+            
+            // Touch Swipe Support
+            let startX = 0;
+            container.addEventListener('touchstart', (e) => {
+                startX = e.changedTouches[0].screenX;
+                stopAutoPlay();
+            }, { passive: true });
+
+            container.addEventListener('touchend', (e) => {
+                const diff = e.changedTouches[0].screenX - startX;
+                if (Math.abs(diff) > 40) {
+                    if (diff < 0) nextSlide();
+                    else prevSlide();
+                }
+                startAutoPlay();
+            }, { passive: true });
+        }
+
+        // Keyboard Arrow Navigation
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') prevSlide();
+            if (e.key === 'ArrowRight') nextSlide();
+        });
+
+        // Initialize Carousel
+        startAutoPlay();
 
         function toggleFaq(element) {
             const item = element.parentElement;
