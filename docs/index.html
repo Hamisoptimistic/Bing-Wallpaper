@@ -6,6 +6,25 @@
     <title>AutoScape - Your Daily Dose of Stunning Wallpapers</title>
     <meta name="description" content="Curated daily wallpapers from Bing, Windows Spotlight, Wallhaven, and Pexels. Pure Windows native architecture with zero idle RAM.">
     
+    <!-- Favicons -->
+    <link rel="icon" type="image/x-icon" href="assets/app.ico">
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+    <link rel="apple-touch-icon" href="assets/logo.png">
+
+    <!-- Theme Initialization (prevents flash of incorrect theme) -->
+    <script>
+        (function() {
+            var saved = localStorage.getItem('autoscape-theme');
+            if (saved === 'light' || saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', saved);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+
     <!-- Microsoft / Fluent & Poppins Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,18 +32,43 @@
     
     <style>
         :root {
+            /* Dark Theme Default (Windows 11 Fluent Dark) */
             --bg-base: #0c0d10;
             --bg-subtle: #14161b;
             --surface-card: #1a1d24;
             --surface-card-hover: #222630;
             --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-highlight: rgba(255, 255, 255, 0.16);
+            --border-highlight: rgba(255, 255, 255, 0.18);
             --accent: #0078d4;
             --accent-hover: #1084d8;
             --accent-glow: rgba(0, 120, 212, 0.4);
             --text-primary: #ffffff;
             --text-secondary: #9ea7b3;
             --text-tertiary: #68707c;
+            --nav-bg: rgba(12, 13, 16, 0.85);
+            --hero-title-grad: linear-gradient(180deg, #ffffff 40%, #c9d1d9 100%);
+            --hero-slogan-span: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
+            --btn-secondary-bg: #1a1d24;
+            --btn-secondary-hover: #222630;
+            --btn-subtle-bg: rgba(255, 255, 255, 0.06);
+            --btn-subtle-hover: rgba(255, 255, 255, 0.14);
+            --card-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+            --img-shadow: drop-shadow(0 24px 60px rgba(0, 0, 0, 0.65));
+            --footer-bg: #090a0d;
+            --terminal-bg: #131519;
+            --terminal-border: rgba(255, 255, 255, 0.1);
+            --badge-bg: rgba(0, 120, 212, 0.15);
+            --badge-good-color: #4ade80;
+            --badge-bad-color: #f87171;
+            --arrow-bg: rgba(18, 20, 25, 0.6);
+            --arrow-bg-hover: rgba(18, 20, 25, 0.9);
+            --arrow-color: #ffffff;
+            --dots-bg: rgba(18, 20, 25, 0.6);
+            --dot-active-bg: #ffffff;
+            --table-header-bg: rgba(255, 255, 255, 0.02);
+            --bg-radial-1: rgba(0, 120, 212, 0.12);
+            --bg-radial-2: rgba(76, 29, 149, 0.08);
+            
             --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             --font-poppins: 'Poppins', var(--font-family);
             --font-mono: 'JetBrains Mono', Consolas, monospace;
@@ -33,6 +77,45 @@
             --radius-lg: 16px;
             --radius-pill: 9999px;
             --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        [data-theme="light"] {
+            /* Light Theme (Windows 11 Fluent Light) */
+            --bg-base: #f7f9fc;
+            --bg-subtle: #ffffff;
+            --surface-card: #ffffff;
+            --surface-card-hover: #f3f5f9;
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-highlight: rgba(0, 0, 0, 0.16);
+            --accent: #0078d4;
+            --accent-hover: #0067b8;
+            --accent-glow: rgba(0, 120, 212, 0.25);
+            --text-primary: #1a1e24;
+            --text-secondary: #57606e;
+            --text-tertiary: #8490a0;
+            --nav-bg: rgba(247, 249, 252, 0.88);
+            --hero-title-grad: linear-gradient(180deg, #111827 40%, #4b5563 100%);
+            --hero-slogan-span: linear-gradient(135deg, #0284c7 0%, #0078d4 100%);
+            --btn-secondary-bg: #ffffff;
+            --btn-secondary-hover: #f1f5f9;
+            --btn-subtle-bg: rgba(0, 0, 0, 0.05);
+            --btn-subtle-hover: rgba(0, 0, 0, 0.1);
+            --card-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+            --img-shadow: drop-shadow(0 20px 48px rgba(0, 0, 0, 0.14));
+            --footer-bg: #eaedf2;
+            --terminal-bg: #14171f;
+            --terminal-border: rgba(0, 0, 0, 0.12);
+            --badge-bg: rgba(0, 120, 212, 0.08);
+            --badge-good-color: #16a34a;
+            --badge-bad-color: #dc2626;
+            --arrow-bg: rgba(255, 255, 255, 0.9);
+            --arrow-bg-hover: #ffffff;
+            --arrow-color: #1a1e24;
+            --dots-bg: rgba(255, 255, 255, 0.9);
+            --dot-active-bg: #0078d4;
+            --table-header-bg: rgba(0, 0, 0, 0.03);
+            --bg-radial-1: rgba(0, 120, 212, 0.08);
+            --bg-radial-2: rgba(147, 51, 234, 0.04);
         }
 
         * {
@@ -49,9 +132,10 @@
             -webkit-font-smoothing: antialiased;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(circle at 50% 0%, rgba(0, 120, 212, 0.12) 0px, transparent 60%),
-                radial-gradient(circle at 90% 20%, rgba(76, 29, 149, 0.08) 0px, transparent 50%);
+                radial-gradient(circle at 50% 0%, var(--bg-radial-1) 0px, transparent 60%),
+                radial-gradient(circle at 90% 20%, var(--bg-radial-2) 0px, transparent 50%);
             background-attachment: fixed;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         /* ---------------- Navigation ---------------- */
@@ -61,8 +145,9 @@
             z-index: 100;
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            background: rgba(12, 13, 16, 0.85);
+            background: var(--nav-bg);
             border-bottom: 1px solid var(--border-subtle);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
 
         .nav-container {
@@ -100,7 +185,7 @@
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 24px;
+            gap: 20px;
         }
 
         .nav-links a {
@@ -115,12 +200,68 @@
             color: var(--text-primary);
         }
 
+        /* Theme Toggle Button */
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-sm);
+            background: var(--btn-subtle-bg);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            cursor: pointer;
+            position: relative;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: var(--btn-subtle-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-1px);
+        }
+
+        .theme-toggle-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            inset: 0;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+        }
+
+        /* Dark mode: Sun active, Moon rotated out */
+        .theme-toggle-icon.sun {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+            color: #fbbf24;
+        }
+
+        .theme-toggle-icon.moon {
+            opacity: 0;
+            transform: scale(0.5) rotate(-90deg);
+            color: #0078d4;
+        }
+
+        /* Light mode: Moon active, Sun rotated out */
+        [data-theme="light"] .theme-toggle-icon.sun {
+            opacity: 0;
+            transform: scale(0.5) rotate(90deg);
+        }
+
+        [data-theme="light"] .theme-toggle-icon.moon {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+
         .github-btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
             padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.06);
+            background: var(--btn-subtle-bg);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-sm);
             color: var(--text-primary) !important;
@@ -130,7 +271,7 @@
         }
 
         .github-btn:hover {
-            background: rgba(255, 255, 255, 0.12);
+            background: var(--btn-subtle-hover);
             border-color: var(--border-highlight);
             transform: translateY(-1px);
         }
@@ -166,10 +307,9 @@
             font-size: clamp(48px, 8vw, 76px);
             font-weight: 800;
             letter-spacing: -2px;
-            color: #ffffff;
             margin-top: 14px;
             line-height: 1;
-            background: linear-gradient(180deg, #ffffff 40%, #c9d1d9 100%);
+            background: var(--hero-title-grad);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -178,13 +318,13 @@
             font-size: clamp(22px, 3.4vw, 32px);
             font-weight: 700;
             letter-spacing: -0.6px;
-            color: #ffffff;
+            color: var(--text-primary);
             margin-bottom: 12px;
             line-height: 1.25;
         }
 
         .hero-slogan span {
-            background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
+            background: var(--hero-slogan-span);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -234,17 +374,18 @@
             gap: 10px;
             padding: 14px 24px;
             border-radius: var(--radius-md);
-            background: var(--surface-card);
+            background: var(--btn-secondary-bg);
             border: 1px solid var(--border-subtle);
             color: var(--text-primary);
             font-size: 15.5px;
             font-weight: 500;
             text-decoration: none;
+            box-shadow: var(--card-shadow);
             transition: var(--transition);
         }
 
         .btn-secondary:hover {
-            background: var(--surface-card-hover);
+            background: var(--btn-secondary-hover);
             border-color: var(--border-highlight);
             transform: translateY(-1px);
         }
@@ -253,15 +394,15 @@
         .terminal-box {
             max-width: 660px;
             margin: 0 auto;
-            background: #131519;
-            border: 1px solid var(--border-subtle);
+            background: var(--terminal-bg);
+            border: 1px solid var(--terminal-border);
             border-radius: var(--radius-md);
             padding: 10px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 14px;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
         }
 
         .terminal-prefix {
@@ -287,9 +428,9 @@
         }
 
         .copy-pill {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #ffffff;
             font-size: 12px;
             font-weight: 500;
             padding: 6px 14px;
@@ -304,8 +445,8 @@
         }
 
         .copy-pill:hover {
-            background: rgba(255, 255, 255, 0.16);
-            border-color: var(--border-highlight);
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.32);
         }
 
         /* ---------------- Wide Seamless Gallery Carousel ---------------- */
@@ -356,7 +497,7 @@
             object-fit: contain;
             display: block;
             border-radius: var(--radius-lg);
-            filter: drop-shadow(0 24px 60px rgba(0, 0, 0, 0.65));
+            filter: var(--img-shadow);
         }
 
         /* Carousel Navigation Controls */
@@ -368,25 +509,26 @@
             width: 48px;
             height: 48px;
             border-radius: 50%;
-            background: rgba(18, 20, 25, 0.6);
+            background: var(--arrow-bg);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: none;
-            color: #ffffff;
+            border: 1px solid var(--border-subtle);
+            color: var(--arrow-color);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: var(--transition);
             outline: none;
-            opacity: 0.8;
+            opacity: 0.88;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
         }
 
         .carousel-arrow:hover {
             opacity: 1;
-            background: rgba(18, 20, 25, 0.9);
+            background: var(--arrow-bg-hover);
             transform: translateY(-50%) scale(1.08);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
         }
 
         .carousel-arrow.prev {
@@ -407,17 +549,18 @@
             gap: 10px;
             padding: 8px 16px;
             border-radius: var(--radius-pill);
-            background: rgba(18, 20, 25, 0.6);
+            background: var(--dots-bg);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: none;
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
         }
 
         .carousel-dot {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.35);
+            background: rgba(125, 125, 125, 0.4);
             cursor: pointer;
             transition: var(--transition);
             border: none;
@@ -425,10 +568,10 @@
         }
 
         .carousel-dot.active {
-            background: #ffffff;
+            background: var(--dot-active-bg);
             width: 26px;
             border-radius: var(--radius-pill);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 120, 212, 0.5);
         }
 
         /* ---------------- Visual Auto-Feature Flow Diagram ---------------- */
@@ -449,6 +592,7 @@
             font-weight: 700;
             letter-spacing: -0.6px;
             margin-bottom: 12px;
+            color: var(--text-primary);
         }
 
         .section-header p {
@@ -472,6 +616,7 @@
             display: flex;
             flex-direction: column;
             position: relative;
+            box-shadow: var(--card-shadow);
             transition: var(--transition);
         }
 
@@ -479,6 +624,7 @@
             background: var(--surface-card-hover);
             border-color: var(--border-highlight);
             transform: translateY(-3px);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08);
         }
 
         .flow-step-num {
@@ -488,8 +634,8 @@
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            background: rgba(0, 120, 212, 0.15);
-            color: #60a5fa;
+            background: var(--badge-bg);
+            color: var(--accent);
             font-weight: 700;
             font-size: 14px;
             margin-bottom: 18px;
@@ -513,8 +659,8 @@
             margin-top: auto;
             padding-top: 18px;
             font-size: 12.5px;
-            color: #60a5fa;
-            font-weight: 500;
+            color: var(--accent);
+            font-weight: 600;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -538,6 +684,7 @@
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
             padding: 32px 28px;
+            box-shadow: var(--card-shadow);
             transition: var(--transition);
             display: flex;
             flex-direction: column;
@@ -547,14 +694,15 @@
             background: var(--surface-card-hover);
             border-color: var(--border-highlight);
             transform: translateY(-3px);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08);
         }
 
         .feature-icon-wrapper {
             width: 44px;
             height: 44px;
             border-radius: var(--radius-md);
-            background: rgba(0, 120, 212, 0.12);
-            color: #60a5fa;
+            background: var(--badge-bg);
+            color: var(--accent);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -589,6 +737,7 @@
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius-lg);
             overflow: hidden;
+            box-shadow: var(--card-shadow);
         }
 
         .compare-table th, .compare-table td {
@@ -599,7 +748,7 @@
         }
 
         .compare-table th {
-            background: rgba(255, 255, 255, 0.02);
+            background: var(--table-header-bg);
             color: var(--text-primary);
             font-weight: 600;
         }
@@ -609,7 +758,7 @@
         }
 
         .badge-good {
-            color: #4ade80;
+            color: var(--badge-good-color);
             font-weight: 600;
             display: inline-flex;
             align-items: center;
@@ -617,7 +766,7 @@
         }
 
         .badge-bad {
-            color: #f87171;
+            color: var(--badge-bad-color);
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -636,6 +785,7 @@
             border-radius: var(--radius-md);
             margin-bottom: 12px;
             overflow: hidden;
+            box-shadow: var(--card-shadow);
             transition: var(--transition);
         }
 
@@ -651,6 +801,7 @@
             cursor: pointer;
             font-weight: 600;
             font-size: 15px;
+            color: var(--text-primary);
             user-select: none;
         }
 
@@ -679,10 +830,11 @@
         /* ---------------- Footer ---------------- */
         footer {
             border-top: 1px solid var(--border-subtle);
-            background: #090a0d;
+            background: var(--footer-bg);
             padding: 48px 24px 36px;
             color: var(--text-secondary);
             font-size: 13.5px;
+            transition: background 0.3s ease;
         }
 
         .footer-container {
@@ -721,6 +873,15 @@
             .carousel-arrow.prev { left: 10px; }
             .carousel-arrow.next { right: 10px; }
         }
+
+        @media (max-width: 768px) {
+            .nav-links a:not(.github-btn) {
+                display: none;
+            }
+            .nav-links {
+                gap: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -738,6 +899,17 @@
                 <a href="#features">Features</a>
                 <a href="#compare">Why Native?</a>
                 <a href="#faq">FAQ</a>
+                
+                <!-- Theme Toggle Button -->
+                <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle color theme" title="Toggle Light / Dark mode">
+                    <span class="theme-toggle-icon sun">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    </span>
+                    <span class="theme-toggle-icon moon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </span>
+                </button>
+
                 <a href="https://github.com/Hamisoptimistic/Bing-Wallpaper" target="_blank" class="github-btn">
                     <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
                     GitHub
@@ -884,7 +1056,7 @@
                 <div class="feature-card">
                     <div class="feature-icon-wrapper">🎨</div>
                     <h3>Windows 11 Fluent UI</h3>
-                    <p>Crafted with reveal lighting, smooth easing transitions, thin auto-hiding scrollbars, and acrylic dark aesthetics that blend seamlessly into Windows.</p>
+                    <p>Crafted with reveal lighting, smooth easing transitions, thin auto-hiding scrollbars, and acrylic aesthetics that blend seamlessly into Windows.</p>
                 </div>
 
                 <div class="feature-card">
@@ -1045,6 +1217,26 @@
 
     <!-- Interactive Carousel & Utility Script -->
     <script>
+        // ---------------- Theme Switcher ----------------
+        function toggleTheme() {
+            var currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            try {
+                localStorage.setItem('autoscape-theme', newTheme);
+            } catch (e) {}
+        }
+
+        // Listen for OS theme changes if user hasn't explicitly set a preference
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('autoscape-theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+                }
+            });
+        }
+
+        // ---------------- Carousel Logic ----------------
         let currentSlide = 0;
         const slides = document.querySelectorAll('.carousel-slide');
         const dots = document.querySelectorAll('.carousel-dot');
@@ -1112,11 +1304,13 @@
         // Initialize Carousel
         startAutoPlay();
 
+        // ---------------- FAQ Accordion ----------------
         function toggleFaq(element) {
             const item = element.parentElement;
             item.classList.toggle('open');
         }
 
+        // ---------------- Terminal Copy ----------------
         function copyCommand() {
             const cmd = document.getElementById('psCmd').innerText;
             navigator.clipboard.writeText(cmd).then(() => {
